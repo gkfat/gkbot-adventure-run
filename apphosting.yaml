@@ -1,0 +1,13 @@
+# Firebase App Hosting configuration
+# https://firebase.google.com/docs/app-hosting
+
+runConfig:
+  # Tune these later based on traffic
+  cpu: 1
+  memoryMiB: 512
+  concurrency: 80
+  maxInstances: 3
+
+env:
+  # Optional: override if you deploy to multiple projects.
+  # FIREBASE_PROJECT_ID: gkbot-adventure-run
