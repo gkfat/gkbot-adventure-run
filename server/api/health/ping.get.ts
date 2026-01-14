@@ -15,10 +15,8 @@ export default defineEventHandler(async () => {
     };
 
     try {
-        const collections = await db.listCollections();
+        await db.listCollections();
   
-        console.log({ collections });
-
         return {
             ok: true,
             ...diagnostics,

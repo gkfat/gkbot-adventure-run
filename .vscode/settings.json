@@ -4,5 +4,12 @@
     "source.fixAll": "always"
   },
   "editor.defaultFormatter": "dbaeumer.vscode-eslint",
-  "eslint.validate": ["javascript", "typescript", "vue"]
+  "eslint.validate": [
+    "javascript",
+    "typescript",
+    "vue"
+  ],
+  "cSpell.words": [
+    "firestore"
+  ]
 }
