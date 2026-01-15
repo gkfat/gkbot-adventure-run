@@ -1,10 +1,16 @@
 export interface LogContext {
-  method: string;
-  path: string;
-  userId?: string;
-  duration?: number;
-  status?: number;
-  error?: any;
+    severity?: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
+    message?: string;
+
+    method: string;
+    path: string;
+    status?: number;
+    durationMs?: number;
+
+    userId?: string;
+    requestId?: string;
+
+    error?: unknown;
 }
 
 /**
@@ -12,22 +18,34 @@ export interface LogContext {
  */
 export function logRequest(context: LogContext) {
     const {
-        method, path, userId, duration, status, error, 
+        severity = 'INFO',
+        error,
+        ...rest
     } = context;
+
+    const errorPayload =
+        error === undefined
+            ? {}
+            : {
+                error:
+                      error instanceof Error
+                          ? {
+                              message: error.message,
+                              stack: error.stack,
+                          }
+                          : error,
+            };
   
-    const timestamp = new Date().toISOString();
-    const userInfo = userId ? ` [${userId}]` : '';
-    const durationInfo = duration ? ` ${duration}ms` : '';
-    const statusInfo = status ? ` ${status}` : '';
-  
-    if (error) {
-        console.error(
-            `[${timestamp}] ${method} ${path}${userInfo}${statusInfo}${durationInfo}`,
-            error,
-        );
+    const logPayload = {
+        severity,
+        timestamp: new Date().toISOString(),
+        ...rest,
+        ...errorPayload,
+    };
+
+    if (severity === 'ERROR') {
+        console.error(JSON.stringify(logPayload));
     } else {
-        console.log(
-            `[${timestamp}] ${method} ${path}${userInfo}${statusInfo}${durationInfo}`,
-        );
+        console.log(JSON.stringify(logPayload));
     }
 }

@@ -1,17 +1,20 @@
 export default defineEventHandler(async (event) => {
     const startTime = Date.now();
-    const method = event.method;
-    const path = event.path;
+    const {
+        method, path, 
+    } = event;
 
     event.node.res.on('finish', () => {
-        const duration = Date.now() - startTime;
+        const durationMs = Date.now() - startTime;
 
         logRequest({
+            severity: 'INFO',
             method,
             path,
+            status: event.node.res.statusCode,
+            durationMs,
             userId: event.context.auth?.uid,
-            duration,
-            status: 200,
+            requestId: event.context.requestId,
         });
     });
 });
