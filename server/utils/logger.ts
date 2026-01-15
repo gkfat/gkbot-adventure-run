@@ -14,7 +14,7 @@ export interface LogContext {
 }
 
 /**
- * Log request with context
+ * API Log request with context
  */
 export function logRequest(context: LogContext) {
     const {
@@ -47,5 +47,55 @@ export function logRequest(context: LogContext) {
         console.error(JSON.stringify(logPayload));
     } else {
         console.log(JSON.stringify(logPayload));
+    }
+}
+
+/**
+ * Service Log event
+ */
+export function logEvent(context: {
+  severity?: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
+  message: string;
+
+  module?: string;        // auth / combat / firestore
+  action?: string;        // verifyToken / startRun
+  userId?: string;
+  requestId?: string;
+
+  data?: Record<string, unknown>;
+  error?: unknown;
+}) {
+    const errorPayload =
+        context.error === undefined
+            ? {}
+            : {
+                error:
+                      context.error instanceof Error
+                          ? {
+                              message: context.error.message,
+                              stack: context.error.stack,
+                          }
+                          : context.error,
+            };
+
+    const payload = {
+        severity: context.severity ?? 'INFO',
+        timestamp: new Date().toISOString(),
+        message: context.message,
+        module: context.module,
+        action: context.action,
+        userId: context.userId,
+        requestId: context.requestId,
+        data: context.data,
+        ...errorPayload,
+
+    };
+
+    const output = JSON.stringify(payload);
+
+    if (context.severity === 'ERROR') {
+        console.error(output);
+    } else {
+        console.log(output);
     }
 }
