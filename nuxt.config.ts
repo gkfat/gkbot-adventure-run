@@ -3,6 +3,14 @@ export default defineNuxtConfig({
     devtools: { enabled: true },
     modules: ['@nuxt/eslint', '@nuxt/image'],
 
+    // SPA mode for Vercel deployment
+    ssr: false,
+
+    // Vercel deployment preset
+    nitro: {
+        preset: 'vercel',
+    },
+
     /**
      * Env handling:
      * - Private runtimeConfig keys are server-only

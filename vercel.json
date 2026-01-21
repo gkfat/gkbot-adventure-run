@@ -1,0 +1,30 @@
+{
+  "buildCommand": "pnpm build",
+  "framework": "nuxtjs",
+  "installCommand": "pnpm install",
+  "devCommand": "pnpm dev",
+  "outputDirectory": ".output/public",
+  "functions": {
+    "api/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, must-revalidate"
+        }
+      ]
+    }
+  ]
+}
