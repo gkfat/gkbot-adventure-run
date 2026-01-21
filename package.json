@@ -11,11 +11,13 @@
     "lint": "eslint . --ext .ts,.js,.vue --fix"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^8.4.0",
     "@mdi/font": "^7.4.47",
     "@nuxt/image": "^2.0.0",
     "dayjs": "^1.11.19",
     "firebase-admin": "^13.6.0",
     "nuxt": "^4.2.2",
+    "swagger-ui-dist": "^5.31.0",
     "vue": "^3.5.26",
     "vuetify": "^3.11.6",
     "zod": "^4.3.5"

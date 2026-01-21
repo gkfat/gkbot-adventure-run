@@ -9,8 +9,18 @@
  * The auth token is verified and stored in event.context.auth if present.
  */
 export default defineEventHandler(async (event) => {
+    // Skip authentication for non-API routes (pages, assets, etc.)
+    if (!event.path.startsWith('/api')) {
+        return;
+    }
+
     // Public paths - no authentication required or attempted
-    const publicPaths = ['/api/health/ping', '/api/auth/login'];
+    const publicPaths = [
+        '/api/health/ping',
+        '/api/auth/login',
+        '/api/openapi.json',
+        '/api-docs',
+    ];
     
     if (publicPaths.includes(event.path)) {
         return;
