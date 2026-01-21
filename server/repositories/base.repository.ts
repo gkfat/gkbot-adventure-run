@@ -36,7 +36,7 @@ export abstract class BaseRepository<T extends DocumentData> {
           }
           return {
               id: doc.id, ...doc.data(), 
-          } as T;
+          } as unknown as T;
       } catch (error: any) {
           throw new DatabaseError(`Failed to get document: ${error.message}`);
       }
@@ -68,7 +68,7 @@ export abstract class BaseRepository<T extends DocumentData> {
           await this.collection.doc(id).set(docData);
           return {
               id, ...docData, 
-          } as T;
+          } as unknown as T;
       } catch (error: any) {
           throw new DatabaseError(`Failed to create document: ${error.message}`);
       }
@@ -121,7 +121,7 @@ export abstract class BaseRepository<T extends DocumentData> {
       return snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-      })) as T[];
+      })) as unknown as T[];
   }
 
   /**

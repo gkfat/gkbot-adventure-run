@@ -8,6 +8,7 @@ import type { Timestamp } from './common';
  * Account document stored in Firestore
  */
 export type Account = {
+  id: string;             // Document ID (same as accountId)
   accountId: string;      // Firebase Auth UID
   provider: 'google';     // Auth provider
   googleUid: string;      // Google user ID
