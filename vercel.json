@@ -3,19 +3,6 @@
   "framework": "nuxtjs",
   "installCommand": "pnpm install",
   "devCommand": "pnpm dev",
-  "outputDirectory": ".output/public",
-  "functions": {
-    "api/**/*.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/"
-    }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",
