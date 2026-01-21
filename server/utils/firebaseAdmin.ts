@@ -1,5 +1,5 @@
 import {
-    getApps, initializeApp, type App, 
+    getApps, initializeApp, type App, cert,
 } from 'firebase-admin/app';
 import {
     getFirestore, type Firestore, 
@@ -17,6 +17,29 @@ function getProjectIdFromEnv(): string | undefined {
     return projectId || undefined;
 }
 
+/**
+ * 取得 Firebase Admin 憑證
+ * 優先順序：
+ * 1. FIREBASE_SERVICE_ACCOUNT_KEY (JSON string in env) - for Vercel
+ * 2. applicationDefault() - for local dev or GCP environments
+ */
+function getCredential() {
+    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    
+    if (serviceAccountKey) {
+        try {
+            const serviceAccount = JSON.parse(serviceAccountKey);
+            return cert(serviceAccount);
+        } catch (error) {
+            console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:', error);
+            throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT_KEY format');
+        }
+    }
+    
+    // Fallback to applicationDefault for local dev or GCP
+    return applicationDefault();
+}
+
 let app: App | null = null;
 let db: Firestore | null = null;
 
@@ -27,7 +50,7 @@ export function getFirebaseAdminApp(): App {
         const projectId = getProjectIdFromEnv();
 
         app = initializeApp({
-            credential: applicationDefault(),
+            credential: getCredential(),
             ...(projectId ? { projectId } : {}),
         });
     } else {
