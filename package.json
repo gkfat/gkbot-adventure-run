@@ -15,6 +15,7 @@
     "@mdi/font": "^7.4.47",
     "@nuxt/image": "^2.0.0",
     "dayjs": "^1.11.19",
+    "firebase": "^12.8.0",
     "firebase-admin": "^13.6.0",
     "nuxt": "^4.2.2",
     "swagger-ui-dist": "^5.31.0",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@nuxt/eslint": "^1.12.1",
     "globals": "^17.0.0",
+    "sass-embedded": "^1.97.3",
     "typescript": "^5.9.3"
   }
 }
