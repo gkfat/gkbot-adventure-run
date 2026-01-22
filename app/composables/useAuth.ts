@@ -61,6 +61,7 @@ export const useAuth = () => {
         unsubscribe = onAuthStateChanged(
             $firebaseAuth as Auth,
             async (user) => {
+                console.log('[useAuth] Auth state changed:', user ? `Logged in as ${user.email}` : 'Logged out');
                 authState.value.user = user;
                 authState.value.loading = false;
                 authState.value.initialized = true;
@@ -70,6 +71,7 @@ export const useAuth = () => {
                         // 取得 ID token
                         const token = await user.getIdToken();
                         authState.value.idToken = token;
+                        console.log('[useAuth] ID token obtained, isAuthenticated should be true');
                     } catch (error) {
                         console.error('[useAuth] Failed to get ID token:', error);
                         authState.value.error = '無法取得認證憑證';
@@ -192,19 +194,6 @@ export const useAuth = () => {
     const clearError = () => {
         authState.value.error = null;
     };
-
-    // 在組件 mount 時初始化 listener
-    onMounted(() => {
-        initAuthListener();
-    });
-
-    // 在組件 unmount 時清理
-    onUnmounted(() => {
-        if (unsubscribe) {
-            unsubscribe();
-            unsubscribe = null;
-        }
-    });
 
     return {
         // State

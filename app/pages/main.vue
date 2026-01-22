@@ -1,13 +1,17 @@
 <template>
     <v-container class="main-page">
         <!-- App Bar -->
-        <v-card class="mb-6" elevation="2">
+        <v-card
+            class="mb-6"
+            elevation="2"
+            color="primary"
+        >
             <v-card-title class="d-flex align-center justify-space-between">
                 <div class="d-flex align-center">
                     <v-icon
                         icon="mdi-robot"
                         size="32"
-                        color="primary"
+                        color="dark"
                         class="mr-3"
                     />
                     <span class="text-h5">GkBot Adventure Run</span>
@@ -26,7 +30,11 @@
         </v-card>
 
         <!-- User Info Card -->
-        <v-card class="mb-6" elevation="2">
+        <v-card
+            class="mb-6"
+            elevation="2" 
+            color="primary"
+        >
             <v-card-title>
                 <v-icon icon="mdi-account-circle" class="mr-2" />
                 使用者資訊
@@ -52,7 +60,11 @@
         </v-card>
 
         <!-- API Test Card -->
-        <v-card class="mb-6" elevation="2">
+        <v-card
+            class="mb-6"
+            elevation="2"
+            color="primary"
+        >
             <v-card-title>
                 <v-icon icon="mdi-api" class="mr-2" />
                 API 測試
@@ -84,7 +96,7 @@
         </v-card>
 
         <!-- Game Placeholder -->
-        <v-card elevation="2">
+        <v-card elevation="2" color="primary">
             <v-card-title>
                 <v-icon icon="mdi-gamepad-variant" class="mr-2" />
                 遊戲區域
@@ -93,7 +105,7 @@
                 <v-icon
                     icon="mdi-hammer-wrench"
                     size="64"
-                    color="primary"
+                    color="dark"
                     class="mb-4"
                 />
                 <div class="text-h6 text-medium-emphasis">

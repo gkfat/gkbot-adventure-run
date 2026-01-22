@@ -37,10 +37,10 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
         });
     }
 
-    // 如果未登入，重定向到首頁
+    // 如果未登入，重定向到登入頁
     if (!isAuthenticated.value) {
-        console.log('[auth middleware] Not authenticated, redirecting to /');
-        return navigateTo('/', { replace: true });
+        console.log('[auth middleware] Not authenticated, redirecting to /login');
+        return navigateTo('/login', { replace: true });
     }
 
     // 已登入，允許訪問

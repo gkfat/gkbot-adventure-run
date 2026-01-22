@@ -66,7 +66,7 @@ import { SystemBtn } from '../../.nuxt/components';
 </template>
 
 <script setup lang="ts">
-const { signInWithGoogle, loading, error, clearError, isAuthenticated, initialized } = useAuth();
+const { signInWithGoogle, loading, error, clearError, isAuthenticated, initialized, initAuthListener } = useAuth();
 
 // 設定 SEO
 useHead({
@@ -79,11 +79,18 @@ useHead({
     ],
 });
 
+// 初始化 auth listener
+onMounted(() => {
+    initAuthListener();
+});
+
+// 監聽登入狀態變化，自動跳轉
 watch(
     [isAuthenticated, initialized],
     ([auth, init]) => {
         if (init && auth) {
-            navigateTo('/main')
+            console.log('[login.vue] Auth detected, navigating to /main');
+            navigateTo('/main', { replace: true });
         }
     },
     { immediate: true },
@@ -96,7 +103,8 @@ const handleGoogleLogin = async () => {
     const success = await signInWithGoogle();
     
     if (success) {
-        navigateTo('/main')
+        // onAuthStateChanged 會觸發，watch 會處理導航
+        console.log('[login.vue] Login successful, waiting for auth state update');
     }
 };
 </script>
