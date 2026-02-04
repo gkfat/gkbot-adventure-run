@@ -20,6 +20,8 @@ interface LoginResponse {
     data?: {
         accountId: string;
         email: string;
+        characterId: string;
+        level: number;
         isNewAccount: boolean;
     };
 }
@@ -122,20 +124,46 @@ export const useAuth = () => {
                 authState.value.idToken = idToken;
                 return true;
             } else {
-                throw new Error('Server login failed');
+                throw new Error('伺服器登入失敗');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[useAuth] Google sign in failed:', error);
             
+            // 登入失敗時登出 Firebase (避免狀態不一致)
+            try {
+                if ($firebaseAuth) {
+                    await firebaseSignOut($firebaseAuth as Auth);
+                }
+            } catch (signOutError) {
+                console.error('[useAuth] Failed to sign out after error:', signOutError);
+            }
+            
+            // Type guard for error object
+            const isErrorWithCode = (err: unknown): err is { code: string } => {
+                return typeof err === 'object' && err !== null && 'code' in err;
+            };
+            
+            const isErrorWithStatus = (err: unknown): err is { statusCode: number; data?: { message?: string } } => {
+                return typeof err === 'object' && err !== null && 'statusCode' in err;
+            };
+            
             // 處理常見錯誤
-            if (error.code === 'auth/popup-closed-by-user') {
+            if (isErrorWithCode(error) && error.code === 'auth/popup-closed-by-user') {
                 authState.value.error = '登入視窗已關閉';
-            } else if (error.code === 'auth/popup-blocked') {
+            } else if (isErrorWithCode(error) && error.code === 'auth/popup-blocked') {
                 authState.value.error = '瀏覽器阻擋了彈出視窗，請允許彈出視窗後重試';
-            } else if (error.code === 'auth/cancelled-popup-request') {
+            } else if (isErrorWithCode(error) && error.code === 'auth/cancelled-popup-request') {
                 authState.value.error = '登入請求已取消';
+            } else if (isErrorWithStatus(error) && error.statusCode === 401) {
+                authState.value.error = '認證失敗，請重新登入';
+            } else if (isErrorWithStatus(error) && error.statusCode === 500) {
+                authState.value.error = '伺服器錯誤，請稍後再試';
+            } else if (isErrorWithStatus(error) && error.data?.message) {
+                authState.value.error = error.data.message;
+            } else if (error instanceof Error) {
+                authState.value.error = error.message;
             } else {
-                authState.value.error = error.message || '登入失敗，請稍後再試';
+                authState.value.error = '登入失敗，請稍後再試';
             }
             
             return false;
@@ -162,7 +190,7 @@ export const useAuth = () => {
             
             // 重定向到首頁
             await router.push('/');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[useAuth] Sign out failed:', error);
             authState.value.error = '登出失敗';
         } finally {

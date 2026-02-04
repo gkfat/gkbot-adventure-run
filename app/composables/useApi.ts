@@ -5,7 +5,9 @@ import type { FetchOptions } from 'ofetch';
  * 自動附加 Authorization header 並處理 token refresh
  */
 export const useApi = () => {
-    const { idToken, refreshToken, isAuthenticated } = useAuth();
+    const {
+        idToken, refreshToken, isAuthenticated, 
+    } = useAuth();
 
     /**
      * 執行認證請求

@@ -88,7 +88,7 @@ onMounted(() => {
 watch(
     [isAuthenticated, initialized],
     ([auth, init]) => {
-        if (init && auth) {
+        if (init && auth && !loading.value) {
             console.log('[login.vue] Auth detected, navigating to /main');
             navigateTo('/main', { replace: true });
         }
