@@ -4,7 +4,9 @@ import {
 import { getAuth } from 'firebase-admin/auth';
 import { getFirebaseAdminApp } from '../../utils/firebaseAdmin';
 import { AccountService } from '../../services/account.service';
-import { loginRequestSchema } from '../../../shared/schemas/api/auth.schema';
+import {
+    loginRequestSchema, loginResponseSchema, 
+} from '../../../shared/schemas/api/auth.schema';
 import { toH3Error } from '../../utils/errorHandler';
 import { AuthError } from '../../../shared/types/errors';
 import { logRequest } from '../../utils/logger';
@@ -29,7 +31,7 @@ export default defineEventHandler(async (event) => {
         let decodedToken;
         try {
             decodedToken = await auth.verifyIdToken(idToken);
-        } catch (error: any) {
+        } catch {
             throw new AuthError('Invalid authentication token');
         }
 
@@ -38,10 +40,10 @@ export default defineEventHandler(async (event) => {
             throw new AuthError('Invalid token payload');
         }
 
-        // Create or get account
+        // Create or get account and character
         const accountService = new AccountService();
         const {
-            account, isNewAccount, 
+            account, character, isNewAccount, 
         } = await accountService.createOrGetAccount(
             decodedToken.uid,
         );
@@ -64,21 +66,33 @@ export default defineEventHandler(async (event) => {
             requestId,
         });
 
-        return {
-            success: true,
+        // Prepare and validate response
+        const response = {
+            success: true as const,
             data: {
                 accountId: account.accountId,
                 email: account.email,
+                characterId: character.characterId,
+                level: character.level,
                 isNewAccount,
             },
         };
-    } catch (error: any) {
+
+        // Validate response schema (development safety)
+        const validatedResponse = loginResponseSchema.parse(response);
+
+        return validatedResponse;
+    } catch (error: unknown) {
+        const statusCode = error && typeof error === 'object' && 'statusCode' in error 
+            ? (error as { statusCode: number }).statusCode 
+            : 500;
+            
         logRequest({
             severity: 'ERROR',
             message: 'Login failed',
             method: event.method,
             path: event.path,
-            status: error.statusCode || 500,
+            status: statusCode,
             durationMs: Date.now() - startTime,
             requestId,
             error,

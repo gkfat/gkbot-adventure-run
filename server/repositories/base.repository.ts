@@ -125,7 +125,38 @@ export abstract class BaseRepository<T extends DocumentData> {
   }
 
   /**
-   * Batch write helper
+   * Get document reference for a specific ID
+   * Useful for batch operations and advanced queries
+   */
+  protected getDocumentRef(id: string) {
+      return this.collection.doc(id);
+  }
+
+  /**
+   * Create batch write with document reference helper
+   * 
+   * Returns:
+   * - batch: Firestore batch instance
+   * - getDocRef: Helper function to get document references for this collection
+   * 
+   * @example
+   * ```typescript
+   * const { batch, getDocRef } = this.repository.createBatchWrite();
+   * const docRef = getDocRef('doc-id');
+   * batch.set(docRef, data);
+   * await batch.commit();
+   * ```
+   */
+  public createBatchWrite() {
+      return {
+          batch: this.db.batch(),
+          getDocRef: (id: string) => this.collection.doc(id),
+      };
+  }
+
+  /**
+   * Batch write helper (legacy)
+   * @deprecated Use createBatchWrite() instead for better encapsulation
    */
   protected createBatch() {
       return this.db.batch();

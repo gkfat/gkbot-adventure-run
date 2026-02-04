@@ -10,13 +10,15 @@ import { z } from 'zod';
 export const loginRequestSchema = z.object({ idToken: z.string().min(1) }).strict();
 
 export const loginResponseSchema = z.object({
-    success: z.boolean(),
+    success: z.literal(true),
     data: z.object({
         accountId: z.string(),
         email: z.string().email(),
+        characterId: z.string(),
+        level: z.number().int().min(1),
         isNewAccount: z.boolean(),
     }),
-});
+}).strict();
 
 /**
  * GET /api/auth/me
