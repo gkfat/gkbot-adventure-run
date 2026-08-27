@@ -8,7 +8,8 @@
 
 - 新增 `GET /api/character`：回傳角色資料（等級/資源/attributes/裝備引用）與 server 即時計算的 stats（不落庫）
 - 新增 `POST /api/character/attributes`：分配 `unspentAttributePoints`
-- 新增 `POST /api/character/nickname`：設定排行榜顯示暱稱
+- 新增 `POST /api/character/nickname`：設定排行榜顯示暱稱（覆蓋角色建立時系統自動產生的預設暱稱）
+- 角色建立流程（`prepareInitialCharacterData`）新增自動產生預設暱稱邏輯（格式：`玩家{accountId 後 6 碼大寫}`），確保 `nickname` 一律有值，`leaderboard` change 無需等待玩家手動設定即可顯示
 - 補齊 `server/services/` 的 `CharacterService`（目前只有 `AccountService` 內嵌了建立角色的邏輯，缺乏獨立的角色服務層）
 - 擴充 `server/constants/stats.ts` 的計算，納入裝備加成（目前 `calculateBaseStats` 只算 attributes，未含裝備與 run modifiers；run modifiers 部分留給 `adventure-run-core`/`combat-engine` change 串接，本 change 只需預留擴充點）
 
@@ -23,6 +24,8 @@
 ## Impact
 
 - `shared/schemas/api/character.schema.ts`：既有 schema 已定義好回應/請求形狀，直接沿用，不需大改（`healingPotion` 相關欄位需一併從 `characterSchema`/`getCharacterResponseSchema` 移除，見 tasks）
+- `shared/schemas/firestore/character.schema.ts`：`nickname` 欄位語意由「選填」改為「必填字串（建立時保證有預設值）」
+- `server/repositories/character.repository.ts`：`prepareInitialCharacterData` 新增預設暱稱產生邏輯
 - `server/services/character.service.ts`（新增）：屬性分配、暱稱設定的商業邏輯與規則檢查
 - `server/constants/stats.ts`：`calculateBaseStats` 擴充為支援裝備加成的參數（介面預留，裝備讀取邏輯待 `items-and-equipment` change 完成後串接）
 - 新增 `server/api/character/index.get.ts`、`server/api/character/attributes.post.ts`、`server/api/character/nickname.post.ts`

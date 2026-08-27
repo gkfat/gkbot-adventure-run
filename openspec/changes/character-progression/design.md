@@ -21,6 +21,7 @@
 - **新增 `CharacterService`，取代把角色邏輯散落在 `AccountService`**：`AccountService.createOrGetAccount` 仍保留建立角色的呼叫（透過 `CharacterRepository.createCharacter`），但角色的查詢/變更一律走新的 `CharacterService`，維持 AGG-001/AGG-002 的服務邊界對齊。
 - **`calculateBaseStats` 簽名擴充為可選裝備加成參數**：改為 `calculateStats(attributes, equipmentBonus?)`，本 change 呼叫時 `equipmentBonus` 傳空物件（等同目前行為），待 `items-and-equipment` change 完成後由該 change 負責把實際裝備加總傳入，避免本 change 阻塞在還沒實作的裝備系統上，也避免之後又要改一次函式簽名。
 - **屬性點分配的原子性**：以 Firestore 單一文件（`characters/{accountId}`）更新完成，天然原子（單一 aggregate 邊界，見 AGG-002），不需要額外 transaction。
+- **預設暱稱格式選用 `玩家{accountId 後 6 碼大寫}`，而非隨機碼或流水號**：因為直接由已保證唯一的 `accountId` 衍生，不需要額外的碰撞檢查或全域計數器（流水號需要額外 Firestore 文件 + transaction 才能保證嚴格遞增且無競態），建立角色時可在單一文件寫入內完成，不增加額外的讀寫成本。
 
 ## Risks / Trade-offs
 
