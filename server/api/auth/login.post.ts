@@ -40,10 +40,10 @@ export default defineEventHandler(async (event) => {
             throw new AuthError('Invalid token payload');
         }
 
-        // Create or get account and character
+        // Create or get account
         const accountService = new AccountService();
         const {
-            account, character, isNewAccount, 
+            account, isNewAccount,
         } = await accountService.createOrGetAccount(
             decodedToken.uid,
         );
@@ -72,8 +72,6 @@ export default defineEventHandler(async (event) => {
             data: {
                 accountId: account.accountId,
                 email: account.email,
-                characterId: character.characterId,
-                level: character.level,
                 isNewAccount,
             },
         };

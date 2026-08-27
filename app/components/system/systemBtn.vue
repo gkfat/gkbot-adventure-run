@@ -1,26 +1,17 @@
 <template>
-    <v-hover>
-        <template #default="{ isHovering, props: hoverProps }">
-            <v-btn
-                v-bind="{
-                    ...hoverProps,
-                    ...buttonProps,
-                    ...$attrs,
-                }"
-                :class="[
-                    'text-none text-green bg-dark opacity-100',
-                    'border-xl rounded-lg pa-7',
-                    $attrs.class,
-                ]"
-                :style="{
-                    transform: isHovering ? 'scale(95%)': 'none'
-                }"
-                @click="handleClick"
-            >
-                <slot />
-            </v-btn>
-        </template>
-    </v-hover>
+    <v-btn
+        v-bind="{
+            ...buttonProps,
+            ...$attrs,
+        }"
+        :class="[
+            'text-none text-green bg-dark opacity-100 pixel-btn pa-7',
+            $attrs.class,
+        ]"
+        @click="handleClick"
+    >
+        <slot />
+    </v-btn>
 </template>
 
 <script setup lang="ts">

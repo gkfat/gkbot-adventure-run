@@ -20,8 +20,6 @@ interface LoginResponse {
     data?: {
         accountId: string;
         email: string;
-        characterId: string;
-        level: number;
         isNewAccount: boolean;
     };
 }

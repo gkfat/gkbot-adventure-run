@@ -4,9 +4,8 @@ import { CharacterRepository } from '../repositories/character.repository';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirebaseAdminApp } from '../utils/firebaseAdmin';
 import type { Account } from '../../shared/types/account';
-import type { Character } from '../../shared/types/character';
 import {
-    NotFoundError, AuthError, DatabaseError, 
+    NotFoundError, AuthError, DatabaseError,
 } from '../../shared/types/errors';
 
 /**
@@ -14,7 +13,6 @@ import {
  */
 type CreateOrGetAccountResult = {
     account: Account;
-    character: Character;
     isNewAccount: boolean;
 };
 
@@ -30,8 +28,10 @@ export class AccountService extends BaseService {
     }
 
     /**
-     * Create or get existing account + character
-     * Used during login flow
+     * Create or get existing account.
+     * Used during login flow. Does NOT create a character — a fresh account
+     * starts with zero characters; the player builds their roster afterwards
+     * via the character-roster endpoints.
      */
     async createOrGetAccount(uid: string): Promise<CreateOrGetAccountResult> {
         try {
@@ -43,22 +43,8 @@ export class AccountService extends BaseService {
                     userId: uid,
                 });
 
-                // Check if character exists (handle inconsistent state)
-                let existingCharacter = await this.characterRepo.getByAccountId(uid);
-                
-                if (!existingCharacter) {
-                    // Inconsistent state: account exists but character missing
-                    this.logWarn('Account exists but character missing, creating character', {
-                        action: 'createOrGetAccount',
-                        userId: uid,
-                    });
-                    
-                    existingCharacter = await this.characterRepo.createCharacter({ accountId: uid });
-                }
-
                 return {
                     account: existingAccount,
-                    character: existingCharacter,
                     isNewAccount: false,
                 };
             }
@@ -82,14 +68,7 @@ export class AccountService extends BaseService {
                 throw new AuthError('User email not found');
             }
 
-            // Create both Account and Character atomically using batch
-            const {
-                batch, getDocRef: getAccountDocRef, 
-            } = this.accountRepo.createBatchWrite();
-            const { getDocRef: getCharacterDocRef } = this.characterRepo.createBatchWrite();
             const timestamp = Date.now();
-            
-            // Prepare account data
             const accountData = {
                 accountId: uid,
                 provider: 'google' as const,
@@ -98,20 +77,14 @@ export class AccountService extends BaseService {
                 createdAt: timestamp,
                 updatedAt: timestamp,
             };
-            
-            // Prepare character data using centralized initialization logic
-            const characterData = this.characterRepo.prepareInitialCharacterData(uid);
-            
-            // Batch write for atomicity
-            const accountRef = getAccountDocRef(uid);
-            const characterRef = getCharacterDocRef(uid);
-            
-            batch.set(accountRef, accountData);
-            batch.set(characterRef, characterData);
-            
-            await batch.commit();
 
-            this.logInfo('Account and character created', {
+            await this.accountRepo.createAccount({
+                accountId: uid,
+                googleUid: firebaseUser.uid,
+                email: firebaseUser.email,
+            });
+
+            this.logInfo('Account created', {
                 action: 'createOrGetAccount',
                 userId: uid,
                 data: { email: firebaseUser.email },
@@ -122,7 +95,6 @@ export class AccountService extends BaseService {
                     id: uid,
                     ...accountData,
                 },
-                character: characterData,
                 isNewAccount: true,
             };
         } catch (error) {
@@ -180,16 +152,18 @@ export class AccountService extends BaseService {
                 data: { email: account.email },
             });
 
-            // Delete character (1:1 relationship)
+            // Delete all characters owned by this account (roster: 0~3)
             try {
-                await this.characterRepo.delete(uid);
-                this.logInfo('Character deleted', {
+                const characters = await this.characterRepo.listByAccountId(uid);
+                await Promise.all(characters.map(character => this.characterRepo.delete(character.characterId)));
+                this.logInfo('Characters deleted', {
                     action: 'deleteAccountCascade',
                     userId: uid,
+                    data: { count: characters.length },
                 });
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : 'Unknown error';
-                this.logWarn('Failed to delete character (may not exist)', {
+                this.logWarn('Failed to delete characters (may not exist)', {
                     action: 'deleteAccountCascade',
                     userId: uid,
                     data: { error: message },

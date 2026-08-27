@@ -31,7 +31,11 @@ export const equipmentSchema = z.partialRecord(
 export const characterSchema = z.object({
     characterId: z.string(),
     accountId: z.string(),
-  
+
+    // Class (character archetype chosen at creation; 'legacy' for pre-roster characters)
+    archetypeId: z.string(),
+    className: z.string(),
+
     // Progression
     level: z.number().int().min(1).max(RESOURCE_LIMITS.LEVEL_MAX),
     exp: z.number().int().min(0),

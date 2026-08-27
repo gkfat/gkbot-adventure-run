@@ -5,13 +5,61 @@
 import { z } from 'zod';
 import { attributesSchema } from '../firestore/character.schema';
 
+const statsSchema = z.object({
+    ATK: z.number(),
+    DEF: z.number(),
+    HP_MAX: z.number(),
+    HP_CURRENT: z.number(),
+    actionIntervalSec: z.number(),
+    critChance: z.number(),
+    critMultiplier: z.number(),
+    dodgeChance: z.number(),
+});
+
+const archetypeSchema = z.object({
+    archetypeId: z.string(),
+    className: z.string(),
+    attributes: attributesSchema,
+    spriteUrl: z.string(),
+});
+
+const characterSummarySchema = z.object({
+    characterId: z.string(),
+    nickname: z.string(),
+    level: z.number(),
+    gold: z.number(),
+    gems: z.number(),
+    archetypeId: z.string(),
+    className: z.string(),
+    spriteUrl: z.string(),
+});
+
 /**
- * GET /api/character
+ * GET /api/character/roster
+ */
+export const getRosterResponseSchema = z.object({
+    success: z.boolean(),
+    data: z.object({
+        characters: z.array(characterSummarySchema),
+        archetypes: z.array(archetypeSchema),
+    }),
+});
+
+/**
+ * POST /api/character
+ */
+export const createCharacterRequestSchema = z.object({ archetypeId: z.string().min(1) }).strict();
+
+/**
+ * GET /api/character/:characterId
+ * POST /api/character (response shares the same shape)
  */
 export const getCharacterResponseSchema = z.object({
     success: z.boolean(),
     data: z.object({
         characterId: z.string(),
+        archetypeId: z.string(),
+        className: z.string(),
         level: z.number(),
         exp: z.number(),
         gold: z.number(),
@@ -19,21 +67,15 @@ export const getCharacterResponseSchema = z.object({
         attributes: attributesSchema,
         unspentAttributePoints: z.number(),
         nickname: z.string(),
-        stats: z.object({
-            ATK: z.number(),
-            DEF: z.number(),
-            HP_MAX: z.number(),
-            HP_CURRENT: z.number(),
-            actionIntervalSec: z.number(),
-            critChance: z.number(),
-            critMultiplier: z.number(),
-            dodgeChance: z.number(),
-        }),
+        spriteUrl: z.string(),
+        stats: statsSchema,
     }),
 });
 
+export const createCharacterResponseSchema = getCharacterResponseSchema;
+
 /**
- * POST /api/character/attributes
+ * POST /api/character/:characterId/attributes
  */
 export const allocateAttributesRequestSchema = z.object({
     STR: z.number().int().min(0).optional(),
@@ -57,7 +99,7 @@ export const allocateAttributesResponseSchema = z.object({
 });
 
 /**
- * POST /api/character/nickname
+ * POST /api/character/:characterId/nickname
  */
 export const setNicknameRequestSchema = z.object({ nickname: z.string().min(1).max(20) }).strict();
 
@@ -66,6 +108,8 @@ export const setNicknameResponseSchema = z.object({
     data: z.object({ nickname: z.string() }),
 });
 
+export type GetRosterResponse = z.infer<typeof getRosterResponseSchema>;
+export type CreateCharacterRequest = z.infer<typeof createCharacterRequestSchema>;
 export type GetCharacterResponse = z.infer<typeof getCharacterResponseSchema>;
 export type AllocateAttributesRequest = z.infer<typeof allocateAttributesRequestSchema>;
 export type AllocateAttributesResponse = z.infer<typeof allocateAttributesResponseSchema>;

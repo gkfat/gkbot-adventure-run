@@ -1,12 +1,17 @@
 import { BaseService } from './base.service';
-import { CharacterRepository } from '../repositories/character.repository';
+import { CharacterRepository, CHARACTER_ROSTER_MAX } from '../repositories/character.repository';
 import {
     calculateBaseStats, applyEquipmentStats,
 } from '../constants/stats';
+import {
+    CHARACTER_ARCHETYPES, getArchetypeById,
+} from '../constants/characterArchetypes';
 import type {
-    Character, CharacterWithStats, AllocateAttributesInput,
+    Character, CharacterWithStats, CharacterSummary, AllocateAttributesInput,
 } from '../../shared/types/character';
-import { BusinessLogicError } from '../../shared/types/errors';
+import {
+    BusinessLogicError, NotFoundError,
+} from '../../shared/types/errors';
 
 export class CharacterService extends BaseService {
     protected serviceName = 'character';
@@ -18,40 +23,65 @@ export class CharacterService extends BaseService {
     }
 
     /**
-     * Get character with server-computed stats (attributes + equipment bonus,
-     * equipment bonus is empty until items-and-equipment change wires it in)
+     * List the caller's characters plus the available archetypes to create new ones from
      */
-    async getCharacterWithStats(accountId: string): Promise<CharacterWithStats> {
-        let character = await this.characterRepo.getByAccountId(accountId);
-        if (!character) {
-            // Repairs the inconsistent state where an account exists but its character is missing
-            this.logWarn('Character missing for existing account, creating character', {
-                action: 'getCharacterWithStats',
-                userId: accountId,
-            });
-            character = await this.characterRepo.createCharacter({ accountId });
-        }
-
-        const baseStats = await calculateBaseStats(character.attributes, character.level);
-        const stats = applyEquipmentStats(baseStats, {});
+    async getRoster(accountId: string): Promise<{ characters: CharacterSummary[]; archetypes: typeof CHARACTER_ARCHETYPES }> {
+        const characters = await this.characterRepo.listByAccountId(accountId);
 
         return {
-            ...character,
-            stats: {
-                ...stats,
-                HP_CURRENT: stats.HP_MAX,
-            },
+            characters: characters.map(character => ({
+                characterId: character.characterId,
+                nickname: character.nickname,
+                level: character.level,
+                gold: character.gold,
+                gems: character.gems,
+                archetypeId: character.archetypeId,
+                className: character.className,
+                spriteUrl: getArchetypeById(character.archetypeId)?.spriteUrl ?? '/images/hero-sprite.png',
+            })),
+            archetypes: CHARACTER_ARCHETYPES,
         };
     }
 
     /**
-     * Allocate unspent attribute points
-     * Rejects when the requested total exceeds unspentAttributePoints
+     * Create a new character from an archetype. Rejects once the account already
+     * owns CHARACTER_ROSTER_MAX characters, or if the archetypeId is unknown.
      */
-    async allocateAttributes(accountId: string, patch: AllocateAttributesInput): Promise<Character> {
-        const character = await this.characterRepo.getByAccountId(accountId);
+    async createCharacterFromArchetype(accountId: string, archetypeId: string): Promise<CharacterWithStats> {
+        const archetype = getArchetypeById(archetypeId);
+        if (!archetype) {
+            throw new BusinessLogicError('Unknown archetype');
+        }
+
+        const existing = await this.characterRepo.listByAccountId(accountId);
+        if (existing.length >= CHARACTER_ROSTER_MAX) {
+            throw new BusinessLogicError(`A character roster can have at most ${CHARACTER_ROSTER_MAX} characters`);
+        }
+
+        const character = await this.characterRepo.createCharacterFromArchetype(accountId, archetype);
+        return this.withStats(character);
+    }
+
+    /**
+     * Get a character (must belong to the caller's account) with server-computed stats
+     */
+    async getCharacterWithStats(accountId: string, characterId: string): Promise<CharacterWithStats> {
+        const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
         if (!character) {
-            throw new BusinessLogicError('Character not found');
+            throw new NotFoundError('character');
+        }
+
+        return this.withStats(character);
+    }
+
+    /**
+     * Allocate unspent attribute points on a character owned by the caller.
+     * Rejects when the requested total exceeds unspentAttributePoints.
+     */
+    async allocateAttributes(accountId: string, characterId: string, patch: AllocateAttributesInput): Promise<Character> {
+        const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
+        if (!character) {
+            throw new NotFoundError('character');
         }
 
         const total = (patch.STR || 0) + (patch.AGI || 0) + (patch.CON || 0) + (patch.LUCK || 0);
@@ -67,16 +97,35 @@ export class CharacterService extends BaseService {
         };
         const unspentAttributePoints = character.unspentAttributePoints - total;
 
-        return this.characterRepo.updateAttributes(accountId, {
+        return this.characterRepo.updateAttributes(characterId, {
             attributes,
             unspentAttributePoints,
         });
     }
 
     /**
-     * Set (or overwrite) the character's leaderboard display name
+     * Set (or overwrite) the display name of a character owned by the caller
      */
-    async setNickname(accountId: string, nickname: string): Promise<Character> {
-        return this.characterRepo.updateNickname(accountId, nickname);
+    async setNickname(accountId: string, characterId: string, nickname: string): Promise<Character> {
+        const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
+        if (!character) {
+            throw new NotFoundError('character');
+        }
+
+        return this.characterRepo.updateNickname(characterId, nickname);
+    }
+
+    private async withStats(character: Character): Promise<CharacterWithStats> {
+        const baseStats = await calculateBaseStats(character.attributes, character.level);
+        const stats = applyEquipmentStats(baseStats, {});
+
+        return {
+            ...character,
+            spriteUrl: getArchetypeById(character.archetypeId)?.spriteUrl ?? '/images/hero-sprite.png',
+            stats: {
+                ...stats,
+                HP_CURRENT: stats.HP_MAX,
+            },
+        };
     }
 }

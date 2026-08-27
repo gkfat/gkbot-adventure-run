@@ -21,6 +21,8 @@ import {
 } from '../../shared/schemas/api/auth.schema';
 
 import {
+    getRosterResponseSchema,
+    createCharacterRequestSchema,
     getCharacterResponseSchema,
     allocateAttributesRequestSchema,
     allocateAttributesResponseSchema,
@@ -76,6 +78,8 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         LoginResponse: loginResponseSchema,
         MeResponse: meResponseSchema,
         DeleteAccountResponse: deleteAccountResponseSchema,
+        GetRosterResponse: getRosterResponseSchema,
+        CreateCharacterRequest: createCharacterRequestSchema,
         GetCharacterResponse: getCharacterResponseSchema,
         AllocateAttributesRequest: allocateAttributesRequestSchema,
         AllocateAttributesResponse: allocateAttributesResponseSchema,
@@ -157,14 +161,14 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
     // Register Character Endpoints
     registry.registerPath({
         method: 'get',
-        path: '/api/character',
-        description: 'Get current character information including stats and attributes',
+        path: '/api/character/roster',
+        description: 'List the caller\'s characters and the available archetypes to create new ones from',
         tags: ['Character'],
         security: [{ bearerAuth: [] }],
         responses: {
             200: {
-                description: 'Character information retrieved',
-                content: { 'application/json': { schema: getCharacterResponseSchema } },
+                description: 'Roster retrieved',
+                content: { 'application/json': { schema: getRosterResponseSchema } },
             },
             401: {
                 description: 'Unauthorized',
@@ -175,11 +179,60 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
 
     registry.registerPath({
         method: 'post',
-        path: '/api/character/attributes',
+        path: '/api/character',
+        description: 'Create a new character from an archetype (max 3 characters per account)',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: { body: { content: { 'application/json': { schema: createCharacterRequestSchema } } } },
+        responses: {
+            200: {
+                description: 'Character created',
+                content: { 'application/json': { schema: getCharacterResponseSchema } },
+            },
+            400: {
+                description: 'Roster already full or unknown archetype',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}',
+        description: 'Get a character (must belong to the caller) including stats and attributes',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Character information retrieved',
+                content: { 'application/json': { schema: getCharacterResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/attributes',
         description: 'Allocate unspent attribute points to character stats',
         tags: ['Character'],
         security: [{ bearerAuth: [] }],
-        request: { body: { content: { 'application/json': { schema: allocateAttributesRequestSchema } } } },
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: allocateAttributesRequestSchema } } },
+        },
         responses: {
             200: {
                 description: 'Attributes successfully allocated',
@@ -193,16 +246,23 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
                 description: 'Unauthorized',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
         },
     });
 
     registry.registerPath({
         method: 'post',
-        path: '/api/character/nickname',
+        path: '/api/character/{characterId}/nickname',
         description: 'Set or update character nickname',
         tags: ['Character'],
         security: [{ bearerAuth: [] }],
-        request: { body: { content: { 'application/json': { schema: setNicknameRequestSchema } } } },
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: setNicknameRequestSchema } } },
+        },
         responses: {
             200: {
                 description: 'Nickname successfully updated',
@@ -214,6 +274,10 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             },
             401: {
                 description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
         },

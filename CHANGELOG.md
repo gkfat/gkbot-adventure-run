@@ -12,4 +12,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Init project
 - 實作登入機制
-- 實作首頁角色圖
+- 實作首頁角色圖、選擇角色流程

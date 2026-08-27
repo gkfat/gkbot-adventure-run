@@ -6,3 +6,50 @@
 .font-pixel {
     font-family: 'Press Start 2P', 'Source Sans 3', 'Noto Sans TC', sans-serif !important;
 }
+
+// ---------------------------------------------------------------------------
+// 全站統一按鈕互動語言：idle 時像素感的「立體邊」，hover 時像按下一半，
+// 點擊（active）時才真正按到底。所有按鈕（含純 <button>）共用同一組數值。
+// ---------------------------------------------------------------------------
+
+// 實體 CTA 按鈕（SystemBtn）：帶底部立體邊
+// class 選擇器重複一次以提高優先權，蓋過 Vuetify v-btn 自帶的 .rounded-lg
+.pixel-btn.pixel-btn {
+    --pixel-shadow: rgba(0, 0, 0, 0.45);
+    border-radius: 3px !important;
+    box-shadow: 0 3px 0 0 var(--pixel-shadow) !important;
+    transform: translateY(0);
+    transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, background-color 0.08s ease-out;
+
+    &:hover:not(:disabled) {
+        transform: translateY(1px);
+        box-shadow: 0 2px 0 0 var(--pixel-shadow) !important;
+    }
+
+    &:active:not(:disabled) {
+        transform: translateY(3px);
+        box-shadow: 0 0 0 0 var(--pixel-shadow) !important;
+    }
+
+    &:disabled {
+        transform: none;
+    }
+}
+
+// 輕量按鈕（icon-only / 選單列 / 清單列）：無立體邊，僅位移回饋
+.pixel-press {
+    transition: transform 0.08s ease-out, background-color 0.08s ease-out;
+    transform: translateY(0);
+
+    &:hover:not(:disabled) {
+        transform: translateY(1px);
+    }
+
+    &:active:not(:disabled) {
+        transform: translateY(3px);
+    }
+
+    &:disabled {
+        transform: none;
+    }
+}

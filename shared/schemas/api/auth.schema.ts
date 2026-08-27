@@ -14,8 +14,6 @@ export const loginResponseSchema = z.object({
     data: z.object({
         accountId: z.string(),
         email: z.string().email(),
-        characterId: z.string(),
-        level: z.number().int().min(1),
         isNewAccount: z.boolean(),
     }),
 }).strict();

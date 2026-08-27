@@ -4,7 +4,7 @@
             v-for="item in leftItems"
             :key="item.key"
             type="button"
-            class="bottom-nav__item"
+            class="bottom-nav__item pixel-press"
             :aria-label="item.label"
             @click="handleTap(item)"
         >
@@ -34,7 +34,7 @@
             v-for="item in rightItems"
             :key="item.key"
             type="button"
-            class="bottom-nav__item"
+            class="bottom-nav__item pixel-press"
             :aria-label="item.label"
             @click="handleTap(item)"
         >
@@ -107,14 +107,10 @@ const handleTap = (item: NavItem) => {
         color: rgb(var(--v-theme-primary));
         opacity: 0.5;
         cursor: pointer;
-        transition: opacity 0.15s ease, transform 0.15s ease;
+        transition: opacity 0.08s ease-out;
 
         &:hover {
             opacity: 0.8;
-        }
-
-        &:active {
-            transform: scale(0.94);
         }
 
         &:focus-visible {

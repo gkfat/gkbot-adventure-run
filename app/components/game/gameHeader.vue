@@ -11,7 +11,7 @@
 
         <button
             type="button"
-            class="game-header__config"
+            class="game-header__config pixel-press"
             aria-label="開啟設定選單"
             @click="$emit('open-drawer')"
         >
@@ -50,14 +50,13 @@ defineEmits<{ 'open-drawer': [] }>();
         background: rgba(196, 203, 219, 0.08);
         border: none;
         cursor: pointer;
-        transition: background-color 0.15s ease, transform 0.15s ease;
 
         &:hover {
             background: rgba(196, 203, 219, 0.16);
         }
 
         &:active {
-            transform: scale(0.92);
+            background: rgba(196, 203, 219, 0.22);
         }
 
         &:focus-visible {

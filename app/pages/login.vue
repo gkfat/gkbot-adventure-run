@@ -22,12 +22,12 @@ import { SystemBtn } from '../../.nuxt/components';
             </div>
 
             <!-- Title -->
-            <v-card-title class="text-h4 text-center">
+            <v-card-title class="text-h4 text-center text-wrap">
                 GkBot Adventure Run
             </v-card-title>
 
             <!-- Description -->
-            <v-card-subtitle class="text-center text-h6 mb-8">
+            <v-card-subtitle class="text-center text-h6 mb-8 text-wrap">
                 試著摧毀更多的 GkBot 機器人吧！
             </v-card-subtitle>
 
@@ -56,11 +56,6 @@ import { SystemBtn } from '../../.nuxt/components';
             >
                 使用 Google 登入
             </SystemBtn>
-
-            <!-- Additional Info -->
-            <div class="text-center mt-6 text-caption text-medium-emphasis">
-                登入即表示您同意我們的服務條款與隱私權政策
-            </div>
         </v-card>
     </v-container>
 </template>

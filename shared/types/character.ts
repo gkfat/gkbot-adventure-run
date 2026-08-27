@@ -6,9 +6,13 @@ import type {
  * Character document stored in Firestore
  */
 export type Character = {
-  characterId: string;        // Same as accountId (1:1 relationship)
-  accountId: string;          // Reference to account
-  
+  characterId: string;        // Firestore auto-generated ID
+  accountId: string;          // Reference to owning account (1 account : up to 3 characters)
+
+  // Class (archetype chosen at creation; 'legacy' for pre-roster characters)
+  archetypeId: string;
+  className: string;
+
   // Progression
   level: number;              // 1-30
   exp: number;                // Current experience points
@@ -33,18 +37,25 @@ export type Character = {
 };
 
 /**
- * Initial character creation
- */
-export type CreateCharacterInput = {
-  characterId: string;
-  accountId: string;
-};
-
-/**
  * Character with computed stats (returned by API)
  */
 export type CharacterWithStats = Character & {
   stats: import('./common').Stats;
+  spriteUrl: string;
+};
+
+/**
+ * Lightweight roster entry (GET /api/character/roster)
+ */
+export type CharacterSummary = {
+  characterId: string;
+  nickname: string;
+  level: number;
+  gold: number;
+  gems: number;
+  archetypeId: string;
+  className: string;
+  spriteUrl: string;
 };
 
 /**

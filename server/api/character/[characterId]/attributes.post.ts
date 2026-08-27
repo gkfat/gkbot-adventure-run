@@ -1,14 +1,14 @@
 import {
-    defineEventHandler, readBody,
+    defineEventHandler, getRouterParam, readBody,
 } from 'h3';
-import { requireAuth } from '../../utils/auth';
-import { CharacterService } from '../../services/character.service';
+import { requireAuth } from '../../../utils/auth';
+import { CharacterService } from '../../../services/character.service';
 import {
     allocateAttributesRequestSchema, allocateAttributesResponseSchema,
-} from '../../../shared/schemas/api/character.schema';
-import { toH3Error } from '../../utils/errorHandler';
-import { ValidationError } from '../../../shared/types/errors';
-import { logRequest } from '../../utils/logger';
+} from '../../../../shared/schemas/api/character.schema';
+import { toH3Error } from '../../../utils/errorHandler';
+import { ValidationError } from '../../../../shared/types/errors';
+import { logRequest } from '../../../utils/logger';
 
 export default defineEventHandler(async (event) => {
     const startTime = Date.now();
@@ -17,6 +17,11 @@ export default defineEventHandler(async (event) => {
     try {
         const authUser = await requireAuth(event);
 
+        const characterId = getRouterParam(event, 'characterId');
+        if (!characterId) {
+            throw new ValidationError('characterId is required');
+        }
+
         const body = await readBody(event);
         const parseResult = allocateAttributesRequestSchema.safeParse(body);
         if (!parseResult.success) {
@@ -24,7 +29,7 @@ export default defineEventHandler(async (event) => {
         }
 
         const characterService = new CharacterService();
-        const character = await characterService.allocateAttributes(authUser.uid, parseResult.data);
+        const character = await characterService.allocateAttributes(authUser.uid, characterId, parseResult.data);
 
         logRequest({
             severity: 'INFO',

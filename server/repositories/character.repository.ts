@@ -1,125 +1,100 @@
 /**
  * Character Repository
  * Handles Firestore operations for Character collection
+ *
+ * One account can own 0~3 characters (see CHARACTER_ROSTER_MAX). Characters created
+ * before the multi-character roster shipped are identified by document ID === accountId
+ * and lack accountId/archetypeId/className; they are self-healed into 'legacy'
+ * characters the first time listByAccountId reads them (see listByAccountId).
  */
 
 import { BaseRepository } from './base.repository';
 import type { Character } from '../../shared/types/character';
 import { characterSchema } from '../../shared/schemas/firestore/character.schema';
 import { DatabaseError } from '../../shared/types/errors';
+import {
+    LEGACY_ARCHETYPE_ID, LEGACY_CLASS_NAME, type CharacterArchetype,
+} from '../constants/characterArchetypes';
+
+export const CHARACTER_ROSTER_MAX = 3;
 
 export class CharacterRepository extends BaseRepository<Character> {
     protected collectionName = 'characters';
 
     /**
-     * Generate the default leaderboard display name for a newly created character.
-     * Derived deterministically from accountId (last 6 chars, uppercased) so it
-     * needs no uniqueness check or counter document.
-     *
-     * @param accountId - Account ID
-     * @returns Default nickname, e.g. "玩家A1B2C3"
+     * Default display name for a newly created character, derived from its class
+     * and the last 6 chars of its (already-unique) characterId — no uniqueness
+     * check or counter needed, and it won't collide with the account's other characters.
      */
-    generateDefaultNickname(accountId: string): string {
+    generateArchetypeNickname(className: string, characterId: string): string {
+        const suffix = characterId.slice(-6).toUpperCase();
+        return `${className}${suffix}`;
+    }
+
+    /**
+     * Legacy default nickname format used before the roster shipped (accountId-derived).
+     * Only used to backfill pre-roster characters that never got a nickname.
+     */
+    generateLegacyDefaultNickname(accountId: string): string {
         const suffix = accountId.slice(-6).toUpperCase();
         return `玩家${suffix}`;
     }
 
     /**
-     * Prepare initial character data (DRY principle)
-     * This ensures all character creation uses the same initial values
-     *
-     * @param accountId - Account ID (used as character ID for 1:1 mapping)
-     * @returns Initial character data
+     * Build a new character document for a given archetype
      */
-    prepareInitialCharacterData(accountId: string): Character {
+    private prepareCharacterData(params: {
+        accountId: string;
+        characterId: string;
+        archetype: CharacterArchetype;
+    }): Character {
         const timestamp = Date.now();
+        const { accountId, characterId, archetype } = params;
 
         const characterData = {
-            characterId: accountId,
-            accountId: accountId,
+            characterId,
+            accountId,
 
-            // Initial progression
+            archetypeId: archetype.archetypeId,
+            className: archetype.className,
+
             level: 1,
             exp: 0,
 
-            // Initial currency
             gold: 0,
             gems: 0,
 
-            // Initial attributes (all set to 1)
-            attributes: {
-                STR: 1,
-                AGI: 1,
-                CON: 1,
-                LUCK: 1,
-            },
+            attributes: { ...archetype.attributes },
             unspentAttributePoints: 0,
 
-            // No equipment initially
             equipment: {},
 
-            // Leaderboard display name (player can override via nickname endpoint)
-            nickname: this.generateDefaultNickname(accountId),
+            nickname: this.generateArchetypeNickname(archetype.className, characterId),
 
-            // Timestamps
             createdAt: timestamp,
             updatedAt: timestamp,
         };
 
-        // Validate against schema (development safety check)
         const validated = characterSchema.parse(characterData);
         return validated as Character;
     }
 
     /**
-     * Get character by account ID (1:1 relationship)
-     * 
-     * @param accountId - Account ID
-     * @returns Character or null if not found
-     * @throws DatabaseError if data integrity violation detected
-     */
-    async getByAccountId(accountId: string): Promise<Character | null> {
-        try {
-            const character = await this.getById(accountId);
-            if (!character) return null;
-
-            // Explicit validation: ensure characterId matches accountId
-            if (character.characterId !== accountId) {
-                throw new DatabaseError(
-                    `Data integrity violation: character.characterId (${character.characterId}) !== accountId (${accountId})`,
-                );
-            }
-
-            // Backfill nickname for characters created before it became required
-            if (!character.nickname) {
-                return this.updateNickname(accountId, this.generateDefaultNickname(accountId));
-            }
-
-            return character;
-        } catch (error: unknown) {
-            if (error instanceof DatabaseError) throw error;
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            throw new DatabaseError(`Failed to get character: ${message}`);
-        }
-    }
-
-    /**
-     * Create new character with initial values
-     * 
-     * @param data - Object containing accountId
-     * @returns Created character
+     * Create a new character for an account using the given archetype.
+     * Uses a Firestore auto-generated document ID (accounts can own multiple characters).
+     *
      * @throws DatabaseError if creation fails
      */
-    async createCharacter(data: {
-        accountId: string;
-    }): Promise<Character> {
+    async createCharacterFromArchetype(accountId: string, archetype: CharacterArchetype): Promise<Character> {
         try {
-            const characterData = this.prepareInitialCharacterData(data.accountId);
+            const docRef = this.collection.doc();
+            const characterData = this.prepareCharacterData({
+                accountId,
+                characterId: docRef.id,
+                archetype,
+            });
 
-            // Use accountId as document ID (ensures 1:1 mapping)
-            const docRef = this.getDocumentRef(data.accountId);
             await docRef.set(characterData);
-
             return characterData;
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Unknown error';
@@ -128,29 +103,73 @@ export class CharacterRepository extends BaseRepository<Character> {
     }
 
     /**
-     * Update character attributes and unspent points
+     * List all characters owned by an account.
      *
-     * @param accountId - Account ID
-     * @param patch - New attributes and unspentAttributePoints
-     * @returns Updated character
-     * @throws DatabaseError if update fails
+     * Self-heals the pre-roster single-character shape: if no character has an
+     * `accountId` field matching this account, checks the legacy document path
+     * (`characters/{accountId}`) and backfills accountId/archetypeId/className
+     * (and nickname if it was somehow missing) onto that same document in place.
+     */
+    async listByAccountId(accountId: string): Promise<Character[]> {
+        try {
+            const snapshot = await this.collection.where('accountId', '==', accountId).get();
+            const characters = this.snapshotToArray(snapshot);
+
+            if (characters.length > 0) {
+                return characters;
+            }
+
+            const legacyCharacter = await this.getById(accountId);
+            if (!legacyCharacter) {
+                return [];
+            }
+
+            const migrated = await this.update(accountId, {
+                accountId,
+                archetypeId: LEGACY_ARCHETYPE_ID,
+                className: LEGACY_CLASS_NAME,
+                nickname: legacyCharacter.nickname || this.generateLegacyDefaultNickname(accountId),
+            });
+
+            return [migrated];
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new DatabaseError(`Failed to list characters: ${message}`);
+        }
+    }
+
+    /**
+     * Get a character by ID, but only if it belongs to the given account.
+     * Returns null both when the character doesn't exist and when it belongs
+     * to someone else, so callers can't distinguish "not found" from "not yours".
+     */
+    async getByIdForAccount(characterId: string, accountId: string): Promise<Character | null> {
+        try {
+            const character = await this.getById(characterId);
+            if (!character || character.accountId !== accountId) {
+                return null;
+            }
+            return character;
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new DatabaseError(`Failed to get character: ${message}`);
+        }
+    }
+
+    /**
+     * Update character attributes and unspent points
      */
     async updateAttributes(
-        accountId: string,
+        characterId: string,
         patch: { attributes: Character['attributes']; unspentAttributePoints: number },
     ): Promise<Character> {
-        return this.update(accountId, patch);
+        return this.update(characterId, patch);
     }
 
     /**
      * Update character nickname
-     *
-     * @param accountId - Account ID
-     * @param nickname - New nickname (1~20 chars)
-     * @returns Updated character
-     * @throws DatabaseError if update fails
      */
-    async updateNickname(accountId: string, nickname: string): Promise<Character> {
-        return this.update(accountId, { nickname });
+    async updateNickname(characterId: string, nickname: string): Promise<Character> {
+        return this.update(characterId, { nickname });
     }
 }

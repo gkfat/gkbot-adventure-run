@@ -36,11 +36,8 @@
 
                 <div
                     v-if="character"
-                    class="d-flex align-center justify-center ga-2 mt-2"
+                    class="mt-2"
                 >
-                    <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-green));">
-                        LV {{ character.level }}
-                    </span>
                     <span class="text-caption text-medium-emphasis">
                         {{ character.nickname }}
                     </span>
@@ -48,6 +45,22 @@
             </div>
 
             <v-divider />
+
+            <div class="pa-2">
+                <button
+                    v-if="character"
+                    type="button"
+                    class="account-drawer__menu-item pixel-press"
+                    @click="handleSwitchCharacter"
+                >
+                    <v-icon
+                        icon="mdi-account-switch-outline"
+                        size="20"
+                        color="primary"
+                    />
+                    <span class="text-body-2">切換角色</span>
+                </button>
+            </div>
 
             <v-spacer />
 
@@ -71,12 +84,46 @@
 
 <script setup lang="ts">
 defineProps<{ modelValue: boolean }>();
-defineEmits<{ 'update:modelValue': [value: boolean] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const { user, signOut, loading } = useAuth();
-const { character } = useCharacter();
+const { character, clearSelection, reset: resetCharacter } = useCharacter();
 
 const handleSignOut = async () => {
     await signOut();
+    resetCharacter();
+};
+
+const handleSwitchCharacter = () => {
+    clearSelection();
+    emit('update:modelValue', false);
 };
 </script>
+
+<style scoped lang="scss">
+.account-drawer__menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    text-align: left;
+
+    &:hover {
+        background: rgba(196, 203, 219, 0.08);
+    }
+
+    &:active {
+        background: rgba(196, 203, 219, 0.14);
+    }
+
+    &:focus-visible {
+        outline: 2px solid rgb(var(--v-theme-primary));
+        outline-offset: -2px;
+    }
+}
+</style>

@@ -1,8 +1,13 @@
-import { defineEventHandler } from 'h3';
+import {
+    defineEventHandler, readBody,
+} from 'h3';
 import { requireAuth } from '../../utils/auth';
 import { CharacterService } from '../../services/character.service';
-import { getCharacterResponseSchema } from '../../../shared/schemas/api/character.schema';
+import {
+    createCharacterRequestSchema, createCharacterResponseSchema,
+} from '../../../shared/schemas/api/character.schema';
 import { toH3Error } from '../../utils/errorHandler';
+import { ValidationError } from '../../../shared/types/errors';
 import { logRequest } from '../../utils/logger';
 
 export default defineEventHandler(async (event) => {
@@ -12,12 +17,21 @@ export default defineEventHandler(async (event) => {
     try {
         const authUser = await requireAuth(event);
 
+        const body = await readBody(event);
+        const parseResult = createCharacterRequestSchema.safeParse(body);
+        if (!parseResult.success) {
+            throw new ValidationError('Invalid character creation request', parseResult.error.flatten());
+        }
+
         const characterService = new CharacterService();
-        const character = await characterService.getCharacterWithStats(authUser.uid);
+        const character = await characterService.createCharacterFromArchetype(
+            authUser.uid,
+            parseResult.data.archetypeId,
+        );
 
         logRequest({
             severity: 'INFO',
-            message: 'Character info retrieved',
+            message: 'Character created',
             method: event.method,
             path: event.path,
             status: 200,
@@ -31,11 +45,11 @@ export default defineEventHandler(async (event) => {
             data: character,
         };
 
-        return getCharacterResponseSchema.parse(response);
+        return createCharacterResponseSchema.parse(response);
     } catch (error: any) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to get character info',
+            message: 'Failed to create character',
             method: event.method,
             path: event.path,
             status: error.statusCode || 500,
