@@ -1,0 +1,300 @@
+version: 1
+generatedBy: data-modeling
+updatedAt: 2026-08-27T00:00:00Z
+relatedChanges: [gkbot-adventure-run-full-system]
+
+notes:
+  - >
+    資料庫為 Firestore（document store）。"table" 對應 Firestore collection 或
+    embedded sub-document shape，並非關聯式資料庫的表。命名沿用專案既有
+    shared/schemas/firestore/*.schema.ts 與 docs/13_Firestore資料模型草案.md
+    的 collection 慣例，未變更既有欄位命名。
+  - >
+    設計偏差確認（回報而非自行改動 domain-model.yaml）：domain-model.yaml 的
+    AGG-006 DailyQuestSet 以「一組 3 個任務」為一致性邊界，但既有實作
+    （shared/schemas/firestore/quest.schema.ts::dailyQuestSchema）是每個任務各自一份
+    扁平文件（accountId+date+templateId 為邏輯複合鍵），而非單一父文件包三個任務。
+    本資料模型沿用既有的「每任務一份文件」設計，「同一天 3 個任務」的原子性
+    改由 application service 以 Firestore batch write（對這 3 份文件）達成，
+    而非單一文件的原生 atomic write。若後續認為需要真正單文件原子性，需回頭
+    調整 domain-model.yaml 的邊界或此處的表設計。
+  - >
+    設計變更紀錄：補血藥水由「角色固定欄位」改為「一般消耗品物品」（見
+    requirements.yaml FR-015 的重新定義與 FR-016/017/018 的 deprecated 說明）。
+    DATA-002 characters 已移除 `healingPotion.level`／`healingPotion.coolDownUntil`
+    兩欄；效果強度改由 DATA-004 itemInstance 的 rolledStats（healPercent）依稀有度決定，
+    取得方式併入一般的商店購買（DATA-006/007）與戰鬥/事件掉落流程，不再需要獨立資料結構。
+
+tables:
+  - id: DATA-001
+    name: accounts
+    storage: "Firestore collection accounts/{accountId}"
+    domainModel: [ENT-001, VO-012]
+    api: [API-001, API-002, API-003, API-004]
+    primaryKey: accountId
+    columns:
+      - { name: accountId, type: string, constraints: "PK, = Firebase uid" }
+      - { name: provider, type: string, constraints: "'google'" }
+      - { name: googleUid, type: string, constraints: "not null" }
+      - { name: email, type: string, constraints: "not null, email format" }
+      - { name: bgmEnabled, type: boolean, constraints: "default true" }
+      - { name: sfxEnabled, type: boolean, constraints: "default true" }
+      - { name: createdAt, type: timestamp, constraints: "not null" }
+      - { name: updatedAt, type: timestamp, constraints: "not null" }
+
+  - id: DATA-002
+    name: characters
+    storage: "Firestore collection characters/{accountId}（doc id = accountId，一帳號一角色）"
+    domainModel: [ENT-002, VO-001, VO-003, VO-004]
+    api: [API-005, API-006, API-007, API-009, API-010, API-015, API-021, API-028]
+    primaryKey: characterId
+    columns:
+      - { name: characterId, type: string, constraints: "PK, = accountId" }
+      - { name: accountId, type: string, constraints: "not null, FK -> accounts.accountId" }
+      - { name: level, type: int, constraints: "1..30" }
+      - { name: exp, type: int, constraints: ">= 0" }
+      - { name: gold, type: int, constraints: "[0, 100000)，見 RULE-001" }
+      - { name: gems, type: int, constraints: "[0, 100000)，見 RULE-001" }
+      - { name: "attributes.STR", type: int, constraints: ">= 1" }
+      - { name: "attributes.AGI", type: int, constraints: ">= 1" }
+      - { name: "attributes.CON", type: int, constraints: ">= 1" }
+      - { name: "attributes.LUCK", type: int, constraints: ">= 1" }
+      - { name: unspentAttributePoints, type: int, constraints: ">= 0" }
+      - { name: "equipment.<SLOT>", type: string, constraints: "nullable，值為 itemId（引用 inventories 或 adventureRuns 內嵌的 ItemInstance，跨 collection 引用，非 FK 約束）；SLOT ∈ HEAD/BODY/SHOES/GLOVES/LEFT_HAND/RIGHT_HAND/NECKLACE/RING" }
+      - { name: nickname, type: string, constraints: "nullable, 1..20 chars" }
+      - { name: createdAt, type: timestamp }
+      - { name: updatedAt, type: timestamp }
+
+  - id: DATA-003
+    name: inventories
+    storage: "Firestore collection inventories/{accountId}（doc id = accountId，永久背包）"
+    domainModel: [ENT-005]
+    api: [API-009, API-010, API-011, API-012, API-015, API-028]
+    primaryKey: inventoryId
+    columns:
+      - { name: inventoryId, type: string, constraints: "PK, = accountId" }
+      - { name: accountId, type: string, constraints: "not null, FK -> accounts.accountId" }
+      - { name: items, type: "array<DATA-004>", constraints: "max 500 筆，見 RULE-006" }
+      - { name: updatedAt, type: timestamp }
+
+  - id: DATA-004
+    name: itemInstance (embedded shape)
+    storage: >
+      非獨立 top-level collection；以相同 shape 內嵌於 inventories.items[]、
+      adventureRuns.runInventory[]、shopsGold/shopsGems 的 slot.item 三處。
+    domainModel: [ENT-003]
+    api: [API-009, API-010, API-011, API-012, API-013, API-014, API-015, API-024, API-027, API-028]
+    primaryKey: itemId
+    columns:
+      - { name: itemId, type: string, constraints: "全域唯一" }
+      - { name: templateId, type: string, constraints: "not null，對應 DATA-011 itemTemplates（in-repo constant，非 Firestore FK）" }
+      - { name: type, type: string, constraints: "EQUIPMENT | POTION" }
+      - { name: equipSlot, type: string, constraints: "nullable，僅 type=EQUIPMENT 有值" }
+      - { name: rarity, type: string, constraints: "N|R|SR|SSR|L" }
+      - { name: "stats.ATK / DEF / HP / actionSpeedMod", type: number, constraints: "皆為 optional，僅 type=EQUIPMENT 使用，依 templateId roll 出" }
+      - { name: "stats.healPercent", type: number, constraints: "optional，僅 type=POTION 使用，依 templateId+rarity roll 出的回復生命值百分比" }
+      - { name: source, type: string, constraints: "DROP|SHOP|EVENT" }
+      - { name: createdAt, type: timestamp }
+
+  - id: DATA-005
+    name: adventureRuns
+    storage: "Firestore collection adventureRuns/{runId}"
+    domainModel: [ENT-010, VO-009, VO-010, VO-011]
+    api: [API-021, API-022, API-023, API-024, API-025, API-026, API-027, API-028]
+    primaryKey: runId
+    columns:
+      - { name: runId, type: string, constraints: "PK" }
+      - { name: characterId, type: string, constraints: "not null, FK -> characters.characterId" }
+      - { name: accountId, type: string, constraints: "not null" }
+      - { name: seed, type: string, constraints: "not null，僅 server 端使用" }
+      - { name: rngIndex, type: int, constraints: ">= 0，見 RULE-014，單調遞增" }
+      - { name: state, type: string, constraints: "INIT|EXPLORING|COMBAT|EVENT|BLESSING_SELECT|SHOP|RESOLUTION|ENDED" }
+      - { name: step, type: int, constraints: ">= 0" }
+      - { name: startedAt, type: timestamp }
+      - { name: endedAt, type: timestamp, constraints: "nullable" }
+      - { name: endReason, type: string, constraints: "nullable，DEAD|QUIT|DISCONNECT|TIMEOUT（TIMEOUT 保留未啟用）" }
+      - { name: currentNodeType, type: string, constraints: "nullable" }
+      - { name: currentNodeData, type: object, constraints: "nullable，節點細節" }
+      - { name: playerHp, type: number, constraints: ">= 0，跨 step 保留" }
+      - { name: playerHpMax, type: number, constraints: ">= 1" }
+      - { name: blessings, type: "array<string>", constraints: "生效中 RunModifier id（見 RULE-015）" }
+      - { name: curses, type: "array<string>", constraints: "生效中 RunModifier id（見 RULE-015）" }
+      - { name: blessingPoints, type: int, constraints: ">= 0" }
+      - { name: runInventory, type: "array<DATA-004>", constraints: "max 50 筆，見 RULE-006" }
+      - { name: score, type: int, constraints: ">= 0" }
+      - { name: goldEarned, type: int, constraints: ">= 0，run 結束才併入 characters.gold" }
+      - { name: gemsEarned, type: int, constraints: ">= 0，run 結束才併入 characters.gems" }
+      - { name: potionUsedThisRun, type: boolean }
+      - { name: lastCombatSummary, type: object, constraints: "nullable，見 DATA-005A combatSummary shape" }
+      - { name: auditSummary, type: "array<object>", constraints: "精簡稽核紀錄 { step, nodeType, outcome }，見 NFR-014 待決策的保留策略" }
+      - { name: lastActivityAt, type: timestamp, constraints: "用於 15 分鐘重連窗口判定（RULE 見 NFR-006）" }
+      - { name: disconnectedAt, type: timestamp, constraints: "nullable" }
+      - { name: updatedAt, type: timestamp }
+    note: >
+      combatSummary 為內嵌物件（非獨立表），shape：
+      { victory, roundCount, playerHpRemaining, scoreGained, goldDropped,
+        gemsDropped, itemsDropped: array<DATA-004>, blessingPointsGained,
+        enemies: array<{enemyId,name,level}>, completedAt }。
+      對應 domain-model.yaml 的 VO-010 CombatSummary。
+
+  - id: DATA-006
+    name: shopsGold
+    storage: "Firestore collection shopsGold/{accountId}_{date}（per-account，date=UTC yyyy-mm-dd）"
+    domainModel: [ENT-006, VO-006]
+    api: [API-013, API-015]
+    primaryKey: "accountId + date"
+    columns:
+      - { name: accountId, type: string, constraints: "not null, FK -> accounts.accountId" }
+      - { name: date, type: string, constraints: "yyyy-mm-dd (UTC+0)" }
+      - { name: seed, type: string }
+      - { name: generatedAt, type: timestamp }
+      - { name: items, type: "array<ShopSlot>", constraints: "固定數量（如 6），slot shape: {slotId, item: DATA-004, priceGold, sold, purchasedBy, purchasedAt}，見 RULE-009" }
+
+  - id: DATA-007
+    name: shopsGems
+    storage: "Firestore collection shopsGems/{date}（全服共享，date=UTC yyyy-mm-dd）"
+    domainModel: [ENT-006, VO-006]
+    api: [API-014, API-015]
+    primaryKey: date
+    columns:
+      - { name: date, type: string, constraints: "yyyy-mm-dd (UTC+0), PK" }
+      - { name: seed, type: string }
+      - { name: generatedAt, type: timestamp }
+      - { name: items, type: "array<ShopSlot>", constraints: "固定數量（如 6），slot shape: {slotId, item: DATA-004, priceGems, sold, purchasedBy, purchasedAt}，見 RULE-009" }
+
+  - id: DATA-008
+    name: dailyQuests
+    storage: "Firestore collection dailyQuests/{accountId}_{date}_{templateId}（每任務一份文件）"
+    domainModel: [ENT-007, VO-007]
+    api: [API-016, API-017]
+    primaryKey: "accountId + date + templateId"
+    columns:
+      - { name: questId, type: string, constraints: "PK（合成，等同 accountId_date_templateId）" }
+      - { name: templateId, type: string }
+      - { name: accountId, type: string, constraints: "not null, FK -> accounts.accountId" }
+      - { name: date, type: string, constraints: "yyyy-mm-dd (UTC+0)" }
+      - { name: currentCount, type: int, constraints: ">= 0" }
+      - { name: targetCount, type: int, constraints: ">= 1" }
+      - { name: completed, type: boolean }
+      - { name: rewardGold, type: int, constraints: "10..50，見 RULE-001" }
+      - { name: rewardGems, type: int, constraints: "0..1" }
+      - { name: claimed, type: boolean, constraints: "見 RULE-010，claim once" }
+      - { name: claimedAt, type: timestamp, constraints: "nullable" }
+      - { name: createdAt, type: timestamp }
+      - { name: updatedAt, type: timestamp }
+
+  - id: DATA-009
+    name: achievementProgress
+    storage: "Firestore collection achievementProgress/{accountId}_{achievementId}"
+    domainModel: [ENT-008, VO-008]
+    api: [API-018, API-019]
+    primaryKey: "accountId + achievementId"
+    columns:
+      - { name: achievementId, type: string, constraints: "PK 一部分" }
+      - { name: templateId, type: string }
+      - { name: accountId, type: string, constraints: "not null, FK -> accounts.accountId" }
+      - { name: currentCount, type: int, constraints: ">= 0" }
+      - { name: targetCount, type: int, constraints: ">= 1" }
+      - { name: completed, type: boolean }
+      - { name: rewardGems, type: int, constraints: "3..5" }
+      - { name: claimed, type: boolean, constraints: "見 RULE-011，每帳號每成就限一次" }
+      - { name: claimedAt, type: timestamp, constraints: "nullable" }
+      - { name: createdAt, type: timestamp }
+      - { name: updatedAt, type: timestamp }
+
+  - id: DATA-010
+    name: leaderboardEntries
+    storage: "Firestore collection leaderboardEntries/{accountId}（doc id = accountId，便於 upsert 最高分）"
+    domainModel: [ENT-009]
+    api: [API-020, API-028]
+    primaryKey: accountId
+    columns:
+      - { name: accountId, type: string, constraints: "PK, FK -> accounts.accountId" }
+      - { name: characterId, type: string }
+      - { name: nickname, type: string }
+      - { name: score, type: int, constraints: ">= 0，僅保留該帳號歷史最高分，見 RULE-012" }
+      - { name: runId, type: string, constraints: "產生此最高分的 run" }
+      - { name: achievedAt, type: timestamp }
+      - { name: step, type: int, constraints: "optional，稽核用" }
+      - { name: killCount, type: int, constraints: "optional，稽核用" }
+    index: "score DESC，供 Top-N 查詢"
+
+  - id: DATA-011
+    name: itemTemplates
+    storage: >
+      不落 Firestore；依 CTX-CON-001 放在 repo 內 JSON/TS 常數
+      （對應現有 server/constants/templates.ts）或 server 記憶體快取，
+      避免每個冒險 step 產生 Firestore 讀取（見 NFR-005）。
+    domainModel: [ENT-004]
+    api: []
+    primaryKey: templateId
+    columns:
+      - { name: templateId, type: string, constraints: "PK" }
+      - { name: type, type: string, constraints: "EQUIPMENT | POTION" }
+      - { name: equipSlot, type: string, constraints: "僅 EQUIPMENT 必填" }
+      - { name: rarityWeights, type: "map<rarity, number>" }
+      - { name: baseStatsRange, type: "map<rarity, range>", constraints: "僅 EQUIPMENT 使用" }
+      - { name: healPercentRange, type: "map<rarity, range>", constraints: "僅 POTION 使用" }
+      - { name: priceRangeByRarity, type: "map<rarity, range>" }
+
+relationships:
+  - id: REL-001
+    from: DATA-001
+    to: DATA-002
+    type: one-to-one
+    description: 一個帳號對應恰好一個角色（AGG-006 之外的 1:1 業務規則，見 CTX-CON-006）。
+  - id: REL-002
+    from: DATA-001
+    to: DATA-003
+    type: one-to-one
+    description: 一個帳號對應恰好一份永久背包。
+  - id: REL-003
+    from: DATA-002
+    to: DATA-005
+    type: one-to-many
+    description: 一個角色可有多筆歷史 AdventureRun，但同時間至多一筆 state != ENDED（見 RULE-002）。
+  - id: REL-004
+    from: DATA-001
+    to: DATA-006
+    type: one-to-many
+    description: 一個帳號每天一份金幣商店文件（歷史保留或覆蓋依保留策略決定，見 NFR-014）。
+  - id: REL-005
+    from: DATA-001
+    to: DATA-008
+    type: one-to-many
+    description: 一個帳號每天 3 筆每日任務文件（accountId+date 分組）。
+  - id: REL-006
+    from: DATA-001
+    to: DATA-009
+    type: one-to-many
+    description: 一個帳號對每個成就模板各有一筆進度文件。
+  - id: REL-007
+    from: DATA-001
+    to: DATA-010
+    type: one-to-one
+    description: 一個帳號在排行榜上僅保留一筆最高分紀錄。
+  - id: REL-008
+    from: DATA-011
+    to: DATA-004
+    type: one-to-many
+    description: 一個 ItemTemplate 可生成多個 ItemInstance；非 Firestore FK（模板在 repo 常數，instance 在 Firestore），僅為生成關係。
+  - id: REL-009
+    from: DATA-003
+    to: DATA-004
+    type: one-to-many
+    description: 永久背包內嵌最多 500 個 ItemInstance（陣列，非獨立 collection）。
+  - id: REL-010
+    from: DATA-005
+    to: DATA-004
+    type: one-to-many
+    description: run 內嵌最多 50 個 ItemInstance 作為 run 背包（陣列，非獨立 collection）。
+  - id: REL-011
+    from: DATA-006
+    to: DATA-004
+    type: one-to-many
+    description: 金幣商店文件內嵌固定數量的 ShopSlot，每個 slot 內嵌一個 ItemInstance。
+  - id: REL-012
+    from: DATA-007
+    to: DATA-004
+    type: one-to-many
+    description: 紅寶石商店文件內嵌固定數量的 ShopSlot，每個 slot 內嵌一個 ItemInstance。

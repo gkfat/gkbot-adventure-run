@@ -1,0 +1,233 @@
+classDiagram
+    %% ===== AGG-001 Account =====
+    class Account {
+        <<Entity, AGG-001 root>>
+        +accountId
+        +googleUid
+        +email
+        +createdAt
+    }
+    class AudioSettings {
+        <<ValueObject>>
+        +bgmEnabled
+        +sfxEnabled
+    }
+    Account "1" *-- "1" AudioSettings
+
+    %% ===== AGG-002 Character =====
+    class Character {
+        <<Entity, AGG-002 root>>
+        +characterId
+        +level
+        +exp
+        +gold
+        +gems
+        +unspentAttributePoints
+        +nickname
+    }
+    class Attributes {
+        <<ValueObject>>
+        +str
+        +agi
+        +con
+        +luck
+    }
+    class Equipment {
+        <<ValueObject>>
+        +HEAD
+        +BODY
+        +SHOES
+        +GLOVES
+        +LEFT_HAND
+        +RIGHT_HAND
+        +NECKLACE
+        +RING
+    }
+    class HealingPotion {
+        <<ValueObject, DEPRECATED>>
+        +level
+        +coolDownUntil
+    }
+    class Stats {
+        <<ValueObject, computed-only>>
+        +atk
+        +def
+        +hpMax
+        +actionIntervalSec
+    }
+    Character "1" *-- "1" Attributes
+    Character "1" *-- "1" Equipment
+    Character ..> Stats : derives (not persisted)
+    note for Character "RULE-001 gold/gems in [0,100000)\nRULE-003 level cap 30\nRULE-004 attribute points conservation\n(HealingPotion VO removed - potion is now an ItemInstance, see RULE-020)"
+
+    %% ===== AGG-004 ItemTemplate (independent) =====
+    class ItemTemplate {
+        <<Entity, AGG-004 root>>
+        +templateId
+        +type "EQUIPMENT|POTION"
+        +equipSlot "EQUIPMENT only"
+        +rarityWeights
+        +baseStatsRange "EQUIPMENT only"
+        +healPercentRange "POTION only"
+        +priceRangeByRarity
+    }
+
+    %% ===== ItemInstance shared shape (lives in AGG-003 or AGG-009) =====
+    class ItemInstance {
+        <<Entity>>
+        +itemId
+        +templateId
+        +type "EQUIPMENT|POTION"
+        +rarity
+        +source
+        +location
+        +createdAt
+    }
+    class RolledStats {
+        <<ValueObject>>
+        +values
+    }
+    ItemInstance "1" *-- "1" RolledStats
+    ItemTemplate ..> ItemInstance : generates
+
+    %% ===== AGG-003 Inventory =====
+    class Inventory {
+        <<Entity, AGG-003 root>>
+        +inventoryId
+        +capacity = 500
+    }
+    Inventory "1" o-- "0..500" ItemInstance : location=PERMANENT_INVENTORY
+    note for Inventory "RULE-006 capacity cap"
+    Equipment ..> ItemInstance : references by itemId (cross-aggregate)
+
+    %% ===== AGG-005 Shop =====
+    class Shop {
+        <<Entity, AGG-005 root>>
+        +shopId
+        +scope
+        +date
+    }
+    class ShopSlot {
+        <<ValueObject>>
+        +itemInstanceRef
+        +price
+        +currency
+        +sold
+        +purchasedAt
+    }
+    Shop "1" *-- "1..*" ShopSlot
+    note for Shop "RULE-009 sold once\nper-account vs global scope"
+
+    %% ===== AGG-006 DailyQuestSet =====
+    class DailyQuestSet {
+        <<Entity, AGG-006 root>>
+        +questSetId
+        +date
+    }
+    class QuestProgress {
+        <<ValueObject>>
+        +questTemplateId
+        +progressCount
+        +targetCount
+        +claimed
+    }
+    DailyQuestSet "1" *-- "3" QuestProgress
+    note for DailyQuestSet "RULE-010 no reroll, claim once"
+
+    %% ===== AGG-007 AchievementBoard =====
+    class AchievementBoard {
+        <<Entity, AGG-007 root>>
+        +accountId
+    }
+    class AchievementClaim {
+        <<ValueObject>>
+        +achievementId
+        +achievedAt
+        +claimed
+    }
+    AchievementBoard "1" *-- "*" AchievementClaim
+    note for AchievementBoard "RULE-011 claim once per account"
+
+    %% ===== AGG-008 LeaderboardEntry =====
+    class LeaderboardEntry {
+        <<Entity, AGG-008 root>>
+        +accountId
+        +nickname
+        +bestScore
+        +updatedAt
+    }
+    note for LeaderboardEntry "RULE-012 server-write-only, best-score-only"
+
+    %% ===== AGG-009 AdventureRun =====
+    class AdventureRun {
+        <<Entity, AGG-009 root>>
+        +runId
+        +characterId
+        +seed
+        +rngIndex
+        +state
+        +step
+        +blessingPoints
+        +score
+        +earnedGold
+        +earnedGems
+        +startedAt
+        +endedAt
+        +endReason
+        +lastInteractionAt
+        +potionUsedThisRun
+    }
+    class RunModifier {
+        <<ValueObject>>
+        +modifierId
+        +type
+        +effect
+        +expiresAtStep
+    }
+    class CombatSummary {
+        <<ValueObject>>
+        +result
+        +rounds
+        +dropSummary
+        +remainingHp
+        +scoreDelta
+    }
+    class AuditSummaryEntry {
+        <<ValueObject>>
+        +step
+        +nodeType
+        +outcome
+    }
+    AdventureRun "1" o-- "0..50" ItemInstance : location=RUN_INVENTORY
+    AdventureRun "1" *-- "0..*" RunModifier : active blessings/curses
+    AdventureRun "1" *-- "0..1" CombatSummary : latest
+    AdventureRun "1" *-- "0..*" AuditSummaryEntry
+    note for AdventureRun "RULE-002 single active run\nRULE-013 rest-pity priority\nRULE-014 rngIndex monotonic\nRULE-015 modifiers run-scoped\nRULE-016 no mid-combat actions\nRULE-020 potion use at Rest node only"
+
+    %% ===== Domain Events (selected key transitions) =====
+    class AccountCreated {
+        <<Event>>
+    }
+    class AccountDeleted {
+        <<Event>>
+    }
+    class ItemPurchased {
+        <<Event>>
+    }
+    class AdventureRunStarted {
+        <<Event>>
+    }
+    class CombatResolved {
+        <<Event>>
+    }
+    class AdventureRunEnded {
+        <<Event>>
+    }
+    Account ..> AccountCreated
+    Account ..> AccountDeleted
+    Shop ..> ItemPurchased
+    AdventureRun ..> AdventureRunStarted
+    AdventureRun ..> CombatResolved
+    AdventureRun ..> AdventureRunEnded
+
+    note for AdventureRunEnded "扇出：更新 Character 資源(AGG-002)、\n轉移背包(AGG-003)、更新排行榜(AGG-008)、\n更新任務/成就進度(AGG-006/007)"

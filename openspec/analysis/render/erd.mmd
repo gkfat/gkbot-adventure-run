@@ -1,0 +1,135 @@
+erDiagram
+    accounts ||--|| characters : "REL-001 一帳號一角色"
+    accounts ||--|| inventories : "REL-002 一帳號一永久背包"
+    characters ||--o{ adventureRuns : "REL-003 歷史多筆，同時至多一筆進行中"
+    accounts ||--o{ shopsGold : "REL-004 每日一份 per-account"
+    accounts ||--o{ dailyQuests : "REL-005 每日 3 筆"
+    accounts ||--o{ achievementProgress : "REL-006 每成就一筆"
+    accounts ||--|| leaderboardEntries : "REL-007 僅保留最高分一筆"
+    itemTemplates ||--o{ itemInstance_embedded : "REL-008 生成關係（非 FK）"
+    inventories ||--o{ itemInstance_embedded : "REL-009 內嵌陣列 max 500"
+    adventureRuns ||--o{ itemInstance_embedded : "REL-010 內嵌陣列 max 50 (runInventory)"
+    shopsGold ||--o{ itemInstance_embedded : "REL-011 內嵌於 ShopSlot"
+    shopsGems ||--o{ itemInstance_embedded : "REL-012 內嵌於 ShopSlot"
+
+    accounts {
+        string accountId PK
+        string provider
+        string googleUid
+        string email
+        boolean bgmEnabled
+        boolean sfxEnabled
+        timestamp createdAt
+        timestamp updatedAt
+    }
+
+    characters {
+        string characterId PK
+        string accountId FK
+        int level
+        int exp
+        int gold
+        int gems
+        int unspentAttributePoints
+        string nickname
+        timestamp createdAt
+        timestamp updatedAt
+    }
+
+    inventories {
+        string inventoryId PK
+        string accountId FK
+        array items "max 500, embedded ItemInstance"
+        timestamp updatedAt
+    }
+
+    adventureRuns {
+        string runId PK
+        string characterId FK
+        string accountId
+        string seed
+        int rngIndex
+        string state
+        int step
+        int score
+        int goldEarned
+        int gemsEarned
+        int blessingPoints
+        array runInventory "max 50, embedded ItemInstance"
+        array blessings
+        array curses
+        timestamp startedAt
+        timestamp endedAt
+        string endReason
+        timestamp lastActivityAt
+        timestamp updatedAt
+    }
+
+    shopsGold {
+        string accountId PK "part of composite key"
+        string date PK "yyyy-mm-dd UTC"
+        string seed
+        array items "ShopSlot[], embeds ItemInstance"
+        timestamp generatedAt
+    }
+
+    shopsGems {
+        string date PK "yyyy-mm-dd UTC, global"
+        string seed
+        array items "ShopSlot[], embeds ItemInstance"
+        timestamp generatedAt
+    }
+
+    dailyQuests {
+        string accountId PK "composite w/ date+templateId"
+        string date PK
+        string templateId PK
+        int currentCount
+        int targetCount
+        boolean completed
+        int rewardGold
+        int rewardGems
+        boolean claimed
+        timestamp claimedAt
+    }
+
+    achievementProgress {
+        string accountId PK "composite w/ achievementId"
+        string achievementId PK
+        int currentCount
+        int targetCount
+        boolean completed
+        int rewardGems
+        boolean claimed
+        timestamp claimedAt
+    }
+
+    leaderboardEntries {
+        string accountId PK
+        string characterId
+        string nickname
+        int score "index DESC for Top-N"
+        string runId
+        timestamp achievedAt
+    }
+
+    itemTemplates {
+        string templateId PK
+        string type "EQUIPMENT or POTION"
+        string equipSlot "EQUIPMENT only"
+        object rarityWeights
+        object baseStatsRange "EQUIPMENT only"
+        object healPercentRange "POTION only"
+        object priceRangeByRarity
+    }
+
+    itemInstance_embedded {
+        string itemId PK
+        string templateId FK
+        string type
+        string equipSlot
+        string rarity
+        object stats
+        string source
+        timestamp createdAt
+    }

@@ -1,0 +1,360 @@
+version: 1
+generatedBy: analysis-validator
+updatedAt: 2026-08-27T00:00:00Z
+relatedChanges: [gkbot-adventure-run-full-system]
+
+summary:
+  functionalRequirements: 87 (FR-016/017/018/061/062 deprecated 2026-08-27)
+  nonFunctionalRequirements: 14
+  userStories: 36 (STORY-007 deprecated 2026-08-27)
+  useCases: 36 (UC-007 deprecated 2026-08-27)
+  entities: 10
+  valueObjects: 12 (VO-004 HealingPotion deprecated 2026-08-27)
+  aggregates: 9
+  domainEvents: 15
+  businessRules: 20 (RULE-020 added; RULE-007/008 deprecated 2026-08-27)
+  apiEndpoints: 30 (API-008 deprecated 2026-08-27)
+  dataTables: 11
+  fullChainUseCases: 24
+  partialChainUseCases: 12
+  danglingReferences: 0
+  correctionsAppliedDuringValidation: 3
+  changeLog:
+    - date: 2026-08-27
+      description: >
+        補血藥水從「角色固定欄位（等級/升級/冷卻）」改為「一般消耗品物品
+        （type=POTION，稀有度決定回復%，可購買/掉落取得）」，貼近原始
+        spec.md 的物品模組定義。連帶修正一個先前遺漏：API-027
+        （POST /api/adventure/rest/heal）未被任何 openspec change 認領，
+        已補進 adventure-run-core change。
+
+links:
+  - useCase: UC-001
+    context: [CTX-ACTOR-001, CTX-ACTOR-002, CTX-CON-006, CTX-EXT-001, CTX-EXT-002]
+    requirements: [FR-001, FR-002, FR-003, FR-006]
+    domainModel: [AGG-001, ENT-001, EVT-001]
+    api: [API-001]
+    data: [DATA-001]
+  - useCase: UC-002
+    context: [CTX-ACTOR-001]
+    requirements: [FR-004]
+    domainModel: [AGG-001, ENT-001]
+    api: [API-002]
+    data: [DATA-001]
+  - useCase: UC-003
+    context: [CTX-CON-003, CTX-CON-004, CTX-CON-006]
+    requirements: [FR-005, FR-079, FR-080]
+    domainModel: [AGG-001, ENT-001, EVT-002, RULE-018]
+    api: [API-003]
+    data: [DATA-001]
+  - useCase: UC-004
+    context: [CTX-ACTOR-002, CTX-CON-003, CTX-CON-006]
+    requirements: [FR-007, FR-008, FR-011, FR-013, FR-014]
+    domainModel: [AGG-002, ENT-002, RULE-003, VO-001, VO-002]
+    api: [API-005]
+    data: [DATA-002]
+  - useCase: UC-005
+    context: [CTX-ACTOR-001, CTX-CON-003]
+    requirements: [FR-009, FR-010, FR-012]
+    domainModel: [AGG-002, ENT-002, EVT-003, RULE-001, RULE-004, VO-001]
+    api: [API-006]
+    data: [DATA-002]
+  - useCase: UC-006
+    context: [CTX-ACTOR-001]
+    requirements: [FR-019]
+    domainModel: [AGG-002, ENT-002]
+    api: [API-007]
+    data: [DATA-002]
+  - useCase: UC-007
+    status: deprecated
+    reason: >
+      補血藥水改為一般消耗品物品（type=POTION），不再有角色端的升級動作。
+      舊有 FR-016/017/018、AGG-002 側的 VO-004、RULE-001（就此用途）、API-008
+      皆已標記 deprecated，見對應檔案。
+    context: [CTX-CON-003]
+    requirements: [FR-015, FR-016, FR-017, FR-018]
+    domainModel: [AGG-002, ENT-002, RULE-001, RULE-007, VO-004]
+    api: [API-008]
+    data: [DATA-002]
+  - useCase: UC-008
+    context: [CTX-ACTOR-002]
+    requirements: [FR-020, FR-021, FR-028]
+    domainModel: [AGG-004, ENT-003, ENT-004, VO-005]
+    api: []
+    data: []
+    note: "無獨立 API/表：物品生成是內部邏輯，內嵌於 purchase/combat/event 等端點與 DATA-004(embedded)/DATA-011 中，非缺口。"
+  - useCase: UC-009
+    context: [CTX-ACTOR-001]
+    requirements: [FR-024, FR-025, FR-026]
+    domainModel: [AGG-002, ENT-002, ENT-003, EVT-004, RULE-005, RULE-019, VO-003]
+    api: [API-009, API-010]
+    data: [DATA-002, DATA-003, DATA-004]
+  - useCase: UC-010
+    context: [CTX-CON-007]
+    requirements: [FR-022, FR-023, FR-027]
+    domainModel: [AGG-003, ENT-003, ENT-005, RULE-006]
+    api: [API-011]
+    data: [DATA-003, DATA-004]
+  - useCase: UC-011
+    context: [CTX-ACTOR-002, CTX-CON-005]
+    requirements: [FR-029, FR-030, FR-031, FR-032]
+    domainModel: [AGG-005, ENT-006, VO-006]
+    api: []
+    data: []
+    note: "每日重置採懶生成，內嵌於 API-013/API-014 的 GET 邏輯中，非獨立端點，非缺口。"
+  - useCase: UC-012
+    context: [CTX-ACTOR-002]
+    requirements: [FR-030, FR-031]
+    domainModel: [AGG-005, ENT-006, VO-006]
+    api: [API-013, API-014]
+    data: [DATA-004, DATA-006, DATA-007]
+  - useCase: UC-013
+    context: [CTX-CON-003]
+    requirements: [FR-033, FR-034, FR-035, FR-012]
+    domainModel: [AGG-002, AGG-005, ENT-002, ENT-003, ENT-006, EVT-005, RULE-001, RULE-009, VO-006]
+    api: [API-015]
+    data: [DATA-002, DATA-003, DATA-004, DATA-006, DATA-007]
+  - useCase: UC-014
+    context: [CTX-CON-005]
+    requirements: [FR-036]
+    domainModel: [AGG-006, ENT-007, VO-007]
+    api: [API-016]
+    data: [DATA-008]
+  - useCase: UC-015
+    context: [CTX-ACTOR-001]
+    requirements: [FR-037]
+    domainModel: [AGG-006, ENT-002, ENT-007, EVT-006, RULE-001, RULE-010, VO-007]
+    api: [API-016, API-017]
+    data: [DATA-008]
+  - useCase: UC-016
+    context: [CTX-ACTOR-001]
+    requirements: [FR-038]
+    domainModel: [AGG-007, ENT-002, ENT-008, EVT-007, RULE-001, RULE-011, VO-008]
+    api: [API-018, API-019]
+    data: [DATA-009]
+  - useCase: UC-017
+    context: []
+    requirements: [FR-039, FR-040]
+    domainModel: [ENT-003]
+    api: []
+    data: []
+    note: "無獨立 API/表：gems 掉落內嵌於 combat(API-024)/event(API-025) 結算，非缺口。FR-040 為已知 needs review 項目。"
+  - useCase: UC-018
+    context: [CTX-ACTOR-001]
+    requirements: [FR-042, FR-043, FR-044]
+    domainModel: [AGG-008, ENT-009]
+    api: [API-020]
+    data: [DATA-010]
+  - useCase: UC-019
+    context: [CTX-CON-003]
+    requirements: [FR-041]
+    domainModel: [AGG-008, ENT-009, EVT-008, RULE-012]
+    api: []
+    data: []
+    note: "無獨立 API/表：排行榜更新內嵌於 API-028（/adventure/end）流程中，非缺口。"
+  - useCase: UC-020
+    context: [CTX-ACTOR-001, CTX-ACTOR-002]
+    requirements: [FR-045]
+    domainModel: [AGG-009, ENT-010, EVT-009, RULE-002]
+    api: [API-021]
+    data: [DATA-002, DATA-005]
+  - useCase: UC-021
+    context: [CTX-ACTOR-002]
+    requirements: [FR-046, FR-047, FR-048, FR-049, FR-050, FR-051, FR-052]
+    domainModel: [AGG-009, ENT-010, EVT-010, RULE-013]
+    api: [API-023]
+    data: [DATA-005]
+  - useCase: UC-022
+    context: [CTX-ACTOR-001]
+    requirements: [FR-053, FR-054]
+    domainModel: [AGG-009, ENT-010]
+    api: [API-022]
+    data: [DATA-005]
+  - useCase: UC-023
+    context: [CTX-ACTOR-001, CTX-CON-003]
+    requirements: [FR-055, FR-056, FR-057, FR-084]
+    domainModel: [AGG-009, ENT-003, ENT-010]
+    api: [API-023]
+    data: [DATA-005]
+  - useCase: UC-024
+    context: []
+    requirements: [FR-058, FR-059]
+    domainModel: [AGG-009, ENT-010, EVT-012, RULE-015, VO-009]
+    api: [API-026]
+    data: [DATA-005]
+  - useCase: UC-025
+    context: []
+    requirements: [FR-060]
+    domainModel: [AGG-009, ENT-003, ENT-010, EVT-014, RULE-020]
+    api: [API-027]
+    data: [DATA-004, DATA-005]
+    note: >
+      2026-08-27 更新：藥水改為一般消耗品物品，不再涉及 AGG-002/VO-004/RULE-007/008/019；
+      FR-061/062 已 deprecated（見 requirements.yaml）。此 use case 亦不再屬於
+      character-progression change，改由 adventure-run-core change 實作
+      （見 traceability.yaml 的 gap 清單：API-027 先前未被任何 change 認領）。
+  - useCase: UC-026
+    context: [CTX-CON-003]
+    requirements: [FR-047, FR-056, FR-057]
+    domainModel: [AGG-002, AGG-003, AGG-009, ENT-002, ENT-003, ENT-005, ENT-010, EVT-015, RULE-001, RULE-006]
+    api: [API-028]
+    data: [DATA-002, DATA-003, DATA-004, DATA-005, DATA-010]
+  - useCase: UC-027
+    context: [CTX-ACTOR-002, CTX-CON-002, CTX-CON-008]
+    requirements: [FR-063, FR-064, FR-065, FR-066, FR-067, FR-068, FR-084]
+    domainModel: [AGG-009, ENT-010, EVT-011, RULE-016, VO-002, VO-010]
+    api: [API-024]
+    data: [DATA-004, DATA-005]
+  - useCase: UC-028
+    context: []
+    requirements: [FR-069, FR-070]
+    domainModel: [AGG-009, ENT-010, RULE-015, VO-009]
+    api: [API-024]
+    data: [DATA-004, DATA-005]
+  - useCase: UC-029
+    context: [CTX-ACTOR-002]
+    requirements: [FR-071, FR-072]
+    domainModel: [AGG-009, ENT-010, EVT-013, VO-009]
+    api: [API-025]
+    data: [DATA-005]
+  - useCase: UC-030
+    context: []
+    requirements: [FR-073, FR-074]
+    domainModel: [AGG-009, ENT-003, ENT-010, EVT-013]
+    api: [API-025]
+    data: [DATA-005]
+    note: "FR-074 為已知 needs review 項目（轉盤付費加抽未定案）。"
+  - useCase: UC-031
+    context: [CTX-ACTOR-002, CTX-CON-003]
+    requirements: [FR-075, FR-076]
+    domainModel: [AGG-009, ENT-010, RULE-014]
+    api: []
+    data: []
+    note: "RNG 消耗為內部邏輯，無獨立 API/表，非缺口。"
+  - useCase: UC-032
+    context: []
+    requirements: [FR-077, FR-078]
+    domainModel: [AGG-009, ENT-010, VO-011]
+    api: []
+    data: []
+    note: "稽核摘要為內嵌於 DATA-005.auditSummary，本身無獨立 API；FR-078 為已知 needs review 項目。"
+  - useCase: UC-033
+    context: [CTX-CON-003]
+    requirements: [FR-080]
+    domainModel: [RULE-017]
+    api: []
+    data: []
+    note: "Firestore security rules 屬基礎設施層，非 API/資料表概念，非缺口。"
+  - useCase: UC-034
+    context: [CTX-ACTOR-001, CTX-ASM-002, CTX-EXT-001]
+    requirements: [FR-081, FR-085, FR-083]
+    domainModel: []
+    api: []
+    data: []
+    note: "路由守衛屬前端行為，不引入新領域概念/API/表，非缺口（domain-modeling 階段已確認）。"
+  - useCase: UC-035
+    context: [CTX-ACTOR-001]
+    requirements: [FR-082]
+    domainModel: [AGG-001, VO-012]
+    api: [API-004]
+    data: [DATA-001]
+  - useCase: UC-036
+    context: []
+    requirements: [FR-086, FR-087]
+    domainModel: []
+    api: [API-029, API-030]
+    data: []
+    note: "OpenAPI/Swagger UI 為文件產出功能，不對應領域模型或資料表，非缺口（domain-modeling 階段已確認）。"
+
+correctionsAppliedDuringValidation:
+  - id: FIX-001
+    description: FR-084（戰鬥回饋與結算畫面）原本沒有任何 use case 在 requirements 陣列中引用，屬 orphan FR。已將其加入 UC-023 與 UC-027 的 requirements 陣列。
+    filesChanged: [use-cases.yaml]
+  - id: FIX-002
+    description: >
+      data-model.yaml 的 DATA-008、DATA-009 的 domainModel 欄位誤用 AGG-006/AGG-007
+      （aggregate id），違反共用規範第 3 節「data-model.yaml 的每筆項目 → domainModel: [ENT-...]」。
+      已改為對應的 aggregate root entity：ENT-007、ENT-008。
+    filesChanged: [data-model.yaml]
+  - id: FIX-003
+    description: >
+      requirements.yaml 有 19 筆 FR/NFR 的 context 欄位誤填其他 FR id（例如
+      FR-042 context:[FR-019]、NFR-004 context:[FR-012]），違反共用規範第 3 節
+      「requirements.yaml 的每筆項目 → context: [CTX-...]」。已清空這些欄位
+      （改為 []，其中一筆是 CTX 與 FR 混填，保留 CTX 部分）。FR 與 FR 之間的
+      關聯性仍可從 description 文字與 use-cases.yaml 的分組看出，未遺失資訊。
+    filesChanged: [requirements.yaml]
+
+gaps:
+  - type: change-coverage-gap
+    id: API-027
+    description: >
+      2026-08-27 稽核發現：POST /api/adventure/rest/heal（UC-025）先前在
+      /opsx:propose 拆分 10 個 changes 時未被任何 change 認領（proposal/tasks
+      皆無提及），是遺漏而非刻意排除。已在同一次修訂中，隨補血藥水改為一般
+      消耗品物品的設計變更，一併補進 adventure-run-core change（見該 change
+      的 proposal.md/design.md/tasks.md）。
+    severity: medium
+    status: fixed
+  - type: needs-review-marker
+    id: FR-040
+    description: enemyLevel > 30 時 combat 的 gems 掉落規則未定義（來源文件本身即標記 TBD，見 docs/15_待討論問題總整理.md）。
+    severity: low
+  - type: needs-review-marker
+    id: FR-074
+    description: 事件轉盤是否可付費加抽尚未定案，若啟用將影響經濟系統設計。
+    severity: low
+  - type: needs-review-marker
+    id: FR-078
+    description: Anti-cheat 目標強度與是否支援分享 seed 尚未定案。
+    severity: low
+  - type: needs-review-marker
+    id: NFR-013
+    description: Anti-cheat 目標強度的量測指標未量化。
+    severity: low
+  - type: needs-review-marker
+    id: NFR-014
+    description: Run history 長期保留策略（含是否改用 Google Sheet）的量測指標未量化。
+    severity: low
+  - type: needs-review-marker
+    id: API-012
+    description: >
+      DELETE /inventory/{itemId}（捨棄物品）已存在於既有程式碼 schema
+      （shared/schemas/api/inventory.schema.ts），但來源文件
+      docs/05_物品與裝備系統.md 未描述丟棄機制，requirements.yaml 亦無對應 FR。
+    severity: medium
+    suggestedAction: 與相關人確認丟棄物品是否為既定需求；若是，需回頭於 system-analysis 補上對應 FR 並於 requirement-modeling 補上 use case。
+  - type: design-deviation
+    id: AGG-006-vs-DATA-008
+    description: >
+      domain-model.yaml 的 AGG-006 DailyQuestSet 以「一組 3 個任務」為單一
+      一致性邊界，但 data-model.yaml（沿用既有實作）將每個任務存成獨立扁平文件
+      （accountId+date+templateId），而非單一父文件。已在 data-model.yaml 頂部
+      註記：以 application-level batch write 取代單文件原子性作為緩解。
+    severity: medium
+    suggestedAction: >
+      若後續實作發現 batch write 不足以滿足一致性需求（例如需要嚴格禁止「重置到一半」的中間狀態被讀到），
+      需回頭調整 domain-model.yaml 的 AGG-006 邊界定義或改為單一父文件設計。
+  - type: nfr-not-directly-tagged
+    id: NFR-008
+    description: >
+      Firestore security rules 預設拒絕（NFR-008）在功能面已由 UC-033/RULE-017
+      覆蓋，但 api-model.yaml 與 data-model.yaml 內文都沒有直接標註 NFR-008。
+    severity: low
+    suggestedAction: 屬合理現象（安全規則不是 API operation 也不是資料表欄位），建議於 firestore.rules 檔案或部署檢查清單中另行追蹤，不需要修改 api-model/data-model 結構。
+  - type: nfr-not-applicable-to-schema
+    id: [NFR-010, NFR-012]
+    description: >
+      NFR-010（部署時 Firebase Admin 憑證載入）與 NFR-012（新端點需註冊 OpenAPI）
+      本質是部署流程/工程紀律類 NFR，不會自然落在 API schema 或資料表欄位上。
+    severity: low
+    suggestedAction: 建議在部署 checklist / code review checklist 追蹤，而非要求 api-model.yaml/data-model.yaml 額外欄位。
+  - type: intentional-non-coverage
+    id: AGG-004
+    description: ItemTemplate（AGG-004）刻意不透過任何 API 曝露 CRUD，因其為 repo 內靜態常數（CTX-CON-001），非 Firestore 動態資料。
+    severity: low
+    suggestedAction: 無需動作，已在 api-model.yaml 開頭註明。
+  - type: dangling-reference
+    id: none
+    description: 未發現任何跨檔案的懸空引用（FR/UC/ENT/VO/AGG/EVT/RULE/API/DATA 互相引用皆可在來源檔案中找到對應項目）。
+    severity: none

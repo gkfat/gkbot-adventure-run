@@ -1,0 +1,742 @@
+openapi: 3.0.3
+info:
+  title: GkBot Adventure Run API
+  version: "1.0"
+  description: 乾淨版 OpenAPI 規格（不含分析用 x-trace 中繼資料），來源見 ../api-model.yaml
+servers:
+  - url: /api
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: "Firebase ID Token"
+  schemas:
+    Attributes:
+      type: object
+      properties:
+        STR: { type: integer }
+        AGI: { type: integer }
+        CON: { type: integer }
+        LUCK: { type: integer }
+    Stats:
+      type: object
+      properties:
+        ATK: { type: number }
+        DEF: { type: number }
+        HP_MAX: { type: number }
+        HP_CURRENT: { type: number }
+        actionIntervalSec: { type: number }
+        critChance: { type: number }
+        critMultiplier: { type: number }
+        dodgeChance: { type: number }
+    ItemInstance:
+      type: object
+      properties:
+        itemId: { type: string }
+        templateId: { type: string }
+        type: { type: string, enum: [EQUIPMENT, POTION] }
+        rarity: { type: string, enum: [N, R, SR, SSR, L] }
+        rolledStats: { type: object, additionalProperties: { type: number } }
+        source: { type: string, enum: [DROP, SHOP, EVENT] }
+        location: { type: string, enum: [PERMANENT_INVENTORY, RUN_INVENTORY, EQUIPPED] }
+        createdAt: { type: integer }
+    ShopItem:
+      type: object
+      properties:
+        slotId: { type: string }
+        item: { $ref: '#/components/schemas/ItemInstance' }
+        price: { type: integer }
+        currency: { type: string, enum: [GOLD, GEMS] }
+        sold: { type: boolean }
+        purchasedAt: { type: integer, nullable: true }
+    DailyQuest:
+      type: object
+      properties:
+        questId: { type: string }
+        templateId: { type: string }
+        progressCount: { type: integer }
+        targetCount: { type: integer }
+        claimed: { type: boolean }
+        goldReward: { type: integer }
+        gemsReward: { type: integer }
+    AchievementProgress:
+      type: object
+      properties:
+        achievementId: { type: string }
+        achievedAt: { type: integer, nullable: true }
+        claimed: { type: boolean }
+        gemsReward: { type: integer }
+    LeaderboardEntry:
+      type: object
+      properties:
+        accountId: { type: string }
+        nickname: { type: string }
+        bestScore: { type: integer }
+        updatedAt: { type: integer }
+    AdventureRun:
+      type: object
+      properties:
+        runId: { type: string }
+        characterId: { type: string }
+        state:
+          type: string
+          enum: [INIT, EXPLORING, COMBAT, EVENT, BLESSING_SELECT, SHOP, RESOLUTION, ENDED]
+        step: { type: integer }
+        blessingPoints: { type: integer }
+        score: { type: integer }
+        earnedGold: { type: integer }
+        earnedGems: { type: integer }
+        startedAt: { type: integer }
+        endedAt: { type: integer, nullable: true }
+        endReason: { type: string, enum: [DEAD, QUIT, DISCONNECT, TIMEOUT], nullable: true }
+    CombatSummary:
+      type: object
+      properties:
+        result: { type: string, enum: [WIN, LOSE] }
+        rounds: { type: integer }
+        dropSummary: { type: object }
+        remainingHp: { type: number }
+        scoreDelta: { type: integer }
+
+    LoginRequest:
+      type: object
+      required: [idToken]
+      properties:
+        idToken: { type: string, minLength: 1 }
+    LoginResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            accountId: { type: string }
+            email: { type: string, format: email }
+            characterId: { type: string }
+            level: { type: integer, minimum: 1 }
+            isNewAccount: { type: boolean }
+    MeResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            accountId: { type: string }
+            email: { type: string, format: email }
+            createdAt: { type: integer }
+    DeleteAccountResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            message: { type: string }
+    UpdateAccountSettingsRequest:
+      type: object
+      properties:
+        bgmEnabled: { type: boolean }
+        sfxEnabled: { type: boolean }
+    UpdateAccountSettingsResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            bgmEnabled: { type: boolean }
+            sfxEnabled: { type: boolean }
+
+    GetCharacterResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            characterId: { type: string }
+            level: { type: integer }
+            exp: { type: integer }
+            gold: { type: integer }
+            gems: { type: integer }
+            attributes: { $ref: '#/components/schemas/Attributes' }
+            unspentAttributePoints: { type: integer }
+            nickname: { type: string }
+            stats: { $ref: '#/components/schemas/Stats' }
+    AllocateAttributesRequest:
+      type: object
+      properties:
+        STR: { type: integer, minimum: 0 }
+        AGI: { type: integer, minimum: 0 }
+        CON: { type: integer, minimum: 0 }
+        LUCK: { type: integer, minimum: 0 }
+      description: 至少需分配 1 點；總和不可超過 unspentAttributePoints
+    AllocateAttributesResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            attributes: { $ref: '#/components/schemas/Attributes' }
+            unspentAttributePoints: { type: integer }
+    SetNicknameRequest:
+      type: object
+      required: [nickname]
+      properties:
+        nickname: { type: string, minLength: 1, maxLength: 20 }
+    SetNicknameResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            nickname: { type: string }
+
+    EquipItemRequest:
+      type: object
+      required: [itemId]
+      properties:
+        itemId: { type: string }
+    EquipItemResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            equipped: { $ref: '#/components/schemas/ItemInstance' }
+            unequipped: { $ref: '#/components/schemas/ItemInstance' }
+    UnequipItemRequest:
+      type: object
+      required: [slot]
+      properties:
+        slot: { type: string, enum: [HEAD, BODY, SHOES, GLOVES, LEFT_HAND, RIGHT_HAND, NECKLACE, RING] }
+    UnequipItemResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            unequipped: { $ref: '#/components/schemas/ItemInstance' }
+    GetInventoryResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/ItemInstance' } }
+            count: { type: integer }
+            maxCount: { type: integer, description: "500" }
+    DeleteItemResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            message: { type: string }
+
+    GetGoldShopResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            date: { type: string }
+            items: { type: array, items: { $ref: '#/components/schemas/ShopItem' } }
+    GetGemsShopResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            date: { type: string }
+            items: { type: array, items: { $ref: '#/components/schemas/ShopItem' } }
+    PurchaseItemRequest:
+      type: object
+      required: [shopType, slotId, destination]
+      properties:
+        shopType: { type: string, enum: [GOLD, GEMS] }
+        slotId: { type: string }
+        destination: { type: string, enum: [INVENTORY, EQUIP] }
+        replaceSlot: { type: string }
+    PurchaseItemResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            item:
+              type: object
+              properties:
+                itemId: { type: string }
+                templateId: { type: string }
+                rarity: { type: string }
+            goldSpent: { type: integer }
+            gemsSpent: { type: integer }
+
+    GetDailyQuestsResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            quests: { type: array, items: { $ref: '#/components/schemas/DailyQuest' } }
+    ClaimQuestResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            goldEarned: { type: integer }
+            gemsEarned: { type: integer }
+    GetAchievementsResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            achievements: { type: array, items: { $ref: '#/components/schemas/AchievementProgress' } }
+    ClaimAchievementResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            gemsEarned: { type: integer }
+
+    GetLeaderboardResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            entries: { type: array, items: { $ref: '#/components/schemas/LeaderboardEntry' } }
+            total: { type: integer }
+            myRank: { type: integer }
+            myEntry: { $ref: '#/components/schemas/LeaderboardEntry' }
+
+    StartAdventureResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            runId: { type: string }
+            seed: { type: string }
+            state: { type: string, enum: [INIT] }
+    GetCurrentAdventureResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          allOf:
+            - { $ref: '#/components/schemas/AdventureRun' }
+          nullable: true
+    AdvanceAdventureResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            state: { type: string, enum: [EXPLORING, COMBAT, EVENT, BLESSING_SELECT, SHOP, RESOLUTION, ENDED] }
+            step: { type: integer }
+            nodeType: { type: string, enum: [COMBAT, EVENT, REST, ELITE, STRONG_ELITE, CHOICE] }
+    StartCombatResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            combatLog:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp: { type: integer }
+                  actorId: { type: string }
+                  targetId: { type: string }
+                  action: { type: string, enum: [ATTACK, CRIT, DODGE, DEATH] }
+                  damage: { type: number }
+                  targetHpRemaining: { type: number }
+            summary: { $ref: '#/components/schemas/CombatSummary' }
+    ResolveEventRequest:
+      type: object
+      properties:
+        choiceIndex: { type: integer, minimum: 0 }
+    ResolveEventResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            eventType: { type: string }
+            description: { type: string }
+            hpHealed: { type: number }
+            goldGained: { type: integer }
+            gemsGained: { type: integer }
+    SelectBlessingRequest:
+      type: object
+      required: [blessingId]
+      properties:
+        blessingId: { type: string }
+    SelectBlessingResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            blessing:
+              type: object
+              properties:
+                modifierId: { type: string }
+                name: { type: string }
+                description: { type: string }
+    RestHealRequest:
+      type: object
+      required: [itemId]
+      properties:
+        itemId: { type: string, description: "要使用的 POTION 物品實體 id" }
+    RestHealResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            hpHealed: { type: number }
+            hpCurrent: { type: number }
+    EndAdventureResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            finalScore: { type: integer }
+            goldEarned: { type: integer }
+            gemsEarned: { type: integer }
+            itemsEarned: { type: integer }
+            expGained: { type: integer }
+            leveledUp: { type: boolean }
+
+paths:
+  /auth/login:
+    post:
+      operationId: authLogin
+      summary: 使用 Firebase idToken 登入，首次登入自動建立帳號與角色
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: 登入成功, content: { application/json: { schema: { $ref: '#/components/schemas/LoginResponse' } } } }
+        '401': { description: idToken 無效或過期 }
+
+  /auth/me:
+    get:
+      operationId: authGetMe
+      summary: 取得目前登入帳號資訊
+      responses:
+        '200': { description: 帳號資訊, content: { application/json: { schema: { $ref: '#/components/schemas/MeResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /auth/account:
+    delete:
+      operationId: authDeleteAccount
+      summary: 刪除帳號與所有關聯資料（不可復原）
+      responses:
+        '200': { description: 已刪除, content: { application/json: { schema: { $ref: '#/components/schemas/DeleteAccountResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /account/settings:
+    put:
+      operationId: updateAccountSettings
+      summary: 更新音效設定（BGM/SFX 開關）
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateAccountSettingsRequest' }
+      responses:
+        '200': { description: 設定已更新, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateAccountSettingsResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /character:
+    get:
+      operationId: getCharacter
+      summary: 取得角色資料與伺服器計算後的 stats
+      responses:
+        '200': { description: 角色資料, content: { application/json: { schema: { $ref: '#/components/schemas/GetCharacterResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /character/attributes:
+    post:
+      operationId: allocateCharacterAttributes
+      summary: 分配 unspentAttributePoints
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AllocateAttributesRequest' }
+      responses:
+        '200': { description: 分配成功, content: { application/json: { schema: { $ref: '#/components/schemas/AllocateAttributesResponse' } } } }
+        '400': { description: 分配點數超過剩餘 unspentAttributePoints }
+        '401': { description: 未登入或 token 失效 }
+
+  /character/nickname:
+    post:
+      operationId: setCharacterNickname
+      summary: 設定排行榜顯示暱稱
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetNicknameRequest' }
+      responses:
+        '200': { description: 設定成功, content: { application/json: { schema: { $ref: '#/components/schemas/SetNicknameResponse' } } } }
+        '400': { description: 暱稱格式不合法 }
+        '401': { description: 未登入或 token 失效 }
+
+  /character/equip:
+    post:
+      operationId: equipItem
+      summary: 將背包物品裝備到對應槽位
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EquipItemRequest' }
+      responses:
+        '200': { description: 裝備成功, content: { application/json: { schema: { $ref: '#/components/schemas/EquipItemResponse' } } } }
+        '400': { description: 物品的 equipSlot 與目標槽位不符，或物品不存在於玩家背包 }
+        '401': { description: 未登入或 token 失效 }
+
+  /character/unequip:
+    post:
+      operationId: unequipItem
+      summary: 卸下指定槽位的裝備
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UnequipItemRequest' }
+      responses:
+        '200': { description: 卸下成功, content: { application/json: { schema: { $ref: '#/components/schemas/UnequipItemResponse' } } } }
+        '400': { description: 該槽位目前無裝備 }
+        '401': { description: 未登入或 token 失效 }
+
+  /inventory:
+    get:
+      operationId: getInventory
+      summary: 取得永久背包內容（最多 500 格）
+      responses:
+        '200': { description: 背包內容, content: { application/json: { schema: { $ref: '#/components/schemas/GetInventoryResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /inventory/{itemId}:
+    delete:
+      operationId: deleteInventoryItem
+      summary: 捨棄一件永久背包內的物品
+      parameters:
+        - { name: itemId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 已捨棄, content: { application/json: { schema: { $ref: '#/components/schemas/DeleteItemResponse' } } } }
+        '404': { description: 物品不存在於玩家永久背包 }
+        '401': { description: 未登入或 token 失效 }
+
+  /shop/gold:
+    get:
+      operationId: getGoldShop
+      summary: 取得今日金幣商店商品
+      responses:
+        '200': { description: 商品清單, content: { application/json: { schema: { $ref: '#/components/schemas/GetGoldShopResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /shop/gems:
+    get:
+      operationId: getGemsShop
+      summary: 取得今日紅寶石商店商品
+      responses:
+        '200': { description: 商品清單, content: { application/json: { schema: { $ref: '#/components/schemas/GetGemsShopResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /shop/purchase:
+    post:
+      operationId: purchaseShopItem
+      summary: 購買商店商品
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseItemRequest' }
+      responses:
+        '200': { description: 購買成功, content: { application/json: { schema: { $ref: '#/components/schemas/PurchaseItemResponse' } } } }
+        '400': { description: 資源不足 }
+        '409': { description: 商品已售出 }
+        '401': { description: 未登入或 token 失效 }
+
+  /quests/daily:
+    get:
+      operationId: getDailyQuests
+      summary: 取得今日每日任務與進度
+      responses:
+        '200': { description: 任務清單, content: { application/json: { schema: { $ref: '#/components/schemas/GetDailyQuestsResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /quests/claim/{questId}:
+    post:
+      operationId: claimDailyQuest
+      summary: 領取已完成任務的獎勵
+      parameters:
+        - { name: questId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 領取成功, content: { application/json: { schema: { $ref: '#/components/schemas/ClaimQuestResponse' } } } }
+        '400': { description: 任務尚未達成 }
+        '409': { description: 任務已領取過 }
+        '401': { description: 未登入或 token 失效 }
+
+  /achievements:
+    get:
+      operationId: getAchievements
+      summary: 取得成就清單與領取狀態
+      responses:
+        '200': { description: 成就清單, content: { application/json: { schema: { $ref: '#/components/schemas/GetAchievementsResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /achievements/claim/{achievementId}:
+    post:
+      operationId: claimAchievement
+      summary: 領取成就獎勵
+      parameters:
+        - { name: achievementId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 領取成功, content: { application/json: { schema: { $ref: '#/components/schemas/ClaimAchievementResponse' } } } }
+        '400': { description: 成就尚未達成 }
+        '409': { description: 已領取過 }
+        '401': { description: 未登入或 token 失效 }
+
+  /leaderboard:
+    get:
+      operationId: getLeaderboard
+      summary: 取得全服排行榜 Top-N 與自己的名次
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200': { description: 排行榜資料, content: { application/json: { schema: { $ref: '#/components/schemas/GetLeaderboardResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /adventure/start:
+    post:
+      operationId: startAdventure
+      summary: 開始新的冒險 run
+      responses:
+        '200': { description: run 已建立, content: { application/json: { schema: { $ref: '#/components/schemas/StartAdventureResponse' } } } }
+        '409': { description: 已有進行中的 run }
+        '401': { description: 未登入或 token 失效 }
+
+  /adventure/current:
+    get:
+      operationId: getCurrentAdventure
+      summary: 取得目前進行中的 run
+      responses:
+        '200': { description: 目前 run 狀態, content: { application/json: { schema: { $ref: '#/components/schemas/GetCurrentAdventureResponse' } } } }
+        '401': { description: 未登入或 token 失效 }
+
+  /adventure/advance:
+    post:
+      operationId: advanceAdventure
+      summary: 推進到下一個節點
+      responses:
+        '200': { description: 已決定下一節點, content: { application/json: { schema: { $ref: '#/components/schemas/AdvanceAdventureResponse' } } } }
+        '409': { description: run 目前狀態不允許推進 }
+        '401': { description: 未登入或 token 失效 }
+
+  /adventure/combat/start:
+    post:
+      operationId: startCombat
+      summary: 伺服器單次模擬戰鬥，回傳 combatLog
+      responses:
+        '200': { description: 戰鬥結果, content: { application/json: { schema: { $ref: '#/components/schemas/StartCombatResponse' } } } }
+        '409': { description: run 目前狀態非 COMBAT }
+        '401': { description: 未登入或 token 失效 }
+
+  /adventure/event/resolve:
+    post:
+      operationId: resolveAdventureEvent
+      summary: 解決目前事件（含轉盤）
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveEventRequest' }
+      responses:
+        '200': { description: 事件結果, content: { application/json: { schema: { $ref: '#/components/schemas/ResolveEventResponse' } } } }
+        '400': { description: 提交了不存在的 choice }
+        '401': { description: 未登入或 token 失效 }
+
+  /adventure/blessing/select:
+    post:
+      operationId: selectBlessing
+      summary: 選擇一個祝福候選
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SelectBlessingRequest' }
+      responses:
+        '200': { description: 已套用祝福, content: { application/json: { schema: { $ref: '#/components/schemas/SelectBlessingResponse' } } } }
+        '409': { description: run 目前狀態非 BLESSING_SELECT }
+        '401': { description: 未登入或 token 失效 }
+
+  /adventure/rest/heal:
+    post:
+      operationId: restHeal
+      summary: 在休息節點使用一個 POTION 物品回復 HP
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RestHealRequest' }
+      responses:
+        '200': { description: 已回復 HP，該物品已被消耗, content: { application/json: { schema: { $ref: '#/components/schemas/RestHealResponse' } } } }
+        '400': { description: 指定的 itemId 不存在/不屬於玩家/非 POTION 類型，或非休息節點 }
+        '401': { description: 未登入或 token 失效 }
+
+  /adventure/end:
+    post:
+      operationId: endAdventure
+      summary: 結束並結算目前的冒險 run
+      responses:
+        '200': { description: 結算結果, content: { application/json: { schema: { $ref: '#/components/schemas/EndAdventureResponse' } } } }
+        '409': { description: 沒有進行中的 run }
+        '401': { description: 未登入或 token 失效 }
+
+  /openapi.json:
+    get:
+      operationId: getOpenApiSpec
+      summary: 取得自動生成的 OpenAPI 3.0 規格
+      security: []
+      responses:
+        '200': { description: OpenAPI JSON 文件 }
+
+  /api-docs:
+    get:
+      operationId: getSwaggerUi
+      summary: Swagger UI 互動式文件頁面
+      security: []
+      responses:
+        '200': { description: HTML 頁面 }

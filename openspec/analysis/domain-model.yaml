@@ -1,0 +1,447 @@
+version: 1
+generatedBy: domain-modeling
+updatedAt: 2026-08-27T00:00:00Z
+relatedChanges: [gkbot-adventure-run-full-system]
+
+entities:
+  - id: ENT-001
+    name: Account
+    attributes:
+      - { name: accountId, type: string, description: "= Firebase uid" }
+      - { name: googleUid, type: string }
+      - { name: email, type: string }
+      - { name: createdAt, type: timestamp }
+    useCases: [UC-001, UC-002, UC-003]
+  - id: ENT-002
+    name: Character
+    attributes:
+      - { name: characterId, type: string, description: "= accountId，一帳號一角色" }
+      - { name: level, type: integer, description: "1..30" }
+      - { name: exp, type: integer }
+      - { name: gold, type: integer, description: "[0,100000)" }
+      - { name: gems, type: integer, description: "[0,100000)" }
+      - { name: unspentAttributePoints, type: integer }
+      - { name: nickname, type: string }
+    useCases: [UC-004, UC-005, UC-006, UC-007, UC-009, UC-013, UC-015, UC-016, UC-025, UC-026]
+  - id: ENT-003
+    name: ItemInstance
+    attributes:
+      - { name: itemId, type: string, description: "唯一 id" }
+      - { name: templateId, type: string }
+      - { name: type, type: enum(EQUIPMENT|POTION) }
+      - { name: rarity, type: enum(N|R|SR|SSR|L) }
+      - { name: rolledStats, type: VO-005, description: "裝備為 ATK/DEF/HP 等數值；藥水為 healPercent（單一數值）" }
+      - { name: source, type: enum(DROP|SHOP|EVENT) }
+      - { name: location, type: enum(PERMANENT_INVENTORY|RUN_INVENTORY|EQUIPPED), description: "POTION 恆不會是 EQUIPPED" }
+      - { name: createdAt, type: timestamp }
+    useCases: [UC-008, UC-009, UC-010, UC-013, UC-017, UC-023, UC-025, UC-026, UC-030]
+  - id: ENT-004
+    name: ItemTemplate
+    attributes:
+      - { name: templateId, type: string }
+      - { name: type, type: enum(EQUIPMENT|POTION) }
+      - { name: equipSlot, type: enum(HEAD|BODY|SHOES|GLOVES|LEFT_HAND|RIGHT_HAND|NECKLACE|RING), description: "僅 EQUIPMENT 必填" }
+      - { name: rarityWeights, type: map<rarity, number> }
+      - { name: baseStatsRange, type: map<rarity, range>, description: "僅 EQUIPMENT 使用" }
+      - { name: healPercentRange, type: map<rarity, range>, description: "僅 POTION 使用，各稀有度對應的回復生命值百分比區間" }
+      - { name: priceRangeByRarity, type: map<rarity, range> }
+    useCases: [UC-008]
+  - id: ENT-005
+    name: Inventory
+    attributes:
+      - { name: inventoryId, type: string, description: "= accountId，永久背包" }
+      - { name: capacity, type: integer, description: "固定 500" }
+    useCases: [UC-010, UC-026]
+  - id: ENT-006
+    name: Shop
+    attributes:
+      - { name: shopId, type: string, description: "per-account: accountId+date；global: date" }
+      - { name: scope, type: enum(PER_ACCOUNT|GLOBAL) }
+      - { name: date, type: string, description: "UTC+0 yyyy-mm-dd" }
+    useCases: [UC-011, UC-012, UC-013]
+  - id: ENT-007
+    name: DailyQuestSet
+    attributes:
+      - { name: questSetId, type: string, description: "accountId+date" }
+      - { name: date, type: string }
+    useCases: [UC-014, UC-015]
+  - id: ENT-008
+    name: AchievementBoard
+    attributes:
+      - { name: accountId, type: string }
+    useCases: [UC-016]
+  - id: ENT-009
+    name: LeaderboardEntry
+    attributes:
+      - { name: accountId, type: string }
+      - { name: nickname, type: string }
+      - { name: bestScore, type: integer }
+      - { name: updatedAt, type: timestamp }
+    useCases: [UC-018, UC-019]
+  - id: ENT-010
+    name: AdventureRun
+    attributes:
+      - { name: runId, type: string }
+      - { name: characterId, type: string }
+      - { name: seed, type: string }
+      - { name: rngIndex, type: integer }
+      - { name: state, type: enum(INIT|EXPLORING|COMBAT|EVENT|BLESSING_SELECT|SHOP|RESOLUTION|ENDED) }
+      - { name: step, type: integer }
+      - { name: blessingPoints, type: integer, description: "未命名資源，累積達門檻觸發 BLESSING_SELECT" }
+      - { name: score, type: integer }
+      - { name: earnedGold, type: integer }
+      - { name: earnedGems, type: integer }
+      - { name: startedAt, type: timestamp }
+      - { name: endedAt, type: timestamp, nullable: true }
+      - { name: endReason, type: enum(DEAD|QUIT|DISCONNECT|TIMEOUT), nullable: true }
+      - { name: lastInteractionAt, type: timestamp, description: "用於 15 分鐘重連窗口判定" }
+      - { name: potionUsedThisRun, type: boolean }
+    useCases: [UC-020, UC-021, UC-022, UC-023, UC-024, UC-025, UC-026, UC-027, UC-028, UC-029, UC-030, UC-031, UC-032]
+
+valueObjects:
+  - id: VO-001
+    name: Attributes
+    attributes:
+      - { name: str, type: integer }
+      - { name: agi, type: integer }
+      - { name: con, type: integer }
+      - { name: luck, type: integer }
+    useCases: [UC-004, UC-005]
+  - id: VO-002
+    name: Stats
+    description: 由 server 依 Attributes+Equipment+RunModifier 即時計算，不持久化。
+    attributes:
+      - { name: atk, type: number }
+      - { name: def, type: number }
+      - { name: hpMax, type: number }
+      - { name: actionIntervalSec, type: number }
+    useCases: [UC-004, UC-027]
+  - id: VO-003
+    name: Equipment
+    description: 槽位到 itemId 的對應（引用 AGG-003/AGG-009 內的 ItemInstance by id）。
+    attributes:
+      - { name: HEAD, type: string, nullable: true }
+      - { name: BODY, type: string, nullable: true }
+      - { name: SHOES, type: string, nullable: true }
+      - { name: GLOVES, type: string, nullable: true }
+      - { name: LEFT_HAND, type: string, nullable: true }
+      - { name: RIGHT_HAND, type: string, nullable: true }
+      - { name: NECKLACE, type: string, nullable: true }
+      - { name: RING, type: string, nullable: true }
+    useCases: [UC-009]
+  - id: VO-004
+    name: HealingPotion
+    status: deprecated
+    reason: >
+      補血藥水改為一般消耗品物品（ENT-003 ItemInstance，type=POTION），不再是
+      Character 的固定欄位；level/coolDownUntil 概念一併移除，效果強度改由
+      ENT-003.rolledStats 的 healPercent 依稀有度決定。
+    attributes:
+      - { name: level, type: integer, description: "1..15（已棄用）" }
+      - { name: coolDownUntil, type: timestamp, nullable: true, description: "已棄用" }
+    useCases: [UC-007, UC-025]
+  - id: VO-005
+    name: RolledStats
+    description: 物品實體生成時 roll 出的實際數值（依 templateId+rarity 的 baseStatsRange 決定）。
+    attributes:
+      - { name: values, type: map<statKey, number> }
+    useCases: [UC-008]
+  - id: VO-006
+    name: ShopSlot
+    attributes:
+      - { name: itemInstanceRef, type: string, description: "ItemInstance id" }
+      - { name: price, type: integer }
+      - { name: currency, type: enum(GOLD|GEMS) }
+      - { name: sold, type: boolean }
+      - { name: purchasedAt, type: timestamp, nullable: true }
+    useCases: [UC-011, UC-012, UC-013]
+  - id: VO-007
+    name: QuestProgress
+    attributes:
+      - { name: questTemplateId, type: string }
+      - { name: progressCount, type: integer }
+      - { name: targetCount, type: integer }
+      - { name: claimed, type: boolean }
+    useCases: [UC-014, UC-015]
+  - id: VO-008
+    name: AchievementClaim
+    attributes:
+      - { name: achievementId, type: string }
+      - { name: achievedAt, type: timestamp, nullable: true }
+      - { name: claimed, type: boolean }
+    useCases: [UC-016]
+  - id: VO-009
+    name: RunModifier
+    description: Blessing 與 Curse 的統一抽象，僅在該次 run 有效。
+    attributes:
+      - { name: modifierId, type: string }
+      - { name: type, type: enum(BLESSING|CURSE) }
+      - { name: effect, type: object, description: "影響 attributes/stats/drop table/combat rule 的效果描述" }
+      - { name: expiresAtStep, type: integer, nullable: true }
+    useCases: [UC-024, UC-028, UC-029]
+  - id: VO-010
+    name: CombatSummary
+    attributes:
+      - { name: result, type: enum(WIN|LOSE) }
+      - { name: rounds, type: integer }
+      - { name: dropSummary, type: object }
+      - { name: remainingHp, type: number }
+      - { name: scoreDelta, type: integer }
+    useCases: [UC-027]
+  - id: VO-011
+    name: AuditSummaryEntry
+    attributes:
+      - { name: step, type: integer }
+      - { name: nodeType, type: string }
+      - { name: outcome, type: object }
+    useCases: [UC-032]
+  - id: VO-012
+    name: AudioSettings
+    attributes:
+      - { name: bgmEnabled, type: boolean }
+      - { name: sfxEnabled, type: boolean }
+    useCases: [UC-035]
+
+aggregates:
+  - id: AGG-001
+    name: Account
+    root: ENT-001
+    members: [VO-012]
+    rationale: >
+      Account 是登入身份與帳號級偏好設定（音效開關）的一致性邊界，變動頻率低、
+      與角色的高頻遊玩狀態明顯不同，故獨立成一個 aggregate。刪除帳號需連動刪除
+      Character/Inventory/AdventureRun/Shop/DailyQuestSet/AchievementBoard/LeaderboardEntry，
+      屬跨 aggregate 的一次性 saga（見 RULE-018），不代表這些都屬於同一 aggregate。
+    useCases: [UC-001, UC-002, UC-003, UC-035]
+  - id: AGG-002
+    name: Character
+    root: ENT-002
+    members: [VO-001, VO-003]
+    rationale: >
+      Attributes 與 Equipment（槽位->itemId 引用）皆為角色核心狀態，彼此的規則
+      互相耦合（例如升級同時發放屬性點、裝備替換需同時檢查槽位），必須在同一
+      交易邊界內一起讀寫，避免中間狀態不一致。（VO-004 HealingPotion 已棄用，
+      不再是本聚合成員，見其 deprecated 說明。）
+    useCases: [UC-004, UC-005, UC-006, UC-009, UC-013, UC-026]
+  - id: AGG-003
+    name: Inventory
+    root: ENT-005
+    members: [ENT-003]
+    rationale: >
+      永久背包（500 格上限）需要獨立的一致性邊界來檢查容量與物品歸屬，
+      與角色的高頻狀態變化（升級/裝備切換）分開，避免每次角色更新都鎖住整個背包。
+      此處的 ENT-003 僅限 location=PERMANENT_INVENTORY 的實例；同一 itemId 在
+      run 期間屬於 AGG-009，run 結算轉入永久背包時視為「跨聚合搬遷」（刪除於
+      AGG-009、新建於 AGG-003），而非共享同一份資料。
+    useCases: [UC-010, UC-026]
+  - id: AGG-004
+    name: ItemTemplate
+    root: ENT-004
+    members: []
+    rationale: 靜態設定資料，生命週期獨立於玩家操作（由內容/開發流程維護），不與任何玩家交易共享一致性邊界。
+    useCases: [UC-008]
+  - id: AGG-005
+    name: Shop
+    root: ENT-006
+    members: [VO-006]
+    rationale: >
+      同一份商店文件內的購買（檢查未售出 + 扣款 + 標記 sold）必須是原子操作，
+      避免同一商品被兩個並發請求重複賣出；金幣商店與紅寶石商店是各自獨立的
+      aggregate 實例（scope 不同）。
+    useCases: [UC-011, UC-012, UC-013]
+  - id: AGG-006
+    name: DailyQuestSet
+    root: ENT-007
+    members: [VO-007]
+    rationale: 一天三個任務作為單一一致性邊界，確保重置與領取都是對整組任務的原子操作，不會出現部分任務重置、部分未重置的狀態。
+    useCases: [UC-014, UC-015]
+  - id: AGG-007
+    name: AchievementBoard
+    root: ENT-008
+    members: [VO-008]
+    rationale: 每帳號一份成就進度集合，claim-once 規則需要在同一邊界內做原子檢查，避免重複領取。
+    useCases: [UC-016]
+  - id: AGG-008
+    name: LeaderboardEntry
+    root: ENT-009
+    members: []
+    rationale: 每帳號一筆，寫入時只需比較/更新自己帳號的最高分，帳號之間互不影響，不需要跨帳號交易，故每筆各自成一個 aggregate 實例。
+    useCases: [UC-018, UC-019]
+  - id: AGG-009
+    name: AdventureRun
+    root: ENT-010
+    members: [ENT-003, VO-009, VO-010, VO-011]
+    rationale: >
+      Run 的狀態機、目前節點、run 背包（僅 location=RUN_INVENTORY 的 ItemInstance）、
+      生效中的 RunModifier（Blessing/Curse）、rngIndex、稽核摘要，都必須在同一次
+      checkpoint 呼叫中原子地一起推進——這正是 CTX-CON-002（checkpoint-driven，
+      禁止 tick-based）所要求的單一寫入邊界，也是本遊戲變動最頻繁的一致性邊界。
+    useCases: [UC-020, UC-021, UC-022, UC-023, UC-024, UC-025, UC-026, UC-027, UC-028, UC-029, UC-030, UC-031, UC-032]
+
+domainEvents:
+  - id: EVT-001
+    name: AccountCreated
+    triggeredBy: AGG-001
+    description: 首次登入成功後建立 Account（並同時建立 Character，見 EVT-CharacterCreated 概念併入同一 use case）。
+    useCases: [UC-001]
+  - id: EVT-002
+    name: AccountDeleted
+    triggeredBy: AGG-001
+    description: 觸發跨 aggregate 的級聯刪除 saga（Character/Inventory/AdventureRun/Shop/DailyQuestSet/AchievementBoard/LeaderboardEntry）。
+    useCases: [UC-003]
+  - id: EVT-003
+    name: AttributePointsAllocated
+    triggeredBy: AGG-002
+    useCases: [UC-005]
+  - id: EVT-004
+    name: ItemEquipped
+    triggeredBy: AGG-002
+    description: 更新 Character.equipment 槽位引用；需與 Inventory/AdventureRun 內該 ItemInstance 的存在性保持最終一致（見 RULE-019）。
+    useCases: [UC-009]
+  - id: EVT-005
+    name: ItemPurchased
+    triggeredBy: AGG-005
+    description: 扣款並標記商品售出，同時發放 ItemInstance 給買家（進入 AGG-003 或觸發 EVT-004）。
+    useCases: [UC-013]
+  - id: EVT-006
+    name: QuestRewardClaimed
+    triggeredBy: AGG-006
+    useCases: [UC-015]
+  - id: EVT-007
+    name: AchievementRewardClaimed
+    triggeredBy: AGG-007
+    useCases: [UC-016]
+  - id: EVT-008
+    name: LeaderboardEntryUpdated
+    triggeredBy: AGG-008
+    useCases: [UC-019]
+  - id: EVT-009
+    name: AdventureRunStarted
+    triggeredBy: AGG-009
+    useCases: [UC-020]
+  - id: EVT-010
+    name: NodeAdvanced
+    triggeredBy: AGG-009
+    useCases: [UC-021]
+  - id: EVT-011
+    name: CombatResolved
+    triggeredBy: AGG-009
+    useCases: [UC-027]
+  - id: EVT-012
+    name: BlessingSelected
+    triggeredBy: AGG-009
+    useCases: [UC-024]
+  - id: EVT-013
+    name: EventResolved
+    triggeredBy: AGG-009
+    description: 涵蓋一般事件與轉盤（可能附帶 curse/blessing/掉落）。
+    useCases: [UC-029, UC-030]
+  - id: EVT-014
+    name: HealingPotionUsed
+    triggeredBy: AGG-009
+    description: >
+      消耗一個 POTION 類型的 ItemInstance（來源可能是 AGG-003 永久背包或
+      AGG-009 run 背包），並更新 AdventureRun.playerHp；不再涉及 AGG-002。
+    useCases: [UC-025]
+  - id: EVT-015
+    name: AdventureRunEnded
+    triggeredBy: AGG-009
+    description: >
+      扇出效果最多的事件：觸發 Character 資源結算（AGG-002）、run 背包轉入永久
+      背包（AGG-003）、排行榜更新（AGG-008 的 EVT-008）、任務/成就進度更新
+      （AGG-006/AGG-007）。
+    useCases: [UC-026]
+
+businessRules:
+  - id: RULE-001
+    description: gold 與 gems 永遠落在 [0,100000) 範圍內，任何寫入路徑都需 clamp/拒絕超界寫入。
+    appliesTo: [ENT-002]
+    useCases: [UC-005, UC-007, UC-013, UC-015, UC-016, UC-026]
+  - id: RULE-002
+    description: 一個角色同時只能有一個進行中（非 ENDED）的 AdventureRun。
+    appliesTo: [AGG-009]
+    useCases: [UC-020]
+  - id: RULE-003
+    description: 角色等級上限為 30，達上限後不再增加。
+    appliesTo: [ENT-002]
+    useCases: [UC-004]
+  - id: RULE-004
+    description: 分配的屬性點總和不可超過 unspentAttributePoints，分配後立即扣除。
+    appliesTo: [ENT-002, VO-001]
+    useCases: [UC-005]
+  - id: RULE-005
+    description: 每個裝備槽位僅能有一件裝備；裝備到已佔用槽位需先取得玩家確認才能替換。
+    appliesTo: [VO-003]
+    useCases: [UC-009]
+  - id: RULE-006
+    description: run 背包上限 50 格、永久背包上限 500 格；超過上限的物品無法轉入（目前規則未定義滿倉時的處理，需另行補充，見 gap）。
+    appliesTo: [ENT-005, AGG-009]
+    useCases: [UC-010, UC-026]
+  - id: RULE-007
+    status: deprecated
+    reason: 補血藥水改為一般消耗品，不再有角色等級解鎖限制（見 FR-016 deprecated 說明）。
+    description: 補血藥水僅在 character.level >= 5 時可被帶入 run 使用。
+    appliesTo: [VO-004]
+    useCases: [UC-007, UC-025]
+  - id: RULE-008
+    status: deprecated
+    reason: 補血藥水改為一般消耗品，不再有冷卻與每 run 攜帶上限（見 FR-018/FR-061 deprecated 說明）。
+    description: 補血藥水每次帶入 run 後進入 30 分鐘冷卻，且每次 run 最多使用（帶入）1 瓶。
+    appliesTo: [VO-004, AGG-009]
+    useCases: [UC-025]
+  - id: RULE-020
+    description: >
+      使用藥水（POTION）僅限 Rest 節點，且僅能消耗玩家自己持有（永久背包或
+      run 背包）的 POTION 物品實體；回復量依該實體的 rolledStats.healPercent
+      決定，不超過 HP_MAX。
+    appliesTo: [ENT-003, AGG-009]
+    useCases: [UC-025]
+  - id: RULE-009
+    description: 商店商品一旦標記 sold 即不可再次購買。
+    appliesTo: [VO-006]
+    useCases: [UC-013]
+  - id: RULE-010
+    description: 每日任務不允許 reroll；每個任務只能被領取一次。
+    appliesTo: [VO-007]
+    useCases: [UC-015]
+  - id: RULE-011
+    description: 每個成就每帳號只能領取一次。
+    appliesTo: [VO-008]
+    useCases: [UC-016]
+  - id: RULE-012
+    description: 排行榜項目只能由 server 於 run 結算時寫入，且只保留該帳號的歷史最高分。
+    appliesTo: [ENT-009]
+    useCases: [UC-019]
+  - id: RULE-013
+    description: 節點生成時，保底 Rest（距上次 Rest >= 4 step）優先於固定精英節奏（step%5、step%9）。
+    appliesTo: [AGG-009]
+    useCases: [UC-021]
+  - id: RULE-014
+    description: rngIndex 只能遞增，且每次消耗 random(seed, rngIndex) 後必須立即持久化遞增後的值，不可重複消耗同一 index。
+    appliesTo: [AGG-009]
+    useCases: [UC-031]
+  - id: RULE-015
+    description: RunModifier（Blessing/Curse）僅在建立它的 run 內有效，run 結束（ENDED）即全部失效，不可跨 run 生效。
+    appliesTo: [VO-009, AGG-009]
+    useCases: [UC-024, UC-028]
+  - id: RULE-016
+    description: 戰鬥進行中不接受任何玩家操作（無技能系統），僅能在戰鬥前後的節點互動。
+    appliesTo: [AGG-009]
+    useCases: [UC-027]
+  - id: RULE-017
+    description: Firestore security rules 預設拒絕所有直接 client 讀寫；僅限伺服器（Admin SDK）操作，或明確允許的使用者自身文件（如 AudioSettings）。
+    appliesTo: [AGG-001, AGG-002, AGG-003, AGG-005, AGG-006, AGG-007, AGG-008, AGG-009]
+    useCases: [UC-033]
+  - id: RULE-018
+    description: 刪除帳號必須完整刪除 Account/Character/Inventory/AdventureRun（含歷史）/Shop 個人商店紀錄/DailyQuestSet/AchievementBoard/LeaderboardEntry，不可留下孤兒資料；此為跨 aggregate 的一次性 saga，需保證最終完整性（可重試至完成）。
+    appliesTo: [AGG-001, AGG-002, AGG-003, AGG-009, AGG-006, AGG-007, AGG-008]
+    useCases: [UC-003]
+  - id: RULE-019
+    description: >
+      裝備/卸下（EVT-004）為跨 aggregate 操作（同時涉及 AGG-002 與 AGG-003 或
+      AGG-009）；application service 必須在同一次 API 請求內以 Firestore
+      transaction 完成兩邊寫入，確保不會出現「角色顯示已裝備但背包物品狀態
+      未同步」之類的中間不一致狀態。（使用藥水 EVT-014 已改為僅涉及 AGG-003/
+      AGG-009，不再跨 AGG-002，見 EVT-014 與 RULE-020。）
+    appliesTo: [AGG-002, AGG-003, AGG-009]
+    useCases: [UC-009]

@@ -1,0 +1,73 @@
+version: 1
+generatedBy: system-analysis
+updatedAt: 2026-08-27T00:00:00Z
+relatedChanges: [gkbot-adventure-run-full-system]
+
+actors:
+  - id: CTX-ACTOR-001
+    name: Player
+    description: >
+      終端玩家，透過 Google 帳號登入，擁有一個永久 Character，進行大廳操作
+      （裝備/商店/任務/成就/排行榜/設定）與冒險 run。
+  - id: CTX-ACTOR-002
+    name: Server (Nitro Backend)
+    description: >
+      系統角色。所有會影響資源（gold/gems/items/score）的規則計算與 RNG 判定
+      都必須在此執行，是遊戲規則的唯一權威來源（authoritative）。
+  - id: CTX-ACTOR-003
+    name: Maintainer / Ops
+    description: >
+      維運者，負責 Firebase 專案設定、Service Account 金鑰輪替、Vercel 環境變數
+      與部署設定，不直接參與遊戲玩法。
+
+externalSystems:
+  - id: CTX-EXT-001
+    name: Firebase Authentication (Google Provider)
+    description: 提供 Google OAuth 登入，Client 取得 idToken，Server 用 Firebase Admin SDK 驗證。
+  - id: CTX-EXT-002
+    name: Firestore
+    description: 主要持久化資料庫，儲存 account/character/inventory/run/shop/quest/achievement/leaderboard 等文件。
+  - id: CTX-EXT-003
+    name: Vercel
+    description: 部署平台（Nuxt/Nitro app 與 API），需以環境變數方式提供 Firebase Service Account 憑證。
+  - id: CTX-EXT-004
+    name: Google Sheet（潛在，TBD）
+    description: 文件提及未來可能以 Google Sheet 儲存 run history，作為 Firestore 成本考量的替代方案；尚未定案，僅為假設中的整合點。
+
+constraints:
+  - id: CTX-CON-001
+    type: technical
+    description: 技術棧固定為 Nuxt3（SPA/Hybrid）+ Nitro server/api + Vue3/Vuetify/TypeScript + Firebase Admin SDK + Firestore；不使用 Redis。
+  - id: CTX-CON-002
+    type: technical
+    description: Run 為 idle 自動戰鬥，但伺服器不可採 tick-based 每秒讀寫；只能在節點/事件（checkpoint）驅動時才呼叫 API 並讀寫 Firestore。
+  - id: CTX-CON-003
+    type: business
+    description: 所有會影響資源（gold/gems/items/score/leaderboard）的計算與寫入，必須且只能在 server 端完成，client 不可信任。
+  - id: CTX-CON-004
+    type: technical
+    description: Firestore 無原生 cascade delete；刪除帳號需 server 端以 batch/recursive delete 處理所有子集合。
+  - id: CTX-CON-005
+    type: business
+    description: 每日重置（商店、任務）的時間邊界固定為 UTC+0 00:00。
+  - id: CTX-CON-006
+    type: business
+    description: 一帳號恆對應一角色；角色為永久，不提供新增、刪除或 reset 機制（唯一移除方式是刪除整個帳號）。
+  - id: CTX-CON-007
+    type: business
+    description: 不提供物品交易/拍賣功能。
+  - id: CTX-CON-008
+    type: business
+    description: 目前不做技能系統；戰鬥行為僅有普攻（含暴擊/閃避判定）。
+
+assumptions:
+  - id: CTX-ASM-001
+    description: MVP 僅需支援 Google 單一登入 provider；多 provider / email 重新綁定不在本次範圍內。
+  - id: CTX-ASM-002
+    description: 不需要新手引導/教學流程。
+  - id: CTX-ASM-003
+    description: Anti-cheat 目標強度尚未定案；分析階段先假設「server-authoritative + rngIndex 可稽核」為最低可行水準，待決策後可能升級為完整可重播驗證。
+  - id: CTX-ASM-004
+    description: Run history 長期保留策略（含改用 Google Sheet 的可能性）延後到實作階段再決定，本次分析僅記錄摘要保存需求。
+  - id: CTX-ASM-005
+    description: 文件中所有數值（戰鬥公式、掉落率、EXP 曲線、成本公式）皆為 placeholder，後續會依 playtest 調整；本次分析以「機制正確性」為主，不鎖死具體數值。

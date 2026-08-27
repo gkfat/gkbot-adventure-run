@@ -1,0 +1,567 @@
+version: 1
+generatedBy: api-modeling
+updatedAt: 2026-08-27T00:00:00Z
+relatedChanges: [gkbot-adventure-run-full-system]
+
+openapi: 3.0.3
+info:
+  title: GkBot Adventure Run API
+  version: "1.0"
+  description: >
+    分析階段的 API 模型（含 x-trace 追溯欄位）。乾淨版（無 x-trace）見
+    ../render/api.yaml。資源邊界對齊 domain-model.yaml 的 9 個 Aggregate；
+    ItemTemplate（AGG-004）為靜態內容，不透過 API 曝露 CRUD（依 CTX-CON-001
+    模板資料放 repo 常數/記憶體快取）。
+servers:
+  - url: /api
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: "Firebase ID Token"
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      operationId: authLogin
+      x-trace: { id: API-001, useCases: [UC-001], domainModel: [AGG-001] }
+      summary: 使用 Firebase idToken 登入，首次登入自動建立帳號與角色
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: 登入成功（AccountCreated 或既有帳號）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '401':
+          description: idToken 無效或過期
+      x-trace-requirements: [NFR-003]
+
+  /auth/me:
+    get:
+      operationId: authGetMe
+      x-trace: { id: API-002, useCases: [UC-002], domainModel: [ENT-001] }
+      summary: 取得目前登入帳號資訊
+      responses:
+        '200':
+          description: 帳號資訊
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeResponse' }
+        '401':
+          description: 未登入或 token 失效
+
+  /auth/account:
+    delete:
+      operationId: authDeleteAccount
+      x-trace: { id: API-003, useCases: [UC-003], domainModel: [AGG-001], businessRules: [RULE-018] }
+      summary: 刪除帳號與所有關聯資料（不可復原）
+      responses:
+        '200':
+          description: 已刪除，觸發跨 aggregate 級聯刪除（RULE-018）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeleteAccountResponse' }
+        '401':
+          description: 未登入或 token 失效
+
+  /account/settings:
+    put:
+      operationId: updateAccountSettings
+      x-trace: { id: API-004, useCases: [UC-035], domainModel: [AGG-001, VO-012] }
+      summary: 更新音效設定（BGM/SFX 開關）
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateAccountSettingsRequest' }
+      responses:
+        '200':
+          description: 設定已更新
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateAccountSettingsResponse' }
+        '401':
+          description: 未登入或 token 失效
+
+  /character:
+    get:
+      operationId: getCharacter
+      x-trace: { id: API-005, useCases: [UC-004], domainModel: [AGG-002] }
+      summary: 取得角色資料與伺服器計算後的 stats（不落庫）
+      responses:
+        '200':
+          description: 角色資料
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetCharacterResponse' }
+        '401':
+          description: 未登入或 token 失效
+      x-trace-requirements: [NFR-007]
+
+  /character/attributes:
+    post:
+      operationId: allocateCharacterAttributes
+      x-trace: { id: API-006, useCases: [UC-005], domainModel: [AGG-002, VO-001], businessRules: [RULE-004] }
+      summary: 分配 unspentAttributePoints 到 STR/AGI/CON/LUCK
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AllocateAttributesRequest' }
+      responses:
+        '200':
+          description: 分配成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AllocateAttributesResponse' }
+        '400':
+          description: 分配點數超過剩餘 unspentAttributePoints（RULE-004）
+        '401':
+          description: 未登入或 token 失效
+
+  /character/nickname:
+    post:
+      operationId: setCharacterNickname
+      x-trace: { id: API-007, useCases: [UC-006], domainModel: [ENT-002] }
+      summary: 設定排行榜顯示暱稱
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetNicknameRequest' }
+      responses:
+        '200':
+          description: 設定成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetNicknameResponse' }
+        '400':
+          description: 暱稱格式不合法
+        '401':
+          description: 未登入或 token 失效
+
+  # /character/potion/upgrade: [REMOVED] 補血藥水改為一般消耗品物品（type=POTION），
+  # 不再有角色端的升級動作；對應舊 API-008（x-trace.id 保留紀錄、不重新分配給其他 endpoint）。
+  # 舊行為：以 gold 升級補血藥水（maxLevel=15，需 level>=5 解鎖），useCases:[UC-007]（已 deprecated）。
+
+  /character/equip:
+    post:
+      operationId: equipItem
+      x-trace: { id: API-009, useCases: [UC-009], domainModel: [AGG-002, AGG-003, VO-003], businessRules: [RULE-005, RULE-019] }
+      summary: 將背包物品裝備到對應槽位（若槽位已佔用需先確認替換）
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EquipItemRequest' }
+      responses:
+        '200':
+          description: 裝備成功，回傳新裝備與被替換下來的舊裝備（若有）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EquipItemResponse' }
+        '400':
+          description: 物品的 equipSlot 與目標槽位不符，或物品不存在於玩家背包
+        '401':
+          description: 未登入或 token 失效
+
+  /character/unequip:
+    post:
+      operationId: unequipItem
+      x-trace: { id: API-010, useCases: [UC-009], domainModel: [AGG-002, VO-003], businessRules: [RULE-005] }
+      summary: 卸下指定槽位的裝備
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UnequipItemRequest' }
+      responses:
+        '200':
+          description: 卸下成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UnequipItemResponse' }
+        '400':
+          description: 該槽位目前無裝備
+        '401':
+          description: 未登入或 token 失效
+
+  /inventory:
+    get:
+      operationId: getInventory
+      x-trace: { id: API-011, useCases: [UC-010], domainModel: [AGG-003], businessRules: [RULE-006] }
+      summary: 取得永久背包內容（最多 500 格）
+      responses:
+        '200':
+          description: 背包內容
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetInventoryResponse' }
+        '401':
+          description: 未登入或 token 失效
+
+  /inventory/{itemId}:
+    delete:
+      operationId: deleteInventoryItem
+      x-trace:
+        id: API-012
+        useCases: []
+        domainModel: [AGG-003, ENT-003]
+        note: "no upstream use case, needs review — 現有程式碼 schema 已定義此端點（捨棄物品），但來源文件 docs/05_物品與裝備系統.md 未提及丟棄機制，需與相關人確認是否為既定需求"
+      summary: 捨棄一件永久背包內的物品
+      parameters:
+        - { name: itemId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 已捨棄
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeleteItemResponse' }
+        '404':
+          description: 物品不存在於玩家永久背包
+        '401':
+          description: 未登入或 token 失效
+
+  /shop/gold:
+    get:
+      operationId: getGoldShop
+      x-trace: { id: API-013, useCases: [UC-012], domainModel: [AGG-005] }
+      summary: 取得今日金幣商店（per-account）商品
+      responses:
+        '200':
+          description: 商品清單
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetGoldShopResponse' }
+        '401':
+          description: 未登入或 token 失效
+
+  /shop/gems:
+    get:
+      operationId: getGemsShop
+      x-trace: { id: API-014, useCases: [UC-012], domainModel: [AGG-005] }
+      summary: 取得今日紅寶石商店（全服共享）商品
+      responses:
+        '200':
+          description: 商品清單
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetGemsShopResponse' }
+        '401':
+          description: 未登入或 token 失效
+
+  /shop/purchase:
+    post:
+      operationId: purchaseShopItem
+      x-trace: { id: API-015, useCases: [UC-013], domainModel: [AGG-005, AGG-002, AGG-003], businessRules: [RULE-001, RULE-009] }
+      summary: 購買商店商品（可選擇進永久背包或直接裝備）
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseItemRequest' }
+      responses:
+        '200':
+          description: 購買成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseItemResponse' }
+        '400':
+          description: 資源不足（RULE-001）
+        '409':
+          description: 商品已售出（RULE-009）
+        '401':
+          description: 未登入或 token 失效
+      x-trace-requirements: [NFR-002, NFR-004]
+
+  /quests/daily:
+    get:
+      operationId: getDailyQuests
+      x-trace: { id: API-016, useCases: [UC-014, UC-015], domainModel: [AGG-006] }
+      summary: 取得（必要時懶生成）今日 3 個每日任務與進度
+      responses:
+        '200':
+          description: 任務清單
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetDailyQuestsResponse' }
+        '401':
+          description: 未登入或 token 失效
+
+  /quests/claim/{questId}:
+    post:
+      operationId: claimDailyQuest
+      x-trace: { id: API-017, useCases: [UC-015], domainModel: [AGG-006, VO-007], businessRules: [RULE-001, RULE-010] }
+      summary: 領取已完成任務的獎勵（gold 10~50、gems 0~1）
+      parameters:
+        - { name: questId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 領取成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClaimQuestResponse' }
+        '400':
+          description: 任務尚未達成（RULE-010）
+        '409':
+          description: 任務已領取過（RULE-010）
+        '401':
+          description: 未登入或 token 失效
+
+  /achievements:
+    get:
+      operationId: getAchievements
+      x-trace: { id: API-018, useCases: [UC-016], domainModel: [AGG-007] }
+      summary: 取得成就清單與領取狀態
+      responses:
+        '200':
+          description: 成就清單
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetAchievementsResponse' }
+        '401':
+          description: 未登入或 token 失效
+
+  /achievements/claim/{achievementId}:
+    post:
+      operationId: claimAchievement
+      x-trace: { id: API-019, useCases: [UC-016], domainModel: [AGG-007, VO-008], businessRules: [RULE-001, RULE-011] }
+      summary: 領取成就獎勵（每帳號限領一次，gems 3~5）
+      parameters:
+        - { name: achievementId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 領取成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClaimAchievementResponse' }
+        '400':
+          description: 成就尚未達成
+        '409':
+          description: 已領取過（RULE-011）
+        '401':
+          description: 未登入或 token 失效
+
+  /leaderboard:
+    get:
+      operationId: getLeaderboard
+      x-trace: { id: API-020, useCases: [UC-018], domainModel: [AGG-008], businessRules: [RULE-012] }
+      summary: 取得全服排行榜 Top-N 與自己的名次
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: 排行榜資料
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetLeaderboardResponse' }
+        '401':
+          description: 未登入或 token 失效
+
+  /adventure/start:
+    post:
+      operationId: startAdventure
+      x-trace: { id: API-021, useCases: [UC-020], domainModel: [AGG-009], businessRules: [RULE-002] }
+      summary: 開始新的冒險 run（角色不可有其他進行中的 run）
+      responses:
+        '200':
+          description: run 已建立
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StartAdventureResponse' }
+        '409':
+          description: 已有進行中的 run（RULE-002）
+        '401':
+          description: 未登入或 token 失效
+
+  /adventure/current:
+    get:
+      operationId: getCurrentAdventure
+      x-trace: { id: API-022, useCases: [UC-022], domainModel: [AGG-009], businessRules: [] }
+      summary: 取得目前進行中的 run（用於斷線重連，15 分鐘窗口）
+      responses:
+        '200':
+          description: 目前 run 狀態（若無進行中的 run 則 data 為 null，或已因逾時被結束）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetCurrentAdventureResponse' }
+        '401':
+          description: 未登入或 token 失效
+      x-trace-requirements: [NFR-006]
+
+  /adventure/advance:
+    post:
+      operationId: advanceAdventure
+      x-trace: { id: API-023, useCases: [UC-021, UC-023], domainModel: [AGG-009], businessRules: [RULE-013] }
+      summary: 從 RESOLUTION/EXPLORING 推進到下一個節點
+      responses:
+        '200':
+          description: 已決定下一節點
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdvanceAdventureResponse' }
+        '409':
+          description: run 目前狀態不允許推進
+        '401':
+          description: 未登入或 token 失效
+      x-trace-requirements: [NFR-001]
+
+  /adventure/combat/start:
+    post:
+      operationId: startCombat
+      x-trace: { id: API-024, useCases: [UC-027, UC-028], domainModel: [AGG-009, VO-009, VO-010], businessRules: [RULE-014, RULE-015, RULE-016] }
+      summary: 伺服器單次模擬戰鬥到結束或下個 checkpoint，回傳 combatLog
+      responses:
+        '200':
+          description: 戰鬥結果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StartCombatResponse' }
+        '409':
+          description: run 目前狀態非 COMBAT
+        '401':
+          description: 未登入或 token 失效
+      x-trace-requirements: [NFR-009, NFR-001]
+
+  /adventure/event/resolve:
+    post:
+      operationId: resolveAdventureEvent
+      x-trace: { id: API-025, useCases: [UC-029, UC-030], domainModel: [AGG-009, VO-009], businessRules: [RULE-015] }
+      summary: 解決目前事件（含可選 choice；轉盤為事件的一種結果類型）
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResolveEventRequest' }
+      responses:
+        '200':
+          description: 事件結果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResolveEventResponse' }
+        '400':
+          description: 提交了不存在的 choice
+        '401':
+          description: 未登入或 token 失效
+
+  /adventure/blessing/select:
+    post:
+      operationId: selectBlessing
+      x-trace: { id: API-026, useCases: [UC-024], domainModel: [AGG-009, VO-009], businessRules: [RULE-015] }
+      summary: 在 BLESSING_SELECT 狀態選擇一個祝福候選
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SelectBlessingRequest' }
+      responses:
+        '200':
+          description: 已套用祝福
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SelectBlessingResponse' }
+        '409':
+          description: run 目前狀態非 BLESSING_SELECT
+        '401':
+          description: 未登入或 token 失效
+
+  /adventure/rest/heal:
+    post:
+      operationId: restHeal
+      x-trace: { id: API-027, useCases: [UC-025], domainModel: [AGG-009, ENT-003], businessRules: [RULE-020] }
+      summary: 在休息節點使用一個 POTION 物品回復 HP
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RestHealRequest' }
+      responses:
+        '200':
+          description: 已回復 HP，該 POTION 物品實體已被消耗
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RestHealResponse' }
+        '400':
+          description: 指定的 itemId 不存在、不屬於玩家、或不是 POTION 類型；或非休息節點（RULE-020）
+        '401':
+          description: 未登入或 token 失效
+
+  /adventure/end:
+    post:
+      operationId: endAdventure
+      x-trace: { id: API-028, useCases: [UC-026], domainModel: [AGG-009, AGG-002, AGG-003, AGG-008, AGG-006, AGG-007], businessRules: [RULE-001, RULE-006, RULE-012] }
+      summary: 結束並結算目前的冒險 run
+      responses:
+        '200':
+          description: 結算結果（分數、資源、掉落）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EndAdventureResponse' }
+        '409':
+          description: 沒有進行中的 run
+        '401':
+          description: 未登入或 token 失效
+      x-trace-requirements: [NFR-002, NFR-004, NFR-011]
+
+  /openapi.json:
+    get:
+      operationId: getOpenApiSpec
+      x-trace: { id: API-029, useCases: [UC-036], domainModel: [] }
+      summary: 取得自動生成的 OpenAPI 3.0 規格
+      security: []
+      responses:
+        '200':
+          description: OpenAPI JSON 文件
+
+  /api-docs:
+    get:
+      operationId: getSwaggerUi
+      x-trace: { id: API-030, useCases: [UC-036], domainModel: [] }
+      summary: Swagger UI 互動式文件頁面（支援 Bearer token 授權測試）
+      security: []
+      responses:
+        '200':
+          description: HTML 頁面
+
+components-continued:
+  schemas:
+    LoginRequest: { $ref-note: "沿用 shared/schemas/api/auth.schema.ts::loginRequestSchema" }
+    LoginResponse: { $ref-note: "沿用 shared/schemas/api/auth.schema.ts::loginResponseSchema" }
+    MeResponse: { $ref-note: "沿用 shared/schemas/api/auth.schema.ts::meResponseSchema" }
+    DeleteAccountResponse: { $ref-note: "沿用 shared/schemas/api/auth.schema.ts::deleteAccountResponseSchema" }
+    UpdateAccountSettingsRequest: { $ref-note: "新增：{ bgmEnabled?: boolean, sfxEnabled?: boolean }，對應 VO-012 AudioSettings" }
+    UpdateAccountSettingsResponse: { $ref-note: "新增：{ success, data: { bgmEnabled, sfxEnabled } }" }
+    GetCharacterResponse: { $ref-note: "沿用 shared/schemas/api/character.schema.ts::getCharacterResponseSchema" }
+    AllocateAttributesRequest: { $ref-note: "沿用 character.schema.ts::allocateAttributesRequestSchema" }
+    AllocateAttributesResponse: { $ref-note: "沿用 character.schema.ts::allocateAttributesResponseSchema" }
+    SetNicknameRequest: { $ref-note: "沿用 character.schema.ts::setNicknameRequestSchema" }
+    SetNicknameResponse: { $ref-note: "沿用 character.schema.ts::setNicknameResponseSchema" }
+    UpgradePotionResponse: { $ref-note: "沿用 character.schema.ts::upgradePotionResponseSchema" }
+    EquipItemRequest: { $ref-note: "沿用 inventory.schema.ts::equipItemRequestSchema" }
+    EquipItemResponse: { $ref-note: "沿用 inventory.schema.ts::equipItemResponseSchema" }
+    UnequipItemRequest: { $ref-note: "沿用 inventory.schema.ts::unequipItemRequestSchema" }
+    UnequipItemResponse: { $ref-note: "沿用 inventory.schema.ts::unequipItemResponseSchema" }
+    GetInventoryResponse: { $ref-note: "沿用 inventory.schema.ts::getInventoryResponseSchema" }
+    DeleteItemResponse: { $ref-note: "沿用 inventory.schema.ts::deleteItemResponseSchema" }
+    GetGoldShopResponse: { $ref-note: "沿用 shop.schema.ts::getGoldShopResponseSchema" }
+    GetGemsShopResponse: { $ref-note: "沿用 shop.schema.ts::getGemsShopResponseSchema" }
+    PurchaseItemRequest: { $ref-note: "沿用 shop.schema.ts::purchaseItemRequestSchema" }
+    PurchaseItemResponse: { $ref-note: "沿用 shop.schema.ts::purchaseItemResponseSchema" }
+    GetDailyQuestsResponse: { $ref-note: "沿用 quest.schema.ts::getDailyQuestsResponseSchema" }
+    ClaimQuestResponse: { $ref-note: "沿用 quest.schema.ts::claimQuestResponseSchema" }
+    GetAchievementsResponse: { $ref-note: "沿用 quest.schema.ts::getAchievementsResponseSchema" }
+    ClaimAchievementResponse: { $ref-note: "沿用 quest.schema.ts::claimAchievementResponseSchema" }
+    GetLeaderboardResponse: { $ref-note: "沿用 leaderboard.schema.ts::getLeaderboardResponseSchema" }
+    StartAdventureResponse: { $ref-note: "沿用 adventure.schema.ts::startAdventureResponseSchema" }
+    GetCurrentAdventureResponse: { $ref-note: "沿用 adventure.schema.ts::getCurrentAdventureResponseSchema" }
+    AdvanceAdventureResponse: { $ref-note: "沿用 adventure.schema.ts::advanceAdventureResponseSchema" }
+    StartCombatResponse: { $ref-note: "沿用 adventure.schema.ts::startCombatResponseSchema" }
+    ResolveEventRequest: { $ref-note: "沿用 adventure.schema.ts::resolveEventRequestSchema" }
+    ResolveEventResponse: { $ref-note: "沿用 adventure.schema.ts::resolveEventResponseSchema" }
+    SelectBlessingRequest: { $ref-note: "沿用 adventure.schema.ts::selectBlessingRequestSchema" }
+    SelectBlessingResponse: { $ref-note: "沿用 adventure.schema.ts::selectBlessingResponseSchema" }
+    RestHealRequest: { $ref-note: "新增：{ itemId: string }，指定要使用的 POTION 物品實體" }
+    RestHealResponse: { $ref-note: "沿用 adventure.schema.ts::restHealResponseSchema" }
+    EndAdventureResponse: { $ref-note: "沿用 adventure.schema.ts::endAdventureResponseSchema" }
+  note: >
+    上述 schema 對應到已存在的 shared/schemas/api/*.schema.ts（Zod）。render/api.yaml
+    會將這些展開成實際 OpenAPI schema object（依 Zod 定義推導型別），而非留 $ref-note 佔位。

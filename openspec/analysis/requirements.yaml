@@ -1,0 +1,575 @@
+version: 1
+generatedBy: system-analysis
+updatedAt: 2026-08-27T00:00:00Z
+relatedChanges: [gkbot-adventure-run-full-system]
+
+functionalRequirements:
+  # --- Account & Auth ---
+  - id: FR-001
+    title: Google 登入建立/取得帳號
+    description: 系統 SHALL 允許使用者透過 Google OAuth（Firebase Auth）登入，並由 server 以 Firebase Admin SDK 驗證 idToken。
+    priority: must
+    context: [CTX-ACTOR-001, CTX-EXT-001]
+  - id: FR-002
+    title: 首次登入自動建立帳號與角色
+    description: 首次登入成功時，系統 SHALL 自動建立恰好一個 Account 與一個 Character。
+    priority: must
+    context: [CTX-ACTOR-001, CTX-CON-006]
+  - id: FR-003
+    title: 帳號欄位
+    description: 系統 SHALL 保存 Account 的 createdAt、provider('google')、googleUid、email。
+    priority: must
+    context: [CTX-EXT-002]
+  - id: FR-004
+    title: 取得目前使用者資訊
+    description: 系統 SHALL 提供已驗證使用者查詢自己帳號資訊的 API。
+    priority: must
+    context: [CTX-ACTOR-001]
+  - id: FR-005
+    title: 刪除帳號即刪除全部資料
+    description: 系統 SHALL 提供刪除帳號 API，立即且不可復原地刪除 account/character/inventory/run 歷史/排行榜紀錄/任務與成就進度，不提供冷卻期或 soft-delete。
+    priority: must
+    context: [CTX-CON-004, CTX-CON-006]
+  - id: FR-006
+    title: 拒絕未驗證請求
+    description: 系統 SHALL 對任何 Bearer token 驗證失敗的請求回傳 401，並拒絕處理。
+    priority: must
+    context: [CTX-ACTOR-002, CTX-EXT-001]
+
+  # --- Character & Progression ---
+  - id: FR-007
+    title: 角色初始化數值
+    description: 系統 SHALL 將新角色初始化為 level=1、exp=0、gold=0、gems=0、attributes(STR/AGI/CON/LUCK)=1、unspentAttributePoints=0。
+    priority: must
+    context: [CTX-CON-006]
+  - id: FR-008
+    title: 等級上限
+    description: 系統 SHALL 將角色等級上限設為 30。
+    priority: must
+    context: []
+  - id: FR-009
+    title: 升級屬性點
+    description: 系統 SHALL 於每次升級授予 3 點 unspentAttributePoints。
+    priority: must
+    context: []
+  - id: FR-010
+    title: 分配屬性點
+    description: 系統 SHALL 提供 API 讓玩家將 unspentAttributePoints 分配到 STR/AGI/CON/LUCK，並扣除對應點數。
+    priority: must
+    context: [CTX-ACTOR-001]
+  - id: FR-011
+    title: Stats 為伺服器即時計算
+    description: 系統 SHALL 由 server 依 attributes + 已裝備物品 + 當前 run modifiers 即時計算 ATK/DEF/HP_MAX/actionIntervalSec，且不得將 stats 持久化到 Firestore。
+    priority: must
+    context: [CTX-ACTOR-002, CTX-CON-003]
+  - id: FR-012
+    title: 資源上限 clamp
+    description: 系統 SHALL 將 gold 與 gems 限制在 [0, 100000) 範圍內。
+    priority: must
+    context: [CTX-CON-003]
+  - id: FR-013
+    title: 升級所需經驗表
+    description: 系統 SHALL 使用 level 1~29 的 expToNext 表格決定升級所需經驗值。
+    priority: must
+    context: []
+  - id: FR-014
+    title: 不提供角色重置
+    description: 系統 SHALL NOT 提供角色重置機制；移除進度的唯一方式為刪除整個帳號。
+    priority: must
+    context: [CTX-CON-006]
+  - id: FR-015
+    title: 補血藥水為一般消耗品物品
+    description: >
+      系統 SHALL 將補血藥水定義為 Item Template 的一種類型（type: POTION），
+      依稀有度（N/R/SR/SSR/L）決定回復生命值的百分比（healPercent），透過與裝備
+      相同的 Item Instance 生成流程（見 FR-020/FR-021）產生實體，可經由商店購買
+      （FR-033）或戰鬥/事件掉落取得，不再是角色的固定欄位。
+    priority: must
+    context: []
+  - id: FR-016
+    title: "[REMOVED] 藥水解鎖條件"
+    description: 藥水解鎖條件已移除。
+    priority: must
+    context: []
+    status: deprecated
+    reason: >
+      補血藥水改為一般消耗品物品（見 FR-015），取得與使用不再與角色等級綁定，
+      沒有「等級 >= 5 才能帶入」的解鎖限制。
+  - id: FR-017
+    title: "[REMOVED] 藥水升級"
+    description: 藥水升級機制已移除。
+    priority: must
+    context: []
+    status: deprecated
+    reason: >
+      補血藥水不再是角色的永久升級路徑；不同效果強度改由物品稀有度決定
+      （越稀有回復百分比越高，見 FR-015/FR-028），透過購買或掉落取得更好的藥水，
+      而非花費 gold 升級同一瓶藥水。
+  - id: FR-018
+    title: "[REMOVED] 藥水冷卻"
+    description: 藥水冷卻機制已移除。
+    priority: must
+    context: []
+    status: deprecated
+    reason: >
+      補血藥水改為一般消耗品，攜帶與使用數量僅受背包容量限制（FR-022），
+      不再需要冷卻機制來限制使用頻率。
+  - id: FR-019
+    title: 排行榜暱稱
+    description: 系統 SHALL 允許玩家設定自訂暱稱，供排行榜顯示（不同於角色名或 email）。
+    priority: must
+    context: [CTX-ACTOR-001]
+
+  # --- Items & Equipment ---
+  - id: FR-020
+    title: 物品模板定義
+    description: >
+      系統 SHALL 定義 Item Template（靜態）：templateId、type（EQUIPMENT｜POTION）、
+      rarityWeights、priceRangeByRarity；裝備類額外定義 equipSlot、baseStatsRange，
+      藥水類額外定義 healPercentRange（各稀有度對應的回復生命值百分比區間）。
+    priority: must
+    context: []
+  - id: FR-021
+    title: 物品實體生成
+    description: 系統 SHALL 於掉落或商店上架當下，依 Template + roll 出的稀有度（N/R/SR/SSR/L）生成具唯一 itemId 與 rolledStats 的 Item Instance。
+    priority: must
+    context: [CTX-ACTOR-002]
+  - id: FR-022
+    title: 雙背包上限
+    description: 系統 SHALL 維護 run 背包（上限 50 格，run-only）與永久背包（上限 500 格）兩種容器。
+    priority: must
+    context: []
+  - id: FR-023
+    title: run 結算轉移背包
+    description: 系統 SHALL 於 run 結算時把 run 背包內剩餘的物品（裝備與未使用的藥水）轉入永久背包。
+    priority: must
+    context: []
+  - id: FR-024
+    title: 固定裝備槽位
+    description: 系統 SHALL 支援 8 個固定裝備槽位：HEAD/BODY/SHOES/GLOVES/LEFT_HAND/RIGHT_HAND/NECKLACE/RING。
+    priority: must
+    context: []
+  - id: FR-025
+    title: 裝備加成僅於穿戴時生效
+    description: 系統 SHALL 僅在物品被穿戴時將其數值加到 stats（不修改 attributes），卸下時立即失效。
+    priority: must
+    context: []
+  - id: FR-026
+    title: 裝備替換需確認
+    description: 系統 SHALL 於玩家將物品裝備到已有裝備的槽位時要求確認（替換）。
+    priority: must
+    context: [CTX-ACTOR-001]
+  - id: FR-027
+    title: 不提供交易
+    description: 系統 SHALL NOT 提供帳號間的物品交易或拍賣功能。
+    priority: must
+    context: [CTX-CON-007]
+  - id: FR-028
+    title: 稀有度影響數值/掉率/價格
+    description: 系統 SHALL 依稀有度權重表使更高稀有度物品擁有更好的 baseStatsRange、更低掉落機率與更高價格區間。
+    priority: must
+    context: []
+
+  # --- Shop ---
+  - id: FR-029
+    title: 每日重置商店
+    description: 系統 SHALL 於每日 UTC+0 00:00 重置金幣商店與紅寶石商店的商品。
+    priority: must
+    context: [CTX-CON-005]
+  - id: FR-030
+    title: 金幣商店 per-account 生成
+    description: 系統 SHALL 以（日期+accountId）決定性 seed，為每個帳號各自生成金幣商店商品，稀有度上限較低（如 N/R/SR）。
+    priority: must
+    context: [CTX-ACTOR-002]
+  - id: FR-031
+    title: 紅寶石商店全服共享生成
+    description: 系統 SHALL 以日期決定性 seed，為全服生成共享的紅寶石商店商品，稀有度上限較高（如 SR/SSR/L）。
+    priority: must
+    context: [CTX-ACTOR-002]
+  - id: FR-032
+    title: 每次重置固定格數
+    description: 系統 SHALL 於每次重置生成固定數量的商品格位（例如 6 格）。
+    priority: should
+    context: []
+  - id: FR-033
+    title: 購買流程
+    description: 系統 SHALL 於購買時檢查商品未售出且資源足夠，扣款並發放物品實體，並讓玩家選擇放入永久背包或直接裝備（若槽位已佔用需確認替換）。
+    priority: must
+    context: [CTX-CON-003]
+  - id: FR-034
+    title: 商品售出標記
+    description: 系統 SHALL 於商品售出後標記 sold 與 purchasedAt，避免重複購買。
+    priority: must
+    context: []
+  - id: FR-035
+    title: 購買驗證於伺服器端
+    description: 系統 SHALL 於 server 端完成所有購買驗證與資源異動。
+    priority: must
+    context: [CTX-CON-003]
+
+  # --- Quest & Achievement ---
+  - id: FR-036
+    title: 每日任務生成
+    description: 系統 SHALL 於每帳號每日（UTC+0）生成恰好 3 個每日任務，且不允許 reroll。
+    priority: must
+    context: [CTX-CON-005]
+  - id: FR-037
+    title: 任務領取獎勵
+    description: 系統 SHALL 以計數器追蹤任務進度，並要求玩家明確點擊領取才發放獎勵（gold 10~50、gems 0~1）。
+    priority: must
+    context: [CTX-ACTOR-001]
+  - id: FR-038
+    title: 成就領取一次
+    description: 系統 SHALL 維護常駐成就集合，每帳號每成就最多可領取一次，需玩家明確領取，發放 gems 3~5。
+    priority: must
+    context: [CTX-ACTOR-001]
+  - id: FR-039
+    title: 冒險 gems 掉落規則
+    description: 系統 SHALL 依事件轉盤（3% 機率 1~5 顆）與擊殺敵人（依 enemyLevel 分級：<5 不掉、5-10 為 3%x1、10-15 為 5%x1-2、15-20 為 10%x2-3、20-30 為 10%x5-8）發放 gems。
+    priority: must
+    context: []
+  - id: FR-040
+    title: enemyLevel>30 掉落規則待補
+    description: enemyLevel > 30 時的 gems 掉落規則尚未定義。
+    priority: could
+    context: []
+    note: "no upstream source, needs review"
+
+  # --- Leaderboard ---
+  - id: FR-041
+    title: 排行榜分數僅由伺服器寫入
+    description: 系統 SHALL 僅在 run 結算時由 server 將角色最高分寫入全服排行榜。
+    priority: must
+    context: [CTX-CON-003]
+  - id: FR-042
+    title: 排行榜顯示暱稱
+    description: 系統 SHALL 以玩家自訂暱稱顯示排行榜項目，不使用 email 或 accountId。
+    priority: must
+    context: []
+  - id: FR-043
+    title: 排行榜常駐不重置
+    description: 系統 SHALL 將排行榜維持為持久性全服排名，不做週期性重置。
+    priority: must
+    context: []
+  - id: FR-044
+    title: 排行榜查詢
+    description: 系統 SHALL 支援查詢 Top-N 排行與玩家自己的名次。
+    priority: must
+    context: [CTX-ACTOR-001]
+
+  # --- Adventure Run: lifecycle & state machine ---
+  - id: FR-045
+    title: 開始新的冒險 run
+    description: 系統 SHALL 僅在角色沒有其他進行中的 run 時，允許建立新的 run（seed、state=INIT、step=0）。
+    priority: must
+    context: [CTX-ACTOR-001, CTX-ACTOR-002]
+  - id: FR-046
+    title: Run 狀態機
+    description: >
+      系統 SHALL 以 INIT/EXPLORING/COMBAT/EVENT/BLESSING_SELECT/SHOP/RESOLUTION/ENDED
+      狀態機管理 run，並遵守 spec.md 定義的合法轉移表：
+      INIT→[EXPLORING]；EXPLORING→[COMBAT,EVENT,SHOP,ENDED]；COMBAT→[RESOLUTION,ENDED]；
+      EVENT→[RESOLUTION]；SHOP→[RESOLUTION]；RESOLUTION→[BLESSING_SELECT,EXPLORING,ENDED]；
+      BLESSING_SELECT→[EXPLORING]；ENDED→[]（終止態，無合法轉出）。
+    priority: must
+    context: []
+  - id: FR-047
+    title: Run 結束原因
+    description: 系統 SHALL 以 DEAD/QUIT/DISCONNECT/TIMEOUT（保留未啟用）之一結束 run。
+    priority: must
+    context: []
+  - id: FR-048
+    title: 節點生成優先序
+    description: 系統 SHALL 依序決定下一節點：保底 Rest（距上次 Rest >= 4 step 強制觸發）> 固定精英節奏（step%9==0 強力精英；step%5==0 精英）> 隨機權重（combat/event/rest/choice）；保底與節奏同時觸發時 Rest 優先。
+    priority: must
+    context: [CTX-ACTOR-002]
+  - id: FR-049
+    title: 敵人等級與基礎倍率
+    description: 系統 SHALL 以 enemyLevel = 1 + floor(step/2) 決定敵人等級，並依此套用 hp/atk/def 基礎倍率公式。
+    priority: must
+    context: []
+  - id: FR-050
+    title: 精英/強力精英倍率
+    description: 系統 SHALL 在基礎倍率上再乘以 Elite 或 Strong Elite 專屬倍率，且該類戰鬥固定 waveCount=1。
+    priority: must
+    context: []
+  - id: FR-051
+    title: 多波/多敵生成
+    description: 系統 SHALL 依 step 縮放的機率公式決定一般戰鬥的 waveCount 與 enemyCount，且不超過 waveCountMax=2、enemyCountMax=3。
+    priority: must
+    context: []
+  - id: FR-052
+    title: HP 跨 step 延續
+    description: 系統 SHALL 讓角色 HP 在 run 內跨 step 保留，不逐 step 重置。
+    priority: must
+    context: []
+  - id: FR-053
+    title: Run 中禁止主動退出
+    description: 系統 SHALL 於 run 進行中不提供玩家主動退出冒險畫面的操作。
+    priority: must
+    context: [CTX-ACTOR-001]
+  - id: FR-054
+    title: 斷線重連窗口
+    description: 系統 SHALL 允許在 15 分鐘重連窗口內恢復中斷的 run；超過窗口 SHALL 以 endReason=DISCONNECT 結束該 run。
+    priority: must
+    context: []
+  - id: FR-055
+    title: RESOLUTION 需手動確認
+    description: 系統 SHALL 要求玩家在 RESOLUTION 畫面手動點擊確認才能推進到下一節點。
+    priority: must
+    context: [CTX-ACTOR-001]
+  - id: FR-056
+    title: run 內金幣/紅寶石即時累積
+    description: 系統 SHALL 在擊敗敵人時立即累積 run 範圍的 earnedGold/earnedGems，僅於 run 結束時併入角色資源。
+    priority: must
+    context: [CTX-CON-003]
+  - id: FR-057
+    title: 掉落物先進 run 背包
+    description: 系統 SHALL 將 run 中掉落的裝備物品先放入 run 背包，並僅於 run 結算時轉入永久背包（受 500 格上限限制）。
+    priority: must
+    context: []
+  - id: FR-058
+    title: 祝福點數累積與觸發
+    description: 系統 SHALL 依難度累積一個未命名的「祝福點數」資源，達門檻時觸發 BLESSING_SELECT 狀態。
+    priority: must
+    context: []
+  - id: FR-059
+    title: 祝福候選生成
+    description: 系統 SHALL 於 BLESSING_SELECT 提供候選清單（如 3 選 1），其稀有度/品質可受 LUCK 影響。
+    priority: must
+    context: []
+  - id: FR-060
+    title: 使用藥水
+    description: >
+      系統 SHALL 僅允許玩家在 Rest 節點對持有的 POTION 物品實體（位於永久背包或
+      run 背包皆可）執行使用動作；使用時依該實體的稀有度 healPercent 立即回復
+      生命值（不超過 HP_MAX），並消耗（移除）該物品實體。戰鬥中不可使用藥水。
+    priority: must
+    context: []
+  - id: FR-061
+    title: "[REMOVED] 單次 run 藥水攜帶上限"
+    description: 每 run 限帶 1 瓶的限制已移除。
+    priority: must
+    context: []
+    status: deprecated
+    reason: >
+      補血藥水改為一般消耗品後，可攜帶/持有的數量僅受背包容量上限
+      （run 50 格／永久 500 格，FR-022）限制，不再有額外的「每 run 限 1 瓶」規則。
+  - id: FR-062
+    title: "[REMOVED] 藥水冷卻僅能自然到期"
+    description: 冷卻機制已移除，見 FR-018。
+    priority: must
+    context: []
+    status: deprecated
+    reason: 補血藥水不再有冷卻機制（見 FR-018 的 deprecated 說明）。
+
+  # --- Combat ---
+  - id: FR-063
+    title: 伺服器單次模擬戰鬥
+    description: 系統 SHALL 由 server 使用 seed+rngIndex 一次性決定性模擬戰鬥至結束或下一個可互動 checkpoint，並回傳 combatLog 給前端。
+    priority: must
+    context: [CTX-CON-002, CTX-ACTOR-002]
+  - id: FR-064
+    title: 傷害/暴擊/閃避公式
+    description: 系統 SHALL 以 damage = max(1, ATK-DEF) * (crit ? critMultiplier : 1) 計算傷害，crit/dodge 機率以 base + AGI*係數 計算並各自 clamp 到上限。
+    priority: must
+    context: []
+  - id: FR-065
+    title: 戰鬥中不可介入
+    description: 系統 SHALL NOT 允許玩家在戰鬥進行中操作道具或技能；本階段僅有普攻（無技能系統）。
+    priority: must
+    context: [CTX-CON-008]
+  - id: FR-066
+    title: 戰鬥摘要持久化
+    description: 系統 SHALL 為每場戰鬥保存 combatSummary（勝負、回合數、掉落摘要、剩餘 HP、score 增量）；完整 combatLog 落庫為可選/可截斷，以控制成本。
+    priority: must
+    context: []
+  - id: FR-067
+    title: 分數隨擊殺累積
+    description: 系統 SHALL 於擊敗敵人時累積 run 分數。
+    priority: must
+    context: []
+  - id: FR-068
+    title: LUCK 影響掉落
+    description: 系統 SHALL 以角色 LUCK 屬性調整金幣掉落量與物品掉落機率。
+    priority: must
+    context: []
+  - id: FR-069
+    title: RunModifier 抽象
+    description: 系統 SHALL 以統一的 RunModifier 物件表示 Blessing/Curse，可影響 attributes/stats/掉落表/戰鬥規則，且僅在該次 run 有效。
+    priority: must
+    context: []
+  - id: FR-070
+    title: 狀態效果跨 step 延續
+    description: 系統 SHALL 讓詛咒/事件造成的狀態效果（如 DoT）影響延續到後續 step，直到效果結束。
+    priority: should
+    context: []
+
+  # --- Events / Blessing / Curse ---
+  - id: FR-071
+    title: 事件由伺服器 RNG 決定
+    description: 系統 SHALL 依權重表由 server RNG 選擇事件模板，事件可包含帶 cost/reward/risk 的選項（choices）。
+    priority: must
+    context: [CTX-ACTOR-002]
+  - id: FR-072
+    title: Blessing/Curse 僅限本次 run
+    description: 系統 SHALL 將 Blessing 與 Curse 皆建模為 run-only 的 RunModifier，run 結束即失效。
+    priority: must
+    context: []
+  - id: FR-073
+    title: 事件轉盤獎勵
+    description: 系統 SHALL 支援事件轉盤結果類型，可依既定機率發放物品、gems 或金幣。
+    priority: must
+    context: []
+  - id: FR-074
+    title: 轉盤付費加抽待決
+    description: 轉盤是否可付費加抽尚未定案，若啟用將影響經濟系統設計。
+    priority: could
+    context: []
+    note: "no upstream source, needs review"
+
+  # --- RNG & Replayability ---
+  - id: FR-075
+    title: 決定性 RNG
+    description: 系統 SHALL 以 random(seed, rngIndex) 決定所有 run 內隨機性，每次消耗後 rngIndex++，並以 server 端保存的 rngIndex 為唯一真相來源。
+    priority: must
+    context: [CTX-ACTOR-002]
+  - id: FR-076
+    title: Client 不可預知 RNG
+    description: 系統 SHALL 防止 client 提前得知 seed 或未來 RNG 結果；RNG 判定僅在 server 端進行。
+    priority: must
+    context: [CTX-CON-003]
+  - id: FR-077
+    title: 摘要式可稽核紀錄
+    description: 系統 MAY 僅保存精簡的 run 重播資料（節點類型+結果），以支援分數稽核，取代完整重播以控制儲存成本。
+    priority: should
+    context: []
+  - id: FR-078
+    title: Anti-cheat 強度與 seed 分享待決
+    description: Anti-cheat 目標強度與是否支援分享 seed 尚未定案。
+    priority: could
+    context: []
+    note: "no upstream source, needs review"
+
+  # --- Firestore data model / account deletion cascade ---
+  - id: FR-079
+    title: 帳號刪除的批次級聯刪除
+    description: 系統 SHALL 於刪除帳號時，以批次/遞迴刪除方式移除該帳號所有 Firestore 文件與子集合（account/character/inventory/runs/leaderboard/quest/achievement）。
+    priority: must
+    context: [CTX-CON-004]
+  - id: FR-080
+    title: Firestore 預設拒絕直接存取
+    description: 系統 SHALL 將 Firestore security rules 設為預設拒絕所有直接 client 讀寫，僅允許透過 server（Admin SDK）操作；少數需 client 直寫的欄位（如音效設定）須限制在使用者自己的文件內。
+    priority: must
+    context: [CTX-CON-003]
+
+  # --- UI / UX ---
+  - id: FR-081
+    title: 頁面路由規劃
+    description: 系統 SHALL 提供 /login、/lobby（或 /）、/adventure、/settings 頁面，各自對應其職責。
+    priority: must
+    context: [CTX-ACTOR-001]
+  - id: FR-082
+    title: 音效開關
+    description: 系統 SHALL 讓玩家獨立開關 BGM 與 SFX，並依帳號持久化設定。
+    priority: must
+    context: [CTX-ACTOR-001]
+  - id: FR-083
+    title: 不提供教學
+    description: 系統 SHALL NOT 提供新手引導/教學流程。
+    priority: must
+    context: [CTX-ASM-002]
+  - id: FR-084
+    title: 戰鬥回饋與結算畫面
+    description: 系統 SHALL 顯示逐擊戰鬥 log（攻擊者/目標/傷害/暴擊/閃避）與 RESOLUTION 結算畫面（分數+掉落），並要求手動確認才推進。
+    priority: must
+    context: []
+  - id: FR-085
+    title: 路由守衛
+    description: 系統 SHALL 以 client-side route middleware 保護需登入頁面，未登入時導向 /login。
+    priority: must
+    context: [CTX-ACTOR-001, CTX-EXT-001]
+
+  # --- API documentation ---
+  - id: FR-086
+    title: OpenAPI 自動生成
+    description: 系統 SHALL 由 Zod schemas 自動產生 OpenAPI 3.0 規格並於 /api/openapi.json 提供。
+    priority: should
+    context: []
+  - id: FR-087
+    title: Swagger UI
+    description: 系統 SHALL 於 /api-docs 提供互動式 Swagger UI，並支援 Bearer token 授權以測試需驗證的端點。
+    priority: should
+    context: []
+
+nonFunctionalRequirements:
+  - id: NFR-001
+    category: performance
+    description: Run 相關的伺服器更新 SHALL 僅在節點/事件（checkpoint）觸發時發生，不得採 tick-based 每秒讀寫 Firestore。
+    metric: "運行中的 run 每秒排程寫入次數 = 0（僅事件觸發時寫入）"
+    context: [CTX-CON-002]
+  - id: NFR-002
+    category: security
+    description: 所有會影響資源（gold/gems/items/score）的異動 SHALL 只能由 server 端程式路徑產生。
+    metric: "未量化，需以程式碼審查/測試覆蓋驗證 100% 資源異動皆出自 server"
+    context: [CTX-CON-003]
+  - id: NFR-003
+    category: security
+    description: 需要身份驗證的端點 SHALL 於處理前以 Firebase Admin SDK 驗證 Bearer idToken。
+    metric: "0 個需驗證端點可在缺少有效 token 時成功執行"
+    context: [CTX-EXT-001]
+  - id: NFR-004
+    category: reliability
+    description: gold/gems 欄位 SHALL 永遠落在 [0, 100000) 範圍內，任何寫入路徑都需邊界檢查。
+    metric: "所有寫入路徑皆通過邊界檢查（0 起，100000 為排他上界）"
+    context: []
+  - id: NFR-005
+    category: cost
+    description: 模板資料（怪物/事件/祝福/物品模板）SHALL 由 repo 內常數或 server 記憶體快取提供，避免每次請求查詢 Firestore。
+    metric: "穩定狀態下每個冒險 step 對模板資料的 Firestore 讀取次數 = 0"
+    context: [CTX-CON-002]
+  - id: NFR-006
+    category: reliability
+    description: 斷線重連窗口 SHALL 精確為 15 分鐘，超過窗口需確定性地結束 run。
+    metric: "15 分鐘 ± 伺服器時鐘誤差"
+    context: []
+  - id: NFR-007
+    category: maintainability
+    description: Stats 派生公式（attributes+裝備+run modifiers -> stats）SHALL 集中於單一 server 模組。
+    metric: "未量化：以程式碼結構檢查確認僅一處實作來源，不得有重複公式"
+    context: []
+  - id: NFR-008
+    category: security
+    description: Firestore security rules SHALL 預設拒絕所有直接 client 存取。
+    metric: "firestore.rules 預設 allow read, write: if false 且經審查確認"
+    context: []
+  - id: NFR-009
+    category: cost
+    description: 單場戰鬥 SHALL 以單次 server 呼叫完成模擬並回傳結果，不逐回合往返。
+    metric: "每場戰鬥恰好 1 次 API 請求完成結算"
+    context: []
+  - id: NFR-010
+    category: deployability
+    description: Firebase Admin 憑證 SHALL 在 Vercel 以環境變數（service account JSON）載入、本地以 applicationDefault() 載入，且不需修改程式碼切換環境。
+    metric: "同一份程式碼於 local 與 Vercel 皆可成功初始化 Firebase Admin"
+    context: [CTX-EXT-002, CTX-EXT-003]
+  - id: NFR-011
+    category: security
+    description: 排行榜分數 SHALL 僅能由 server 於 run 結算時寫入，不接受 client 提交的分數值。
+    metric: "0 個可由 client 直接寫入分數的欄位/端點"
+    context: []
+  - id: NFR-012
+    category: maintainability
+    description: 每新增一個 API 端點 SHALL 同步註冊到 OpenAPI registry，使其出現於 /api-docs。
+    metric: "已文件化端點比例 = 100%（目前 15/15）"
+    context: []
+  - id: NFR-013
+    category: security
+    description: Anti-cheat 目標強度尚未量化，需與相關人確認後補齊對應機制與量測方式。
+    metric: "未量化，需與相關人確認"
+    context: [CTX-ASM-003]
+  - id: NFR-014
+    category: cost
+    description: Run history 的長期保留策略（含是否改用 Google Sheet）尚未量化，需與相關人確認。
+    metric: "未量化，需與相關人確認"
+    context: [CTX-ASM-004, CTX-EXT-004]

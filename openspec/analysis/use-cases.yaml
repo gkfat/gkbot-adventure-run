@@ -1,0 +1,718 @@
+version: 1
+generatedBy: requirement-modeling
+updatedAt: 2026-08-27T00:00:00Z
+relatedChanges: [gkbot-adventure-run-full-system]
+
+userStories:
+  - id: STORY-001
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to log in with my Google account, so that I can access my persistent character without creating a new password.
+  - id: STORY-002
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to see my own account info, so that I can confirm which account I'm signed into.
+  - id: STORY-003
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to permanently delete my account and all data, so that I can walk away from the game without residual data.
+  - id: STORY-004
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to view my character's level, resources and computed combat stats, so that I understand my current power.
+  - id: STORY-005
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to spend unspent attribute points on STR/AGI/CON/LUCK, so that I can shape my build.
+  - id: STORY-006
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to set a nickname, so that other players see a name I chose instead of my email.
+  - id: STORY-007
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to upgrade my healing potion, so that I can survive longer during adventures.
+  - id: STORY-008
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to generate an item instance from a template and rarity roll, so that drops and shop stock have concrete stats.
+  - id: STORY-009
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to equip or unequip items into fixed slots, so that I can customize my combat stats.
+  - id: STORY-010
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to view my run inventory and permanent inventory separately, so that I know what I can bring home.
+  - id: STORY-011
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to reset the gold shop and gems shop daily at UTC+0, so that shop offerings stay fresh and fair.
+  - id: STORY-012
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to browse today's shop offerings, so that I can decide what to buy.
+  - id: STORY-013
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to purchase a shop item with gold or gems, so that I can strengthen my character.
+  - id: STORY-014
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to generate 3 daily quests per account, so that players have a bounded daily goal.
+  - id: STORY-015
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to claim a completed daily quest's reward, so that I receive gold/gems for my progress.
+  - id: STORY-016
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to claim an achievement's reward once, so that I'm rewarded for long-term milestones.
+  - id: STORY-017
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to roll gems drops during adventures (event wheel and combat), so that players earn premium currency during play.
+  - id: STORY-018
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to view the global leaderboard and my own rank, so that I can compare my performance to others.
+  - id: STORY-019
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to write the leaderboard entry only during run settlement, so that scores can't be forged by the client.
+  - id: STORY-020
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to start a new adventure run, so that I can begin earning score and loot.
+  - id: STORY-021
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to decide the next node deterministically each step, so that pacing (rest pity, elite cadence) is enforced consistently.
+  - id: STORY-022
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to resume my run within 15 minutes after a disconnect, so that a bad connection doesn't waste my progress.
+  - id: STORY-023
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to confirm the resolution screen to proceed, so that I can review what happened before moving on.
+  - id: STORY-024
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to choose a blessing when my blessing points cross the threshold, so that I can adapt my build for the rest of the run.
+  - id: STORY-025
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to use my healing potion at a rest node, so that I can recover HP before continuing.
+  - id: STORY-026
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to settle a run when it ends, so that earned gold/gems/items and the score are committed to the character and leaderboard.
+  - id: STORY-027
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to resolve an entire combat encounter in one deterministic pass, so that clients don't need per-round round-trips.
+  - id: STORY-028
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to apply active blessing/curse RunModifiers during combat, so that their effects are reflected in damage and drops.
+  - id: STORY-029
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to resolve a random event using weighted templates and RNG, so that events feel varied but fair.
+  - id: STORY-030
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to spin the event wheel, so that I might win items, gems, or gold.
+  - id: STORY-031
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to consume a deterministic RNG stream keyed by seed+rngIndex, so that outcomes are reproducible and not predictable by clients.
+  - id: STORY-032
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to persist a compact audit summary of a run, so that scores can be reviewed without storing full replays.
+  - id: STORY-033
+    actor: CTX-ACTOR-002
+    story: As the Server, I want to enforce that Firestore denies all direct client access by default, so that game data can't be tampered with outside the API.
+  - id: STORY-034
+    actor: CTX-ACTOR-001
+    story: As a Player, I want protected pages to redirect me to login when I'm not authenticated, so that I can't view broken/empty screens.
+  - id: STORY-035
+    actor: CTX-ACTOR-001
+    story: As a Player, I want to toggle BGM and SFX independently, so that I can play the game the way I prefer.
+  - id: STORY-036
+    actor: CTX-ACTOR-003
+    story: As a Maintainer, I want an auto-generated OpenAPI spec and Swagger UI, so that I can inspect and test the API without hand-written docs.
+
+useCases:
+  - id: UC-001
+    title: Google 登入 / 首次登入建立帳號與角色
+    actor: CTX-ACTOR-001
+    story: STORY-001
+    preconditions:
+      - 玩家持有可用的 Google 帳號
+    mainFlow:
+      - 玩家於 client 觸發 Google 登入，Firebase Auth 回傳 idToken
+      - client 呼叫 POST /api/auth/login，帶上 idToken
+      - server 以 Firebase Admin SDK 驗證 idToken，取得 uid/email
+      - 若該 uid 尚無 account：server 建立 account + character（初始值見 FR-007）
+      - server 回傳 account/character 摘要，client 導向大廳
+    alternateFlows:
+      - idToken 無效或過期：server 回 401，client 顯示登入失敗，不建立任何資料
+      - Firebase Auth 服務不可用：client 顯示重試提示，不呼叫登入 API
+    postconditions:
+      - 該 uid 恰有 1 個 account 與 1 個 character 存在
+    requirements: [FR-001, FR-002, FR-003, FR-006]
+  - id: UC-002
+    title: 查詢目前帳號資訊
+    actor: CTX-ACTOR-001
+    story: STORY-002
+    preconditions:
+      - 玩家已登入且持有有效 idToken
+    mainFlow:
+      - client 呼叫 GET /api/auth/me 並附上 Bearer token
+      - server 驗證 token 後查出對應 account
+      - server 回傳 account 資訊
+    alternateFlows:
+      - token 失效：回 401
+      - account 不存在（理論上不應發生）：回 404 並記錄錯誤
+    postconditions:
+      - 無資料異動
+    requirements: [FR-004]
+  - id: UC-003
+    title: 刪除帳號（含全部關聯資料）
+    actor: CTX-ACTOR-001
+    story: STORY-003
+    preconditions:
+      - 玩家已登入
+    mainFlow:
+      - 玩家於設定頁觸發刪除帳號
+      - client 呼叫 DELETE /api/auth/account
+      - server 驗證身份後，批次/遞迴刪除該帳號的 account/character/inventory/run 歷史/leaderboard 紀錄/quest/achievement 進度
+      - server 回傳刪除成功
+      - client 登出並導向 /login
+    alternateFlows:
+      - 刪除過程中部分子集合刪除失敗：server 需記錄並重試，不可留下孤兒資料且不可回報「成功」
+    postconditions:
+      - 該帳號所有 Firestore 資料不再存在
+      - 該帳號的排行榜項目不再出現
+    requirements: [FR-005, FR-079, FR-080]
+    constraints: [NFR-002]
+  - id: UC-004
+    title: 檢視角色資料與計算後 Stats
+    actor: CTX-ACTOR-001
+    story: STORY-004
+    preconditions:
+      - 玩家已登入
+    mainFlow:
+      - client 呼叫 GET /api/character
+      - server 讀出 character 的 attributes/equipment/等級/資源
+      - server 依 attributes + 已裝備物品 + 目前 run modifiers（若在 run 中）即時計算 ATK/DEF/HP_MAX/actionIntervalSec
+      - server 回傳角色資料 + 計算後 stats（不落庫）
+    alternateFlows:
+      - character 不存在：屬異常情況（應在登入時已建立），回 500 並記錄
+    postconditions:
+      - 無資料異動；stats 僅存在於回應中
+    requirements: [FR-007, FR-008, FR-011, FR-013, FR-014]
+    constraints: [NFR-007]
+  - id: UC-005
+    title: 分配屬性點
+    actor: CTX-ACTOR-001
+    story: STORY-005
+    preconditions:
+      - 玩家已登入
+      - character.unspentAttributePoints > 0
+    mainFlow:
+      - client 呼叫 POST /api/character/attributes，帶上各屬性欲分配的點數
+      - server 驗證總分配點數 <= unspentAttributePoints
+      - server 更新 attributes 並扣除 unspentAttributePoints
+      - server 回傳更新後的角色資料
+    alternateFlows:
+      - 分配點數超過剩餘點數：回 400，不異動任何欄位
+      - 分配到不存在的屬性欄位：回 400
+    postconditions:
+      - attributes 與 unspentAttributePoints 已更新且一致
+    requirements: [FR-009, FR-010, FR-012]
+  - id: UC-006
+    title: 設定排行榜暱稱
+    actor: CTX-ACTOR-001
+    story: STORY-006
+    preconditions:
+      - 玩家已登入
+    mainFlow:
+      - client 呼叫 POST /api/character/nickname，帶上新暱稱
+      - server 驗證格式（長度/允許字元）
+      - server 更新 character.nickname
+    alternateFlows:
+      - 暱稱格式不合法：回 400
+    postconditions:
+      - character.nickname 已更新，後續排行榜顯示採用新值
+    requirements: [FR-019]
+  - id: UC-007
+    title: "[REMOVED] 升級補血藥水"
+    status: deprecated
+    reason: >
+      補血藥水改為一般消耗品物品（見 FR-015 的重新定義），不再有角色端的升級
+      動作；取得更強效果的藥水改由購買/掉落更高稀有度的物品達成，見
+      items-and-equipment 與 shop 的物品生成/購買流程。
+    actor: CTX-ACTOR-001
+    story: STORY-007
+    preconditions:
+      - 玩家已登入
+      - character.level >= 5（解鎖藥水）
+      - character.healingPotion.level < 15
+      - character.gold >= upgradeCost(nextLevel)
+    mainFlow:
+      - client 呼叫 POST /api/character/potion/upgrade
+      - server 檢查解鎖條件、等級上限與 gold 是否足夠
+      - server 扣除 gold，healingPotion.level += 1
+      - server 回傳更新後的 healingPotion 狀態
+    alternateFlows:
+      - gold 不足：回 400，不異動
+      - 已達 maxLevel=15：回 400
+      - 角色未達 level 5：回 403
+    postconditions:
+      - healingPotion.level 與 character.gold 已一致更新
+    requirements: [FR-015, FR-016, FR-017, FR-018]
+    constraints: [NFR-002, NFR-004]
+  - id: UC-008
+    title: 生成物品實體（掉落 / 商店上架）
+    actor: CTX-ACTOR-002
+    story: STORY-008
+    preconditions:
+      - 已知觸發來源（DROP/SHOP/EVENT）與可用的 Item Template 集合
+    mainFlow:
+      - server 依來源情境選定候選 Template 與其 rarityWeights
+      - server 以 RNG 依權重 roll 出稀有度（N/R/SR/SSR/L）
+      - server 依 baseStatsRange 為該稀有度 roll 出 rolledStats
+      - server 產生唯一 itemId，組成 Item Instance 並標記 source
+    alternateFlows:
+      - Template 不存在或設定不完整：拒絕生成並記錄錯誤，不回傳半成品物品
+    postconditions:
+      - 產出一個具唯一 id 的 Item Instance，稀有度與數值符合權重/範圍設定
+    requirements: [FR-020, FR-021, FR-028]
+    constraints: [NFR-005]
+  - id: UC-009
+    title: 裝備 / 卸下物品
+    actor: CTX-ACTOR-001
+    story: STORY-009
+    preconditions:
+      - 玩家已登入
+      - 目標物品存在於玩家的永久背包或 run 背包，且 equipSlot 合法
+    mainFlow:
+      - 玩家選擇一件裝備並指定裝備動作
+      - server 檢查目標槽位是否已有裝備
+      - 若已佔用：回傳需要確認替換的提示，玩家確認後才繼續
+      - server 更新 character.equipment[slot] 為新 itemId，舊裝備（若有）回到背包
+      - 裝備效果立即反映在下次 stats 計算（不修改 attributes）
+    alternateFlows:
+      - 物品的 equipSlot 與目標槽位不符：回 400
+      - 玩家未確認替換：不執行替換，維持原裝備
+    postconditions:
+      - character.equipment 已更新；卸下的裝備效果立即失效
+    requirements: [FR-024, FR-025, FR-026]
+  - id: UC-010
+    title: 檢視背包（run 背包 / 永久背包）
+    actor: CTX-ACTOR-001
+    story: STORY-010
+    preconditions:
+      - 玩家已登入
+    mainFlow:
+      - client 依情境呼叫對應 API 取得永久背包（最多 500 格）或（run 中）run 背包（最多 50 格）內容
+      - server 回傳物品實體清單
+    alternateFlows:
+      - 背包已達上限：仍可檢視，但新增物品時應在對應流程（UC-008/UC-023）中被拒絕或提示無法帶出
+    postconditions:
+      - 無資料異動
+    requirements: [FR-022, FR-023, FR-027]
+  - id: UC-011
+    title: 每日商店重置（金幣商店 / 紅寶石商店）
+    actor: CTX-ACTOR-002
+    story: STORY-011
+    preconditions:
+      - 目前 UTC 日期的商店尚未生成（懶生成：以 lastResetAt 判斷）
+    mainFlow:
+      - 玩家或排程觸發商店讀取
+      - server 檢查金幣商店（per-account）與紅寶石商店（全服共享）是否已過期
+      - 過期則以（日期+accountId）或（日期）為決定性 seed，各自生成固定數量（如 6 格）商品
+      - server 寫入新的商店文件並回傳
+    alternateFlows:
+      - 併發觸發重置造成競態：需以冪等寫入或交易確保不重複生成兩批不同商品
+    postconditions:
+      - 當日商店商品已生成且可被讀取
+    requirements: [FR-029, FR-030, FR-031, FR-032]
+  - id: UC-012
+    title: 瀏覽今日商店
+    actor: CTX-ACTOR-001
+    story: STORY-012
+    preconditions:
+      - 玩家已登入
+      - 當日商店已生成（見 UC-011）
+    mainFlow:
+      - client 呼叫商店查詢 API
+      - server 回傳金幣商店與紅寶石商店的商品清單（含售出狀態）
+    alternateFlows: []
+    postconditions:
+      - 無資料異動
+    requirements: [FR-030, FR-031]
+  - id: UC-013
+    title: 購買商店物品
+    actor: CTX-ACTOR-001
+    story: STORY-013
+    preconditions:
+      - 玩家已登入
+      - 目標商品存在且尚未售出
+    mainFlow:
+      - 玩家選擇商品並選擇購買後的去向（永久背包 / 直接裝備）
+      - server 檢查商品未售出，且玩家 gold 或 gems 足夠
+      - server 扣款（clamp 於 [0,100000)）並標記商品 sold + purchasedAt
+      - server 生成/移轉 Item Instance 給玩家，依所選去向放入背包或觸發裝備替換流程（UC-009）
+    alternateFlows:
+      - 商品已售出：回 409
+      - 資源不足：回 400，不異動
+    postconditions:
+      - 商品標記為已售出；玩家資源與背包/裝備已一致更新
+    requirements: [FR-033, FR-034, FR-035, FR-012]
+    constraints: [NFR-002, NFR-004]
+  - id: UC-014
+    title: 每日任務重置
+    actor: CTX-ACTOR-002
+    story: STORY-014
+    preconditions:
+      - 目前 UTC 日期的任務尚未生成
+    mainFlow:
+      - 玩家觸發任務查詢，server 檢查是否已過期
+      - 過期則生成當日 3 個任務並初始化進度計數器
+    alternateFlows:
+      - 併發觸發重置：同 UC-011 的競態處理
+    postconditions:
+      - 當日 3 個任務已建立，進度歸零
+    requirements: [FR-036]
+  - id: UC-015
+    title: 追蹤並領取每日任務獎勵
+    actor: CTX-ACTOR-001
+    story: STORY-015
+    preconditions:
+      - 玩家已登入
+      - 目標任務已達成（計數器達標）且尚未領取
+    mainFlow:
+      - 遊戲行為（完成冒險/擊殺/購買等）觸發 server 更新對應任務計數器
+      - 計數器達標後，client 顯示可領取狀態
+      - 玩家點擊領取，server 驗證達成狀態，發放 gold(10~50)/gems(0~1)
+      - server 標記該任務已領取
+    alternateFlows:
+      - 尚未達成即嘗試領取：回 400
+      - 重複領取：回 409
+    postconditions:
+      - 任務標記為已領取；玩家資源已增加
+    requirements: [FR-037]
+    constraints: [NFR-002]
+  - id: UC-016
+    title: 領取成就獎勵
+    actor: CTX-ACTOR-001
+    story: STORY-016
+    preconditions:
+      - 玩家已登入
+      - 目標成就已達成且該帳號尚未領取過
+    mainFlow:
+      - server 於相關行為發生時（run 結算/累計統計）更新成就進度
+      - 達成後 client 顯示可領取
+      - 玩家點擊領取，server 驗證達成與未領取狀態，發放 gems(3~5)
+      - server 標記該成就（該帳號）已領取
+    alternateFlows:
+      - 已領取過：回 409
+      - 尚未達成：回 400
+    postconditions:
+      - 該帳號該成就標記已領取；gems 已增加
+    requirements: [FR-038]
+    constraints: [NFR-002]
+  - id: UC-017
+    title: 冒險過程獲得 gems 掉落
+    actor: CTX-ACTOR-002
+    story: STORY-017
+    preconditions:
+      - 玩家正在進行 run，觸發事件轉盤或擊殺敵人
+    mainFlow:
+      - server 依情境（轉盤 3% 或 combat 依 enemyLevel 分級）以 RNG 判定是否掉落 gems
+      - 命中則依對應數量區間 roll 出 gems 數量
+      - 累加到 run 的 earnedGems
+    alternateFlows:
+      - enemyLevel > 30：規則未定義，暫以最高已定義區間（20~30）代替，並標記待確認（見 FR-040）
+    postconditions:
+      - run.earnedGems 已更新（若命中掉落）
+    requirements: [FR-039, FR-040]
+  - id: UC-018
+    title: 檢視排行榜
+    actor: CTX-ACTOR-001
+    story: STORY-018
+    preconditions:
+      - 玩家已登入
+    mainFlow:
+      - client 呼叫排行榜查詢 API
+      - server 回傳依分數排序的 Top-N 項目（暱稱+分數）與玩家自己的名次
+    alternateFlows:
+      - 玩家尚無任何 run 紀錄：自己的名次回傳「無紀錄」
+    postconditions:
+      - 無資料異動
+    requirements: [FR-042, FR-043, FR-044]
+  - id: UC-019
+    title: Run 結算時寫入排行榜
+    actor: CTX-ACTOR-002
+    story: STORY-019
+    preconditions:
+      - 一個 run 已進入 ENDED 狀態
+    mainFlow:
+      - server 比較本次 run 分數與角色歷史最高分
+      - 若本次分數更高，更新該角色於全服排行榜的項目（暱稱+分數+摘要）
+    alternateFlows:
+      - 本次分數未超過歷史最高：不更新排行榜項目
+    postconditions:
+      - 排行榜僅反映角色的最高分且只由 server 寫入
+    requirements: [FR-041]
+    constraints: [NFR-011]
+  - id: UC-020
+    title: 開始新的冒險 run
+    actor: CTX-ACTOR-001
+    story: STORY-020
+    preconditions:
+      - 玩家已登入
+      - 該角色目前沒有其他進行中的 run
+    mainFlow:
+      - 玩家於大廳點擊「開始冒險」
+      - server 檢查無進行中的 run
+      - server 產生新 seed，建立 run doc（state=INIT, step=0, rngIndex=0）
+      - client 導向 /adventure 並依 state 顯示畫面
+    alternateFlows:
+      - 已有進行中的 run：server 拒絕並回傳現有 run 資訊，導向續玩
+    postconditions:
+      - 新的 run 已建立且為該角色唯一進行中的 run
+    requirements: [FR-045]
+  - id: UC-021
+    title: 推進到下一個節點（Advance step）
+    actor: CTX-ACTOR-002
+    story: STORY-021
+    preconditions:
+      - run 處於 EXPLORING 或可推進的狀態
+    mainFlow:
+      - server 檢查保底規則：距上次 Rest 節點 >= 4 step，若是則下一節點為 Rest
+      - 否則檢查固定節奏：step%9==0 為 Strong Elite；step%5==0 為 Elite
+      - 否則依權重隨機選擇 combat/event/rest/choice
+      - server 依 enemyLevel = 1+floor(step/2) 與難度倍率、wave/enemy 數量規則產生節點內容
+      - server 更新 run.currentNode、run.state 並回傳給 client
+    alternateFlows:
+      - 保底 Rest 與固定節奏同時觸發：優先套用保底 Rest
+    postconditions:
+      - run.step 已遞增，currentNode 已更新為新決定的節點
+    requirements: [FR-046, FR-047, FR-048, FR-049, FR-050, FR-051, FR-052]
+    constraints: [NFR-001]
+  - id: UC-022
+    title: 斷線後於重連窗口內恢復 run
+    actor: CTX-ACTOR-001
+    story: STORY-022
+    preconditions:
+      - 玩家有一個處於進行中狀態、且最後互動時間在 15 分鐘內的 run
+    mainFlow:
+      - 玩家重新開啟 /adventure
+      - client 呼叫「取得目前冒險狀態」API
+      - server 確認距離最後互動時間 <= 15 分鐘，回傳現有 run 狀態
+      - client 依回傳狀態渲染畫面，玩家可繼續
+    alternateFlows:
+      - 已超過 15 分鐘：server 將該 run 標記 endReason=DISCONNECT 並結束（見 UC-026），回傳「已結束」
+    postconditions:
+      - 未逾時：run 狀態不變，玩家可繼續
+      - 已逾時：run 已進入 ENDED 狀態
+    requirements: [FR-053, FR-054]
+    constraints: [NFR-006]
+  - id: UC-023
+    title: 確認 RESOLUTION 並推進
+    actor: CTX-ACTOR-001
+    story: STORY-023
+    preconditions:
+      - run.state == RESOLUTION
+    mainFlow:
+      - 玩家檢視本節點結算畫面（分數/掉落摘要）
+      - 玩家點擊「確認/下一步」
+      - server 將本次結算的 gold/gems 累加到 run.earnedGold/earnedGems，掉落裝備放入 run 背包
+      - server 依規則決定下一節點（呼叫 UC-021）
+    alternateFlows:
+      - 玩家未點擊確認：畫面停留在 RESOLUTION，不推進
+    postconditions:
+      - run 的即時累積資源與 run 背包已更新；狀態已推進到下一節點
+    requirements: [FR-055, FR-056, FR-057, FR-084]
+  - id: UC-024
+    title: 選擇祝福（Blessing Select）
+    actor: CTX-ACTOR-001
+    story: STORY-024
+    preconditions:
+      - run 累積的祝福點數已達門檻，run.state == BLESSING_SELECT
+    mainFlow:
+      - server 依當前 LUCK 影響候選稀有度/品質，產生候選清單（如 3 選 1）
+      - 玩家選擇其中一個
+      - server 將對應 RunModifier 加入 run 的 active blessings
+      - server 推進到下一節點
+    alternateFlows:
+      - 玩家未選擇（理論上必須選）：畫面保持在 BLESSING_SELECT
+    postconditions:
+      - run.blessings 新增一筆生效中的 RunModifier
+    requirements: [FR-058, FR-059]
+  - id: UC-025
+    title: 於休息節點使用藥水
+    actor: CTX-ACTOR-001
+    story: STORY-025
+    preconditions:
+      - run.state 對應 Rest 節點
+      - 玩家的永久背包或 run 背包內至少有一個 POTION 物品實體
+    mainFlow:
+      - 玩家於休息節點選擇要使用的 POTION 物品（itemId）
+      - server 確認該物品存在且屬於玩家（永久背包或 run 背包皆可）、type=POTION
+      - server 依該實體 rolledStats.healPercent 計算回復量並套用到 run 目前 HP（不超過 HP_MAX）
+      - server 消耗（移除）該物品實體
+    alternateFlows:
+      - 指定的 itemId 不存在或不是玩家持有的 POTION：回 400
+      - 非 Rest 節點嘗試使用：拒絕，回 400
+    postconditions:
+      - run 的 playerHp 已增加；該 POTION 物品實體已從對應背包移除
+    requirements: [FR-060]
+  - id: UC-026
+    title: 結束並結算冒險 run
+    actor: CTX-ACTOR-002
+    story: STORY-026
+    preconditions:
+      - run 觸發結束條件之一（HP<=0／QUIT／逾時斷線）
+    mainFlow:
+      - server 判定 endReason（DEAD/QUIT/DISCONNECT；TIMEOUT 保留不啟用）
+      - server 將 run.earnedGold/earnedGems 併入 character.gold/gems（clamp 於上限）
+      - server 將 run 背包中的裝備轉入永久背包（受 500 格上限限制）
+      - server 觸發排行榜更新（UC-019）與任務/成就進度更新
+      - server 將 run.state 設為 ENDED 並記錄 endedAt/endReason
+    alternateFlows:
+      - 永久背包已滿：無法轉入的裝備需明確標記為遺失或拒絕轉入（待補：目前規格未定義滿倉行為）
+    postconditions:
+      - run 進入 ENDED 狀態；角色資源與背包已反映本次 run 的戰利品；排行榜視情況更新
+    requirements: [FR-047, FR-056, FR-057]
+    constraints: [NFR-002, NFR-004]
+  - id: UC-027
+    title: 解決一場戰鬥
+    actor: CTX-ACTOR-002
+    story: STORY-027
+    preconditions:
+      - run 進入 COMBAT 狀態，已決定 waveCount/enemyCount 與敵人數值
+    mainFlow:
+      - server 以 seed+rngIndex 為基礎，依時間軸（actionIntervalSec）逐次判定攻擊順序
+      - 每次攻擊依 damage=max(1,ATK-DEF)*(crit?critMultiplier:1) 計算傷害，並先判定 dodge
+      - 套用當前生效中的 blessing/curse RunModifier 於攻防/掉落計算
+      - 重複直到某方 HP<=0 或戰鬥end條件成立，過程寫入 combatLog
+      - server 依 LUCK 決定 gold/物品掉落，彙整 combatSummary（含 score 增量）
+      - server 回傳 combatLog + combatSummary，run.state 進入 RESOLUTION
+    alternateFlows:
+      - 玩家 HP<=0：戰鬥判定玩家落敗，run 觸發結束流程（UC-026, endReason=DEAD）
+    postconditions:
+      - combatSummary 已持久化；run 分數已累加；掉落物已產生（進入 UC-023 的結算流程）
+    requirements: [FR-063, FR-064, FR-065, FR-066, FR-067, FR-068, FR-084]
+    constraints: [NFR-009, NFR-001]
+  - id: UC-028
+    title: 於戰鬥中套用 RunModifier（Blessing/Curse）
+    actor: CTX-ACTOR-002
+    story: STORY-028
+    preconditions:
+      - run 存在至少一個生效中的 RunModifier
+    mainFlow:
+      - 進行 UC-027 的傷害/防禦/掉落計算前，先套用所有生效中 RunModifier 的效果調整
+      - 若 RunModifier 帶有持續性狀態（如 DoT），於每個 step 結算時套用並遞減其剩餘時效
+    alternateFlows:
+      - RunModifier 已過期（run 結束或效果時效已到）：從 active 清單移除，不再套用
+    postconditions:
+      - 戰鬥計算結果已反映所有生效中的 RunModifier
+    requirements: [FR-069, FR-070]
+  - id: UC-029
+    title: 解決隨機事件
+    actor: CTX-ACTOR-002
+    story: STORY-029
+    preconditions:
+      - run 進入 EVENT 狀態
+    mainFlow:
+      - server 依權重表以 RNG 選出一個事件模板
+      - 若事件帶有 choices，回傳選項供玩家選擇；否則直接套用結果
+      - 玩家選擇後，server 依該 choice 的 cost/reward/risk 計算結果（可能觸發補血/祝福/詛咒/轉盤）
+      - server 更新對應資源/RunModifier，run.state 進入 RESOLUTION
+    alternateFlows:
+      - 玩家提交了不存在的 choice id：回 400
+    postconditions:
+      - 事件結果已套用（資源變動或新增 RunModifier）
+    requirements: [FR-071, FR-072]
+  - id: UC-030
+    title: 轉動事件轉盤
+    actor: CTX-ACTOR-001
+    story: STORY-030
+    preconditions:
+      - 目前事件節點提供轉盤選項
+    mainFlow:
+      - 玩家觸發轉盤
+      - server 以 RNG 判定結果（物品/gems/金幣，含 UC-017 的 gems 掉落規則）
+      - server 發放對應獎勵到 run 的即時結算欄位或 run 背包
+    alternateFlows:
+      - 是否可付費加抽尚未定案（見 FR-074），目前僅支援單次免費轉動
+    postconditions:
+      - 玩家已獲得轉盤獎勵（若有命中）
+    requirements: [FR-073, FR-074]
+  - id: UC-031
+    title: 消耗決定性 RNG
+    actor: CTX-ACTOR-002
+    story: STORY-031
+    preconditions:
+      - run 已有 seed 與目前 rngIndex
+    mainFlow:
+      - 任一需要隨機性的計算呼叫 random(seed, rngIndex)
+      - server 取得該次隨機值後，將 run.rngIndex 遞增 1 並持久化
+    alternateFlows:
+      - 呼叫方在未更新 rngIndex 前重複讀取：視為實作錯誤，須避免（不可重複消耗同一 index）
+    postconditions:
+      - run.rngIndex 已遞增且與已產生的隨機結果一致
+    requirements: [FR-075, FR-076]
+    constraints: [NFR-002]
+  - id: UC-032
+    title: 保存 run 稽核摘要
+    actor: CTX-ACTOR-002
+    story: STORY-032
+    preconditions:
+      - run 正在進行或剛結束
+    mainFlow:
+      - server 於每個節點結算後，記錄精簡摘要（節點類型 + 結果，不含完整 combatLog）
+      - run 結束時，彙整整個 run 的摘要序列供稽核使用
+    alternateFlows:
+      - 儲存成本過高：可進一步截斷或僅保留最近 N 筆（待決策，見 NFR-014）
+    postconditions:
+      - run 的稽核摘要已持久化，可用於事後分數驗證
+    requirements: [FR-077, FR-078]
+    constraints: [NFR-013, NFR-014]
+  - id: UC-033
+    title: 強制 Firestore 僅限伺服器存取
+    actor: CTX-ACTOR-002
+    story: STORY-033
+    preconditions:
+      - Firestore security rules 已部署
+    mainFlow:
+      - client 嘗試直接讀寫 Firestore 文件
+      - Firestore security rules 預設拒絕該操作（除非是明確允許的使用者自身文件，如音效設定）
+      - 所有遊戲資料存取一律經由 Nitro server（Admin SDK）
+    alternateFlows:
+      - rules 設定錯誤允許了不該開放的路徑：需以 CI/audit 檢查 firestore.rules 內容
+    postconditions:
+      - 除白名單欄位外，client 無法直接讀寫任何 Firestore 文件
+    requirements: [FR-080]
+    constraints: [NFR-008]
+  - id: UC-034
+    title: 路由守衛導向登入
+    actor: CTX-ACTOR-001
+    story: STORY-034
+    preconditions:
+      - 玩家嘗試訪問需登入頁面（/lobby, /adventure, /settings 等）
+    mainFlow:
+      - client route middleware 檢查 isAuthenticated
+      - 若未登入，導向 /login
+      - 若已登入，正常渲染目標頁面（不提供教學/引導流程）
+    alternateFlows:
+      - auth 狀態尚在初始化（loading）：等待初始化完成或逾時後才判斷（避免誤判為未登入）
+    postconditions:
+      - 未登入使用者無法看到受保護頁面內容
+    requirements: [FR-081, FR-085, FR-083]
+    constraints: [NFR-003]
+  - id: UC-035
+    title: 切換 BGM / 音效設定
+    actor: CTX-ACTOR-001
+    story: STORY-035
+    preconditions:
+      - 玩家已登入
+    mainFlow:
+      - 玩家於 /settings 切換 BGM 或 SFX 開關
+      - client 立即套用本地播放狀態，並呼叫 API 持久化設定到該帳號
+    alternateFlows:
+      - 持久化 API 失敗：本地播放狀態仍生效，但下次登入可能還原為舊設定，需提示玩家
+    postconditions:
+      - 該帳號的音效設定已更新並可跨裝置/重新登入後保留
+    requirements: [FR-082]
+  - id: UC-036
+    title: 產生並檢視 OpenAPI 文件
+    actor: CTX-ACTOR-003
+    story: STORY-036
+    preconditions:
+      - 專案內已以 Zod 定義相關 API schema 並於 openapi.ts 註冊
+    mainFlow:
+      - Maintainer 開啟 /api-docs
+      - server 於 /api/openapi.json 提供由 Zod schemas 產生的 OpenAPI 3.0 規格
+      - Swagger UI 讀取該規格並渲染互動式文件，支援輸入 Bearer token 測試需驗證端點
+    alternateFlows:
+      - 新端點未註冊到 openapi.ts：不會出現在文件中，需於程式碼審查時發現並補上
+    postconditions:
+      - 無資料異動；文件反映目前已註冊的端點集合
+    requirements: [FR-086, FR-087]
+    constraints: [NFR-012]
