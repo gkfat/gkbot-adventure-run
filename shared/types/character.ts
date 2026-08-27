@@ -3,14 +3,6 @@ import type {
 } from './common';
 
 /**
- * Healing potion (character fixed field, not an item)
- */
-export type HealingPotion = {
-  level: number;              // 1-15
-  coolDownUntil: Timestamp;   // Cooldown timestamp (30 min after bringing into run)
-};
-
-/**
  * Character document stored in Firestore
  */
 export type Character = {
@@ -31,12 +23,9 @@ export type Character = {
   
   // Equipment (slot -> itemId mapping)
   equipment: Partial<Record<EquipmentSlot, string>>;
-  
-  // Healing potion (fixed field)
-  healingPotion: HealingPotion;
-  
+
   // Leaderboard display
-  nickname?: string;          // Player-chosen display name (default: User#xxxx)
+  nickname: string;           // Display name; auto-generated on creation, player can override
   
   // Timestamps
   createdAt: Timestamp;
@@ -104,36 +93,3 @@ export const EXP_TABLE: Record<number, number> = {
     29: 12771,
 };
 
-/**
- * Healing potion configuration
- */
-export const POTION_CONFIG = {
-    MAX_LEVEL: 15,
-    UNLOCK_LEVEL: 5,           // Character must be level 5+ to use
-    COOLDOWN_MS: 30 * 60 * 1000, // 30 minutes
-  
-    // Heal percent formula: clamp(0.20 + 0.02*(level-1), 0.20, 0.50)
-    BASE_HEAL_PERCENT: 0.20,
-    HEAL_PERCENT_PER_LEVEL: 0.02,
-    MAX_HEAL_PERCENT: 0.50,
-  
-    // Upgrade cost formula: 200 * (nextLevel^2)
-    UPGRADE_COST_BASE: 200,
-} as const;
-
-/**
- * Calculate potion upgrade cost
- */
-export function getPotionUpgradeCost(currentLevel: number): number {
-    const nextLevel = currentLevel + 1;
-    return POTION_CONFIG.UPGRADE_COST_BASE * (nextLevel ** 2);
-}
-
-/**
- * Calculate potion heal percent
- */
-export function getPotionHealPercent(level: number): number {
-    const percent = POTION_CONFIG.BASE_HEAL_PERCENT + 
-                  POTION_CONFIG.HEAL_PERCENT_PER_LEVEL * (level - 1);
-    return Math.min(percent, POTION_CONFIG.MAX_HEAL_PERCENT);
-}

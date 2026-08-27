@@ -26,7 +26,6 @@ import {
     allocateAttributesResponseSchema,
     setNicknameRequestSchema,
     setNicknameResponseSchema,
-    upgradePotionResponseSchema,
 } from '../../shared/schemas/api/character.schema';
 
 import {
@@ -82,7 +81,6 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         AllocateAttributesResponse: allocateAttributesResponseSchema,
         SetNicknameRequest: setNicknameRequestSchema,
         SetNicknameResponse: setNicknameResponseSchema,
-        UpgradePotionResponse: upgradePotionResponseSchema,
         StartAdventureResponse: startAdventureResponseSchema,
         GetCurrentAdventureResponse: getCurrentAdventureResponseSchema,
         AdvanceAdventureResponse: advanceAdventureResponseSchema,
@@ -212,28 +210,6 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             },
             400: {
                 description: 'Invalid nickname',
-                content: { 'application/json': { schema: errorResponseSchema } },
-            },
-            401: {
-                description: 'Unauthorized',
-                content: { 'application/json': { schema: errorResponseSchema } },
-            },
-        },
-    });
-
-    registry.registerPath({
-        method: 'post',
-        path: '/api/character/potion/upgrade',
-        description: 'Upgrade healing potion level using gold',
-        tags: ['Character'],
-        security: [{ bearerAuth: [] }],
-        responses: {
-            200: {
-                description: 'Potion successfully upgraded',
-                content: { 'application/json': { schema: upgradePotionResponseSchema } },
-            },
-            400: {
-                description: 'Insufficient gold or max level reached',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
             401: {

@@ -18,17 +18,9 @@ export const attributesSchema = z.object({
 }).strict();
 
 /**
- * Healing potion schema
- */
-export const healingPotionSchema = z.object({
-    level: z.number().int().min(1).max(15),
-    coolDownUntil: z.number(),
-}).strict();
-
-/**
  * Equipment mapping schema (slot -> itemId)
  */
-export const equipmentSchema = z.record(
+export const equipmentSchema = z.partialRecord(
     z.nativeEnum(EquipmentSlot),
     z.string(),
 ).optional();
@@ -54,13 +46,10 @@ export const characterSchema = z.object({
   
     // Equipment
     equipment: equipmentSchema,
-  
-    // Healing potion
-    healingPotion: healingPotionSchema,
-  
+
     // Leaderboard display
-    nickname: z.string().optional(),
-  
+    nickname: z.string().min(1).max(20),
+
     // Timestamps
     createdAt: z.number(),
     updatedAt: z.number(),
@@ -68,4 +57,3 @@ export const characterSchema = z.object({
 
 export type Character = z.infer<typeof characterSchema>;
 export type Attributes = z.infer<typeof attributesSchema>;
-export type HealingPotion = z.infer<typeof healingPotionSchema>;

@@ -1,3 +1,8 @@
 * {
     font-family: 'Source Sans 3', 'Noto Sans TC', sans-serif !important;
 }
+
+// 8-bit 標題/數值字體，僅用於英數字元（品牌字、LV/HP 數值），保留 CJK 用主字體
+.font-pixel {
+    font-family: 'Press Start 2P', 'Source Sans 3', 'Noto Sans TC', sans-serif !important;
+}

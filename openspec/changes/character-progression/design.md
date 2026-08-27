@@ -30,4 +30,5 @@
 
 ## Migration Plan
 
-- 無資料遷移；`characters` collection 現有欄位已相容（`unspentAttributePoints`、`nickname` 皆已在既有 schema 中，且既有角色建立時已寫入 `unspentAttributePoints: 0`）
+- 無批次資料遷移腳本；`characters` collection 現有欄位已相容（`unspentAttributePoints` 已在既有角色建立時寫入 `0`）
+- 修正（2026-08-27）：`nickname` 改為必填後，實測發現此前已有帳號（登入流程已上線）建立的角色文件沒有 `nickname` 欄位，導致 `GET /api/character` 回傳時被 `getCharacterResponseSchema` 擋下（500 ZodError）。改為在 `CharacterRepository.getByAccountId` 讀取時自我修復：若讀到的角色缺少 `nickname`，即時以 `generateDefaultNickname` 補值並寫回 Firestore，之後才回傳，不需另外批次遷移腳本

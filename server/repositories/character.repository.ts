@@ -12,27 +12,40 @@ export class CharacterRepository extends BaseRepository<Character> {
     protected collectionName = 'characters';
 
     /**
+     * Generate the default leaderboard display name for a newly created character.
+     * Derived deterministically from accountId (last 6 chars, uppercased) so it
+     * needs no uniqueness check or counter document.
+     *
+     * @param accountId - Account ID
+     * @returns Default nickname, e.g. "玩家A1B2C3"
+     */
+    generateDefaultNickname(accountId: string): string {
+        const suffix = accountId.slice(-6).toUpperCase();
+        return `玩家${suffix}`;
+    }
+
+    /**
      * Prepare initial character data (DRY principle)
      * This ensures all character creation uses the same initial values
-     * 
+     *
      * @param accountId - Account ID (used as character ID for 1:1 mapping)
      * @returns Initial character data
      */
-    prepareInitialCharacterData(accountId: string): Omit<Character, 'equipment' | 'nickname'> & Partial<Pick<Character, 'equipment' | 'nickname'>> {
+    prepareInitialCharacterData(accountId: string): Character {
         const timestamp = Date.now();
-        
+
         const characterData = {
             characterId: accountId,
             accountId: accountId,
-            
+
             // Initial progression
             level: 1,
             exp: 0,
-            
+
             // Initial currency
             gold: 0,
             gems: 0,
-            
+
             // Initial attributes (all set to 1)
             attributes: {
                 STR: 1,
@@ -41,20 +54,17 @@ export class CharacterRepository extends BaseRepository<Character> {
                 LUCK: 1,
             },
             unspentAttributePoints: 0,
-            
-            // Initial healing potion (level 1, no cooldown)
-            healingPotion: {
-                level: 1,
-                coolDownUntil: 0,
-            },
-            
+
+            // No equipment initially
+            equipment: {},
+
+            // Leaderboard display name (player can override via nickname endpoint)
+            nickname: this.generateDefaultNickname(accountId),
+
             // Timestamps
             createdAt: timestamp,
             updatedAt: timestamp,
-        } as const;
-        
-        // Note: equipment and nickname are optional fields
-        // We don't include them initially (Firestore doesn't accept undefined)
+        };
 
         // Validate against schema (development safety check)
         const validated = characterSchema.parse(characterData);
@@ -78,6 +88,11 @@ export class CharacterRepository extends BaseRepository<Character> {
                 throw new DatabaseError(
                     `Data integrity violation: character.characterId (${character.characterId}) !== accountId (${accountId})`,
                 );
+            }
+
+            // Backfill nickname for characters created before it became required
+            if (!character.nickname) {
+                return this.updateNickname(accountId, this.generateDefaultNickname(accountId));
             }
 
             return character;
@@ -110,5 +125,32 @@ export class CharacterRepository extends BaseRepository<Character> {
             const message = error instanceof Error ? error.message : 'Unknown error';
             throw new DatabaseError(`Failed to create character: ${message}`);
         }
+    }
+
+    /**
+     * Update character attributes and unspent points
+     *
+     * @param accountId - Account ID
+     * @param patch - New attributes and unspentAttributePoints
+     * @returns Updated character
+     * @throws DatabaseError if update fails
+     */
+    async updateAttributes(
+        accountId: string,
+        patch: { attributes: Character['attributes']; unspentAttributePoints: number },
+    ): Promise<Character> {
+        return this.update(accountId, patch);
+    }
+
+    /**
+     * Update character nickname
+     *
+     * @param accountId - Account ID
+     * @param nickname - New nickname (1~20 chars)
+     * @returns Updated character
+     * @throws DatabaseError if update fails
+     */
+    async updateNickname(accountId: string, nickname: string): Promise<Character> {
+        return this.update(accountId, { nickname });
     }
 }

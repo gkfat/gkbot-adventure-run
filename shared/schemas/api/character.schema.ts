@@ -18,7 +18,7 @@ export const getCharacterResponseSchema = z.object({
         gems: z.number(),
         attributes: attributesSchema,
         unspentAttributePoints: z.number(),
-        nickname: z.string().optional(),
+        nickname: z.string(),
         stats: z.object({
             ATK: z.number(),
             DEF: z.number(),
@@ -66,20 +66,8 @@ export const setNicknameResponseSchema = z.object({
     data: z.object({ nickname: z.string() }),
 });
 
-/**
- * POST /api/character/potion/upgrade
- */
-export const upgradePotionResponseSchema = z.object({
-    success: z.boolean(),
-    data: z.object({
-        level: z.number(),
-        goldSpent: z.number(),
-    }),
-});
-
 export type GetCharacterResponse = z.infer<typeof getCharacterResponseSchema>;
 export type AllocateAttributesRequest = z.infer<typeof allocateAttributesRequestSchema>;
 export type AllocateAttributesResponse = z.infer<typeof allocateAttributesResponseSchema>;
 export type SetNicknameRequest = z.infer<typeof setNicknameRequestSchema>;
 export type SetNicknameResponse = z.infer<typeof setNicknameResponseSchema>;
-export type UpgradePotionResponse = z.infer<typeof upgradePotionResponseSchema>;
