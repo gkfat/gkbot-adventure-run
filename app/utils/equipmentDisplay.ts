@@ -87,13 +87,13 @@ const TEMPLATE_NAMES: Record<string, string> = {
 
 // Detailed item art per template — takes priority over the slot-based fallback.
 const TEMPLATE_ICON: Record<string, PixelIconName> = {
-    salvaged_wrench: 'sword',
-    riot_shield_scrap: 'shield',
-    gkbot_faceplate: 'helmet',
-    supply_crate_vest: 'chest',
-    servo_greaves: 'boot',
-    research_chip_ring: 'ring',
-    engine_oil_basic: 'potion',
+    salvaged_wrench: 'wrench',
+    riot_shield_scrap: 'riotShield',
+    gkbot_faceplate: 'faceplate',
+    supply_crate_vest: 'crateVest',
+    servo_greaves: 'greaves',
+    research_chip_ring: 'chipRing',
+    engine_oil_basic: 'engineOil',
 };
 
 // Flavor/lore text per template (kept in sync with `description` in
