@@ -48,6 +48,17 @@
 - **WHEN** run 結束時，永久背包已達 500 格上限，run 背包仍有未轉移的物品
 - **THEN** 系統明確標記這些物品為無法轉入（不可靜默遺失也不可讓背包超過 500 格），並在結算回應中告知玩家
 
+### Requirement: 首頁開始/繼續冒險入口
+系統 SHALL 讓玩家從首頁根據目前是否有進行中的 run，得到對應的操作入口：沒有進行中 run 時可開始新 run，有進行中 run 時可直接恢復。
+
+#### Scenario: 首頁顯示「開始冒險」
+- **WHEN** 玩家在首頁，且角色目前沒有進行中（state != ENDED）的 run
+- **THEN** CTA 顯示「開始冒險」，點擊呼叫 `POST /api/adventure/start` 並進入冒險畫面
+
+#### Scenario: 首頁顯示「繼續冒險」
+- **WHEN** 玩家在首頁，且角色已有一筆進行中的 run
+- **THEN** CTA 顯示「繼續冒險（第 N 關）」（N 為目前 step），點擊呼叫 `GET /api/adventure/current` 直接進入冒險畫面，不呼叫 `start`
+
 ### Requirement: 於休息節點使用藥水
 系統 SHALL 僅允許在 Rest 節點對玩家持有的 POTION 物品實體（永久背包或 run 背包皆可）執行使用動作，依該實體的稀有度 `healPercent` 立即回復生命值（不超過 `playerHpMax`），並消耗（移除）該物品實體；戰鬥中不可使用。
 

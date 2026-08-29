@@ -10,8 +10,14 @@
 
 import { BaseRepository } from './base.repository';
 import type { Character } from '../../shared/types/character';
+import { EXP_TABLE } from '../../shared/types/character';
 import { characterSchema } from '../../shared/schemas/firestore/character.schema';
-import { DatabaseError } from '../../shared/types/errors';
+import {
+    DatabaseError, NotFoundError,
+} from '../../shared/types/errors';
+import {
+    RESOURCE_LIMITS, clamp,
+} from '../../shared/types/common';
 import {
     LEGACY_ARCHETYPE_ID, LEGACY_CLASS_NAME, type CharacterArchetype,
 } from '../constants/characterArchetypes';
@@ -173,5 +179,64 @@ export class CharacterRepository extends BaseRepository<Character> {
      */
     async updateNickname(characterId: string, nickname: string): Promise<Character> {
         return this.update(characterId, { nickname });
+    }
+
+    /**
+     * Apply an adventure run's settlement rewards: clamp gold/gems into the
+     * character's totals, grant EXP, and roll any level-ups (ASSUMPTION,
+     * undocumented elsewhere: +1 unspentAttributePoint per level — see
+     * adventure-run-core/design.md). Runs inside a transaction since it's a
+     * read-modify-write on the same document a concurrent equip/attribute
+     * allocation could also be touching.
+     */
+    async settleRunRewards(characterId: string, rewards: {
+        goldEarned: number;
+        gemsEarned: number;
+        expGained: number;
+    }): Promise<{ character: Character; leveledUp: boolean }> {
+        const docRef = this.getDocumentRef(characterId);
+
+        try {
+            return await this.db.runTransaction(async (tx) => {
+                const doc = await tx.get(docRef);
+                if (!doc.exists) {
+                    throw new NotFoundError('character');
+                }
+                const character = doc.data() as Character;
+
+                const gold = clamp(character.gold + rewards.goldEarned, 0, RESOURCE_LIMITS.GOLD_MAX - 1);
+                const gems = clamp(character.gems + rewards.gemsEarned, 0, RESOURCE_LIMITS.GEMS_MAX - 1);
+
+                let { level } = character;
+                let exp = character.exp + rewards.expGained;
+                let unspentAttributePoints = character.unspentAttributePoints;
+
+                while (level < RESOURCE_LIMITS.LEVEL_MAX && exp >= (EXP_TABLE[level] ?? Infinity)) {
+                    exp -= EXP_TABLE[level] as number;
+                    level += 1;
+                    unspentAttributePoints += 1;
+                }
+                if (level >= RESOURCE_LIMITS.LEVEL_MAX) {
+                    exp = 0;
+                }
+
+                const updated: Character = {
+                    ...character, gold, gems, level, exp, unspentAttributePoints,
+                };
+                tx.update(docRef, {
+                    gold, gems, level, exp, unspentAttributePoints, updatedAt: Date.now(),
+                });
+
+                return {
+                    character: updated, leveledUp: level > character.level,
+                };
+            });
+        } catch (error: unknown) {
+            if (error instanceof NotFoundError) {
+                throw error;
+            }
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new DatabaseError(`Failed to settle run rewards: ${message}`);
+        }
     }
 }

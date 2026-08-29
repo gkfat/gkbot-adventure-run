@@ -61,6 +61,13 @@
                             :name="slotIcon(slot)"
                             :size="26"
                         />
+                        <span
+                            v-if="slotValue(slot)"
+                            class="equip-slot__value font-pixel"
+                            :style="{ color: slotValueColor(slot) }"
+                        >
+                            {{ slotValue(slot) }}
+                        </span>
                     </div>
                 </div>
 
@@ -84,6 +91,13 @@
                             :name="slotIcon(slot)"
                             :size="26"
                         />
+                        <span
+                            v-if="slotValue(slot)"
+                            class="equip-slot__value font-pixel"
+                            :style="{ color: slotValueColor(slot) }"
+                        >
+                            {{ slotValue(slot) }}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -198,6 +212,18 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 開始/繼續冒險 -->
+            <SystemBtn
+                block
+                variant="flat"
+                color="primary"
+                class="text-none mt-3 mx-auto character-stage__adventure-cta"
+                :loading="adventureLoading"
+                @click="handleAdventureCta"
+            >
+                {{ adventureCtaLabel }}
+            </SystemBtn>
         </div>
     </div>
 </template>
@@ -207,6 +233,7 @@ import { EXP_TABLE } from '../../../shared/types/character';
 import type { EquipmentSlot } from '../../../shared/types/common';
 import {
     EQUIP_SLOTS_LEFT, EQUIP_SLOTS_RIGHT, SLOT_PIXEL_ICON, SLOT_LABEL, RARITY_COLOR, resolvePixelIcon,
+    equippedStatValue, equippedStatColor,
 } from '../../utils/equipmentDisplay';
 
 const {
@@ -215,6 +242,24 @@ const {
 const {
     itemById, fetchInventory, loaded: inventoryLoaded,
 } = useInventory();
+const {
+    currentRun, hasActiveRun, loading: adventureLoading, fetchCurrent: fetchCurrentRun, start: startAdventure,
+} = useAdventureRun();
+
+const adventureCtaLabel = computed(() => (
+    hasActiveRun.value ? `繼續冒險（第 ${(currentRun.value?.step ?? 0) + 1} 關）` : '開始冒險'
+));
+
+const handleAdventureCta = async () => {
+    if (!character.value) return;
+
+    if (!hasActiveRun.value) {
+        const started = await startAdventure(character.value.characterId);
+        if (!started) return;
+    }
+
+    navigateTo('/adventure');
+};
 
 const equippedItem = (slot: EquipmentSlot) => itemById(character.value?.equipment[slot]);
 
@@ -236,6 +281,9 @@ const slotIcon = (slot: EquipmentSlot) => {
     const item = equippedItem(slot);
     return item ? resolvePixelIcon(item) : SLOT_PIXEL_ICON[slot];
 };
+
+const slotValue = (slot: EquipmentSlot) => equippedStatValue(equippedItem(slot));
+const slotValueColor = (slot: EquipmentSlot) => equippedStatColor(equippedItem(slot));
 
 const hpPercent = computed(() => {
     if (!character.value) return 0;
@@ -325,6 +373,12 @@ onMounted(() => {
         fetchInventory();
     }
 });
+
+watch(character, (value) => {
+    if (value) {
+        fetchCurrentRun(value.characterId);
+    }
+}, { immediate: true });
 </script>
 
 <style scoped lang="scss">
@@ -350,7 +404,7 @@ onMounted(() => {
     &__equip-col {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 12px;
     }
 
     &__bar {
@@ -432,6 +486,7 @@ onMounted(() => {
 }
 
 .equip-slot {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -441,6 +496,18 @@ onMounted(() => {
     border-radius: 6px;
     background: rgba(196, 203, 219, 0.04);
     color: rgb(var(--v-theme-primary));
+
+    &__value {
+        position: absolute;
+        bottom: -9px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 0 3px;
+        font-size: 9px;
+        line-height: 1.3;
+        background: #14171c;
+        white-space: nowrap;
+    }
 }
 
 @keyframes character-idle-bob {

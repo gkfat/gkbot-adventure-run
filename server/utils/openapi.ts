@@ -31,15 +31,20 @@ import {
 } from '../../shared/schemas/api/character.schema';
 
 import {
+    startAdventureRequestSchema,
     startAdventureResponseSchema,
+    getCurrentAdventureQuerySchema,
     getCurrentAdventureResponseSchema,
+    advanceAdventureRequestSchema,
     advanceAdventureResponseSchema,
     startCombatResponseSchema,
     resolveEventRequestSchema,
     resolveEventResponseSchema,
     selectBlessingRequestSchema,
     selectBlessingResponseSchema,
+    restHealRequestSchema,
     restHealResponseSchema,
+    endAdventureRequestSchema,
     endAdventureResponseSchema,
 } from '../../shared/schemas/api/adventure.schema';
 
@@ -420,6 +425,7 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         description: 'Start a new adventure run',
         tags: ['Adventure'],
         security: [{ bearerAuth: [] }],
+        request: { body: { content: { 'application/json': { schema: startAdventureRequestSchema } } } },
         responses: {
             200: {
                 description: 'Adventure successfully started',
@@ -442,6 +448,7 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         description: 'Get current active adventure run',
         tags: ['Adventure'],
         security: [{ bearerAuth: [] }],
+        request: { query: getCurrentAdventureQuerySchema },
         responses: {
             200: {
                 description: 'Current adventure state (null if no active adventure)',
@@ -460,6 +467,7 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         description: 'Advance to next node in adventure',
         tags: ['Adventure'],
         security: [{ bearerAuth: [] }],
+        request: { body: { content: { 'application/json': { schema: advanceAdventureRequestSchema } } } },
         responses: {
             200: {
                 description: 'Advanced to next node',
@@ -550,6 +558,7 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         description: 'Heal at rest node',
         tags: ['Adventure'],
         security: [{ bearerAuth: [] }],
+        request: { body: { content: { 'application/json': { schema: restHealRequestSchema } } } },
         responses: {
             200: {
                 description: 'Healing completed',
@@ -572,6 +581,7 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         description: 'End current adventure and collect rewards',
         tags: ['Adventure'],
         security: [{ bearerAuth: [] }],
+        request: { body: { content: { 'application/json': { schema: endAdventureRequestSchema } } } },
         responses: {
             200: {
                 description: 'Adventure ended with rewards',

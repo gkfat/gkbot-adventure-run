@@ -48,6 +48,7 @@ export const adventureRunSchema = z.object({
     // Lifecycle
     state: z.nativeEnum(AdventureStateType),
     step: z.number().int().min(0),
+    lastRestStep: z.number().int().min(0),
     startedAt: z.number(),
     endedAt: z.number().optional(),
     endReason: z.nativeEnum(AdventureEndReason).optional(),

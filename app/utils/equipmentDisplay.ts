@@ -137,6 +137,50 @@ export function resolvePixelIcon(item: ItemLike): PixelIconName {
     return item.equipSlot ? SLOT_FALLBACK_ITEM_ICON[item.equipSlot] : 'potion';
 }
 
+type StatKey = keyof ItemLike['stats'];
+
+// Single source of truth for stat display priority/formatting — used by both
+// primaryStatValue() (compact "+N" for the item grid) and describeItem()
+// (full effect text for the detail dialog), so the two can't drift apart.
+const STAT_DISPLAY_ORDER: {
+    key: StatKey;
+    effectLabel: (value: number) => string;
+    compact: (value: number) => string;
+}[] = [
+    {
+        key: 'ATK', effectLabel: v => `攻擊力 +${v}`, compact: v => `+${Math.round(v)}`, 
+    },
+    {
+        key: 'DEF', effectLabel: v => `防禦力 +${v}`, compact: v => `+${Math.round(v)}`, 
+    },
+    {
+        key: 'HP', effectLabel: v => `生命上限 +${v}`, compact: v => `+${Math.round(v)}`, 
+    },
+    {
+        key: 'actionSpeedMod',
+        effectLabel: v => `攻擊間隔 ${v > 0 ? '+' : ''}${v}s`,
+        compact: v => `+${Math.abs(v).toFixed(2)}`,
+    },
+    {
+        key: 'healPercent', effectLabel: v => `使用後回復 ${v}% 生命值`, compact: v => `+${Math.round(v)}`, 
+    },
+];
+
+/**
+ * Compact "+N" readout for the item grid's small icon — the single most
+ * relevant stat number, without naming which attribute it is (full
+ * breakdown lives in the detail dialog via describeItem()).
+ */
+export function primaryStatValue(item: ItemLike): string | null {
+    for (const {
+        key, compact, 
+    } of STAT_DISPLAY_ORDER) {
+        const value = item.stats[key];
+        if (value) return compact(value);
+    }
+    return null;
+}
+
 /**
  * Build the display name, the mechanical effect text (stat numbers), and a
  * flavor/lore line for an item, for the inventory detail dialog. Effect text
@@ -145,14 +189,11 @@ export function resolvePixelIcon(item: ItemLike): PixelIconName {
 export function describeItem(item: ItemLike): { name: string; effectText: string; flavor: string } {
     const name = TEMPLATE_NAMES[item.templateId] ?? item.templateId;
 
-    const effects: string[] = [];
-    if (item.stats.ATK) effects.push(`攻擊力 +${item.stats.ATK}`);
-    if (item.stats.DEF) effects.push(`防禦力 +${item.stats.DEF}`);
-    if (item.stats.HP) effects.push(`生命上限 +${item.stats.HP}`);
-    if (item.stats.actionSpeedMod) {
-        effects.push(`攻擊間隔 ${item.stats.actionSpeedMod > 0 ? '+' : ''}${item.stats.actionSpeedMod}s`);
-    }
-    if (item.stats.healPercent) effects.push(`使用後回復 ${item.stats.healPercent}% 生命值`);
+    const effects = STAT_DISPLAY_ORDER
+        .filter(({ key }) => item.stats[key])
+        .map(({
+            key, effectLabel, 
+        }) => effectLabel(item.stats[key] as number));
 
     const effectText = effects.length > 0 ? effects.join('、') : '沒有額外效果';
     const flavor = TEMPLATE_FLAVOR[item.templateId]
@@ -161,6 +202,19 @@ export function describeItem(item: ItemLike): { name: string; effectText: string
     return {
         name, effectText, flavor,
     };
+}
+
+/**
+ * Compact "+N" value + rarity color for an equipped slot, or blanks for an
+ * empty one — shared by the home screen's equip-slot overview and the
+ * inventory page's "目前裝備" row (both show the same equipped-item readout).
+ */
+export function equippedStatValue(item: ItemLike | undefined): string | null {
+    return item ? primaryStatValue(item) : null;
+}
+
+export function equippedStatColor(item: ItemLike | undefined): string | undefined {
+    return item ? RARITY_COLOR[item.rarity] : undefined;
 }
 
 /**

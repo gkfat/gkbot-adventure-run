@@ -13,6 +13,7 @@
 - 不在本 change 內實作戰鬥傷害/暴擊/閃避計算（`combat-engine`）
 - 不在本 change 內實作事件模板/轉盤/祝福候選生成（`events-and-blessings`）
 - 不解決 EXP 從何觸發的問題（分析階段已標記：來源文件未明確定義，本 change 假設「run 結算時依本次 run 分數/擊殺數授予 EXP」，若之後與相關人確認不同規則，回頭調整 `AdventureRunService.settleRun`）
+- 不在本 change 內實作 COMBAT/EVENT 節點的實際畫面（戰鬥動畫、事件選項 UI）——這兩者的視覺呈現分別留給 `combat-engine`/`events-and-blessings` change；本 change 的前端畫面只需能顯示「待處理」佔位並保持可推進
 
 ## Decisions
 
@@ -23,6 +24,10 @@
 
 - **永久背包已滿時的結算行為（補齊分析階段的 RULE-006 未定義項目）**：`openspec/analysis/domain-model.yaml` 的 RULE-006 明確標註「超過上限的物品無法轉入，行為未定義，需另行補充」。本 change 做出明確決策：無法轉入的裝備 SHALL NOT 被靜默遺失，也 SHALL NOT 允許背包超過 500 格；改為在結算回應中明確列出「未能帶出的物品」清單，讓玩家知情（未來若要支援「事後回收」可再擴充，非本 change 範圍）。
 - **使用藥水改為消耗一般物品，不再更新 Character 文件（2026-08-27 隨補血藥水改設計一併補上）**：`POST /api/adventure/rest/heal` 改為要求 `itemId` 參數，`AdventureRunService.useHealingItem(runId, itemId)` 依序：(1) 檢查 `run.state` 對應 Rest 節點；(2) 依 itemId 分別到 `run.runInventory` 與（透過 `items-and-equipment` change 的 `InventoryService`）永久背包尋找該實體，確認存在且 `type = POTION`；(3) 依其 `rolledStats.healPercent` 計算回復量並更新 `run.playerHp`（不超過 `playerHpMax`）；(4) 從找到的來源（run 背包或永久背包）移除該實體。整個操作不再觸碰 `characters/{accountId}` 文件（舊設計需要更新 `healingPotion.coolDownUntil`，新設計不需要），跨 aggregate 範圍縮小為 AGG-009 與（視物品位置）AGG-003。
+
+- **結算對 `leaderboard`/`quests-and-achievements` 的依賴同樣用「介面 + stub」解耦**：實作時發現這兩個 change 也都還是 0% 實作，`LeaderboardService`/`QuestService`/`AchievementService` 完全不存在。比照 `CombatResolver`/`EventResolver` 的既有做法，`settleRun` 改為呼叫本 change 自訂的薄介面（`LeaderboardUpdater.updateIfBetter`、`ProgressTracker.incrementProgress`），本 change 內先提供 no-op stub 實作，待對應 change 完成後替換——run 結算的核心邏輯（gold/gems/背包轉移）不受影響。
+- **升級屬性點假設（補齊 5.2 EXP 授予邏輯的未定義項目）**：`character-progression` change 雖已封存，但從未實作 EXP 授予/升級邏輯，也沒有任何文件定義「升級時發放多少屬性點」。本 change 明確假設：**每升 1 級發放 1 點 `unspentAttributePoints`**。若之後與需求方確認不同規則，改動集中在 `CharacterRepository.grantExp`（或對應的 character-progression 邏輯）。
+- **前端維持 checkpoint-driven 的單次請求模型**：`app/pages/adventure.vue` 每次玩家操作（推進/用藥）對應一次 API 呼叫 + 重新渲染最新 run 快照，不在前端維護額外的本地狀態機或樂觀更新，避免跟後端狀態機出現不一致
 
 ## Risks / Trade-offs
 

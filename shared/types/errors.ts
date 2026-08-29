@@ -61,7 +61,11 @@ export class ValidationError extends AppError {
  * Resource conflict (e.g., already exists)
  */
 export class ConflictError extends AppError {
-    constructor(message: string = 'Resource conflict', code?: string) {
+    constructor(
+        message: string = 'Resource conflict',
+    public details?: Record<string, any>,
+    code?: string,
+    ) {
         super(message, 409, code);
     }
 }

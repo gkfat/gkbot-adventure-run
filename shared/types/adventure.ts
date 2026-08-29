@@ -120,6 +120,56 @@ export type EventResult = {
 };
 
 /**
+ * Context passed to CombatResolver.resolve() — everything it needs to run a
+ * single combat node without reaching back into the run's own persistence.
+ */
+export type CombatContext = {
+  enemyLevel: number;
+  tier: NodeType.COMBAT | NodeType.ELITE | NodeType.STRONG_ELITE;
+  waveCount: number;
+  enemyCountPerWave: number;
+};
+
+/**
+ * Strategy interface for resolving a COMBAT/ELITE/STRONG_ELITE node.
+ * `adventure-run-core`'s state machine calls this when `advance()` decides
+ * the next node is combat; `combat-engine` provides the real implementation.
+ * Input is a run snapshot + context, output is a self-contained result — no
+ * side effects on `run` itself, so the state machine stays the single writer.
+ */
+export type CombatResolver = {
+  resolve(run: AdventureRun, context: CombatContext): Promise<CombatResult>;
+};
+
+/**
+ * Strategy interface for resolving an EVENT node. `events-and-blessings`
+ * provides the real implementation; same input/output shape convention as
+ * CombatResolver.
+ */
+export type EventResolver = {
+  resolve(run: AdventureRun): Promise<EventResult>;
+};
+
+/**
+ * Strategy interface for updating the leaderboard on run settlement.
+ * `leaderboard` change provides the real implementation; this change calls
+ * it via this interface and ships a no-op stub until that change lands
+ * (same pattern as CombatResolver/EventResolver — see design.md).
+ */
+export type LeaderboardUpdater = {
+  updateIfBetter(entry: { accountId: string; characterId: string; score: number }): Promise<void>;
+};
+
+/**
+ * Strategy interface for quest/achievement progress tracking on run
+ * settlement. `quests-and-achievements` change provides the real
+ * implementation; this change ships a no-op stub until that change lands.
+ */
+export type ProgressTracker = {
+  incrementProgress(event: { accountId: string; characterId: string; type: string; amount: number }): Promise<void>;
+};
+
+/**
  * Run modifier (blessings/curses)
  */
 export type RunModifier = {
@@ -150,6 +200,7 @@ export type AdventureRun = {
   // Lifecycle
   state: AdventureStateType;
   step: number;
+  lastRestStep: number;       // step at which the last Rest node occurred (0 = start); drives the guaranteed-rest rule
   startedAt: Timestamp;
   endedAt?: Timestamp;
   endReason?: AdventureEndReason;
@@ -236,9 +287,24 @@ export const NODE_CONFIG = {
     REST_GUARANTEED_INTERVAL: 4,  // At least 1 rest per 4 steps
     ELITE_INTERVAL: 5,            // Elite every 5 steps
     STRONG_ELITE_INTERVAL: 9,     // Strong elite every 9 steps
-  
+
     // Reconnection window
     RECONNECT_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
+
+    // Weighted random node type when neither the rest guarantee nor the
+    // elite cadence triggers. ASSUMPTION (undocumented elsewhere): rest is
+    // weighted low since the guaranteed-rest rule already covers most of the
+    // player's healing needs; tune freely, this is a balance knob.
+    WEIGHTED_NODE_WEIGHTS: {
+        COMBAT: 55,
+        EVENT: 25,
+        REST: 5,
+        CHOICE: 15,
+    },
+
+    // ASSUMPTION (undocumented elsewhere): blessingPoints needed before a
+    // BLESSING_SELECT is triggered at the next RESOLUTION checkpoint.
+    BLESSING_POINTS_THRESHOLD: 3,
 } as const;
 
 /**

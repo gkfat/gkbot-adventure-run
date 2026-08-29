@@ -64,6 +64,13 @@
                                 :name="slotIcon(slot)"
                                 :size="30"
                             />
+                            <span
+                                v-if="slotValue(slot)"
+                                class="pixel-slot__value pixel-slot__value--equip font-pixel"
+                                :style="{ color: slotValueColor(slot) }"
+                            >
+                                {{ slotValue(slot) }}
+                            </span>
                         </button>
                         <span class="equip-slot-wrap__label text-caption text-medium-emphasis">
                             {{ SLOT_LABEL[slot] }}
@@ -106,10 +113,11 @@
                         :size="32"
                     />
                     <span
-                        class="pixel-slot__rarity font-pixel"
+                        v-if="primaryStatValue(item)"
+                        class="pixel-slot__value font-pixel"
                         :style="{ color: RARITY_COLOR[item.rarity] }"
                     >
-                        {{ item.rarity }}
+                        {{ primaryStatValue(item) }}
                     </span>
 
                     <div
@@ -221,7 +229,8 @@
 import type { EquipmentSlot } from '../../shared/types/common';
 import {
     EQUIP_SLOTS_ALL, SLOT_PIXEL_ICON, SLOT_LABEL, RARITY_COLOR, RARITY_ORDER_DESC,
-    resolvePixelIcon, describeItem, pickTargetSlot, type ItemLike,
+    resolvePixelIcon, describeItem, pickTargetSlot, primaryStatValue,
+    equippedStatValue, equippedStatColor, type ItemLike,
 } from '../utils/equipmentDisplay';
 
 definePageMeta({
@@ -280,6 +289,9 @@ const slotIcon = (slot: EquipmentSlot) => {
     const item = itemById(character.value?.equipment[slot]);
     return item ? resolvePixelIcon(item) : SLOT_PIXEL_ICON[slot];
 };
+
+const slotValue = (slot: EquipmentSlot) => equippedStatValue(itemById(character.value?.equipment[slot]));
+const slotValueColor = (slot: EquipmentSlot) => equippedStatColor(itemById(character.value?.equipment[slot]));
 
 const isEquipped = (item: { itemId: string }) => (
     Object.values(character.value?.equipment ?? {}).includes(item.itemId)
@@ -383,7 +395,7 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 10px;
     flex: 0 0 auto;
 
     &__label {
@@ -482,8 +494,19 @@ onMounted(() => {
         flex: 0 0 auto;
     }
 
-    &__rarity {
+    &__value {
         font-size: 9px;
+
+        &--equip {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0 3px;
+            line-height: 1.3;
+            background: #14171c;
+            white-space: nowrap;
+        }
     }
 
     &__badge {
