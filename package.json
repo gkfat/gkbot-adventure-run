@@ -8,7 +8,8 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "lint": "eslint . --ext .ts,.js,.vue --fix"
+    "lint": "eslint . --ext .ts,.js,.vue --fix",
+    "test": "vitest run"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.4.0",
@@ -28,6 +29,7 @@
     "@nuxt/eslint": "^1.12.1",
     "globals": "^17.0.0",
     "sass-embedded": "^1.97.3",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   }
 }

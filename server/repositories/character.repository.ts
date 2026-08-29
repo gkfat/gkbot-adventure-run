@@ -49,7 +49,9 @@ export class CharacterRepository extends BaseRepository<Character> {
         archetype: CharacterArchetype;
     }): Character {
         const timestamp = Date.now();
-        const { accountId, characterId, archetype } = params;
+        const {
+            accountId, characterId, archetype, 
+        } = params;
 
         const characterData = {
             characterId,

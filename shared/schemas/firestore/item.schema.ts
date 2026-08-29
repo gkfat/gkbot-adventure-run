@@ -15,32 +15,36 @@ export const itemStatsSchema = z.object({
     DEF: z.number().optional(),
     HP: z.number().optional(),
     actionSpeedMod: z.number().optional(),
+    healPercent: z.number().optional(),
 }).strict();
 
 /**
- * Item instance schema
+ * Item instance schema — one document in the top-level `items` collection
+ * (doc id = itemId). Containers only ever store the itemId string.
  */
 export const itemInstanceSchema = z.object({
     itemId: z.string(),
     templateId: z.string(),
     type: z.nativeEnum(ItemType),
     equipSlot: z.nativeEnum(EquipmentSlot).optional(),
-  
+
     // Generated properties
     rarity: z.nativeEnum(Rarity),
     stats: itemStatsSchema,
-  
+
     // Metadata
     source: z.nativeEnum(ItemSource),
+    characterId: z.string(),
     createdAt: z.number(),
 }).strict();
 
 /**
- * Inventory document schema
+ * Inventory document schema. `items` holds itemId references only — full
+ * item data lives in the `items` collection (see itemInstanceSchema).
  */
 export const inventorySchema = z.object({
-    accountId: z.string(),
-    items: z.array(itemInstanceSchema).max(RESOURCE_LIMITS.INVENTORY_PERMANENT_MAX),
+    characterId: z.string(),
+    items: z.array(z.string()).max(RESOURCE_LIMITS.INVENTORY_PERMANENT_MAX),
     updatedAt: z.number(),
 }).strict();
 

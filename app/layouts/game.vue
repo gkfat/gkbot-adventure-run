@@ -18,7 +18,7 @@
                 <slot />
             </main>
 
-            <GameBottomNav />
+            <GameBottomNav v-if="selectedCharacterId" />
         </div>
 
         <GameAccountDrawer v-model="drawerOpen" />
@@ -36,6 +36,9 @@ const {
 } = useDisplay();
 
 const drawerOpen = ref(false);
+
+// 選角/建立角色畫面（尚未選定角色）不顯示底部導覽列
+const { selectedCharacterId } = useCharacter();
 </script>
 
 <style scoped lang="scss">

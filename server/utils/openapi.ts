@@ -43,6 +43,15 @@ import {
     endAdventureResponseSchema,
 } from '../../shared/schemas/api/adventure.schema';
 
+import {
+    getInventoryResponseSchema,
+    deleteItemResponseSchema,
+    equipItemRequestSchema,
+    equipItemResponseSchema,
+    unequipItemRequestSchema,
+    unequipItemResponseSchema,
+} from '../../shared/schemas/api/inventory.schema';
+
 // Extend Zod with OpenAPI methods
 extendZodWithOpenApi(z);
 
@@ -95,6 +104,12 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         SelectBlessingResponse: selectBlessingResponseSchema,
         RestHealResponse: restHealResponseSchema,
         EndAdventureResponse: endAdventureResponseSchema,
+        GetInventoryResponse: getInventoryResponseSchema,
+        DeleteItemResponse: deleteItemResponseSchema,
+        EquipItemRequest: equipItemRequestSchema,
+        EquipItemResponse: equipItemResponseSchema,
+        UnequipItemRequest: unequipItemRequestSchema,
+        UnequipItemResponse: unequipItemResponseSchema,
         ErrorResponse: errorResponseSchema,
     };
 
@@ -278,6 +293,121 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             },
             404: {
                 description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/equip',
+        description: 'Equip an item from the character\'s permanent inventory onto itself; replaces whatever occupies the item\'s slot',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: equipItemRequestSchema } } },
+        },
+        responses: {
+            200: {
+                description: 'Item equipped (and previous item in that slot, if any, returned as unequipped)',
+                content: { 'application/json': { schema: equipItemResponseSchema } },
+            },
+            400: {
+                description: 'Item not in inventory, not equipment, or slot mismatch',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/unequip',
+        description: 'Unequip the item currently in the given slot on a character',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: unequipItemRequestSchema } } },
+        },
+        responses: {
+            200: {
+                description: 'Item unequipped',
+                content: { 'application/json': { schema: unequipItemResponseSchema } },
+            },
+            400: {
+                description: 'Slot is already empty',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    // Register Inventory Endpoints
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}/inventory',
+        description: 'List a character\'s permanent inventory contents',
+        tags: ['Inventory'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Inventory retrieved',
+                content: { 'application/json': { schema: getInventoryResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'delete',
+        path: '/api/character/{characterId}/inventory/{itemId}',
+        description: 'Permanently discard an item from a character\'s inventory (cannot be undone; fails if the item is currently equipped)',
+        tags: ['Inventory'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({
+                characterId: z.string(), itemId: z.string(), 
+            }), 
+        },
+        responses: {
+            200: {
+                description: 'Item discarded',
+                content: { 'application/json': { schema: deleteItemResponseSchema } },
+            },
+            400: {
+                description: 'Item is currently equipped',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found, or item not found in the character\'s inventory',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
         },
@@ -497,6 +627,10 @@ export function generateOpenAPISpec() {
             {
                 name: 'Adventure',
                 description: 'Adventure run gameplay and progression',
+            },
+            {
+                name: 'Inventory',
+                description: 'Permanent inventory management',
             },
         ],
     });

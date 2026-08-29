@@ -18,9 +18,10 @@
         <div class="bottom-nav__home-slot">
             <button
                 type="button"
-                class="bottom-nav__home"
+                class="bottom-nav__home pixel-press"
                 aria-label="首頁"
-                aria-current="page"
+                :aria-current="isOnMainPage ? 'page' : undefined"
+                @click="handleHomeTap"
             >
                 <v-icon
                     icon="mdi-sword-cross"
@@ -66,7 +67,7 @@ type NavItem = {
 
 const leftItems: NavItem[] = [
     { key: 'shop', label: '商店', icon: 'mdi-store' },
-    { key: 'character', label: '角色', icon: 'mdi-account-circle-outline' },
+    { key: 'inventory', label: '背包', icon: 'mdi-bag-personal-outline' },
 ];
 
 const rightItems: NavItem[] = [
@@ -77,9 +78,22 @@ const rightItems: NavItem[] = [
 const snackbar = ref(false);
 const snackbarText = ref('');
 
+const route = useRoute();
+const isOnMainPage = computed(() => route.path === '/main');
+
 const handleTap = (item: NavItem) => {
+    if (item.key === 'inventory') {
+        navigateTo('/inventory');
+        return;
+    }
     snackbarText.value = `${item.label}即將推出`;
     snackbar.value = true;
+};
+
+const handleHomeTap = () => {
+    if (!isOnMainPage.value) {
+        navigateTo('/main');
+    }
 };
 </script>
 
@@ -137,7 +151,7 @@ const handleTap = (item: NavItem) => {
         border: 3px solid rgb(var(--v-theme-background));
         background: rgb(var(--v-theme-green));
         color: rgb(var(--v-theme-background));
-        cursor: default;
+        cursor: pointer;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
     }
 

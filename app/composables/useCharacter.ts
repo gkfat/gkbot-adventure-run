@@ -1,3 +1,5 @@
+import type { EquipmentSlot } from '../../shared/types/common';
+
 interface CharacterStats {
     ATK: number;
     DEF: number;
@@ -24,9 +26,11 @@ interface CharacterData {
         LUCK: number;
     };
     unspentAttributePoints: number;
+    equipment: Partial<Record<EquipmentSlot, string>>;
     nickname: string;
     spriteUrl: string;
     stats: CharacterStats;
+    equipmentBonus: Partial<Pick<CharacterStats, 'ATK' | 'DEF' | 'HP_MAX' | 'actionIntervalSec'>>;
 }
 
 interface CharacterSummary {
@@ -155,21 +159,71 @@ export const useCharacter = () => {
             const response = await api.post<GetCharacterResponse>('/api/character', { archetypeId });
             const created = response.data;
 
-            roster.value = [...roster.value, {
-                characterId: created.characterId,
-                nickname: created.nickname,
-                level: created.level,
-                gold: created.gold,
-                gems: created.gems,
-                archetypeId: created.archetypeId,
-                className: created.className,
-                spriteUrl: archetypes.value.find(a => a.archetypeId === created.archetypeId)?.spriteUrl || '',
-            }];
+            roster.value = [
+                ...roster.value, {
+                    characterId: created.characterId,
+                    nickname: created.nickname,
+                    level: created.level,
+                    gold: created.gold,
+                    gems: created.gems,
+                    archetypeId: created.archetypeId,
+                    className: created.className,
+                    spriteUrl: archetypes.value.find(a => a.archetypeId === created.archetypeId)?.spriteUrl || '',
+                },
+            ];
 
             await selectCharacter(created.characterId);
         } catch (err: any) {
             console.error('[useCharacter] Failed to create character:', err);
             error.value = err.message || '無法建立角色';
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    /**
+     * 裝備背包中的物品到目前選定角色。`slot` 只在裝備手類型物品（劍/匕首等）時有意義，
+     * 用來指定要裝備到哪一隻手；其餘槽位由物品本身的 equipSlot 決定，忽略此參數。
+     * 成功後重新整理角色資料（含 server 端重新計算的 stats）。
+     */
+    const equipItem = async (itemId: string, slot?: EquipmentSlot): Promise<boolean> => {
+        if (!selectedCharacterId.value) return false;
+
+        loading.value = true;
+        error.value = null;
+
+        try {
+            await api.post(`/api/character/${selectedCharacterId.value}/equip`, {
+                itemId, slot, 
+            });
+            await fetchCharacter();
+            return true;
+        } catch (err: any) {
+            console.error('[useCharacter] Failed to equip item:', err);
+            error.value = err.message || '裝備失敗';
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    /**
+     * 卸下目前選定角色指定槽位的裝備，成功後重新整理角色資料。
+     */
+    const unequipItem = async (slot: EquipmentSlot): Promise<boolean> => {
+        if (!selectedCharacterId.value) return false;
+
+        loading.value = true;
+        error.value = null;
+
+        try {
+            await api.post(`/api/character/${selectedCharacterId.value}/unequip`, { slot });
+            await fetchCharacter();
+            return true;
+        } catch (err: any) {
+            console.error('[useCharacter] Failed to unequip item:', err);
+            error.value = err.message || '卸下失敗';
+            return false;
         } finally {
             loading.value = false;
         }
@@ -216,6 +270,8 @@ export const useCharacter = () => {
         selectCharacter,
         fetchCharacter,
         createCharacter,
+        equipItem,
+        unequipItem,
         clearSelection,
 
         reset,

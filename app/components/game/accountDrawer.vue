@@ -88,15 +88,19 @@ const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const { user, signOut, loading } = useAuth();
 const { character, clearSelection, reset: resetCharacter } = useCharacter();
+const { reset: resetInventory } = useInventory();
 
 const handleSignOut = async () => {
     await signOut();
     resetCharacter();
+    resetInventory();
 };
 
 const handleSwitchCharacter = () => {
     clearSelection();
     emit('update:modelValue', false);
+    // 角色選擇畫面只存在於 /main；若是在其他頁面（例如背包）切換角色，需先導回去
+    navigateTo('/main');
 };
 </script>
 

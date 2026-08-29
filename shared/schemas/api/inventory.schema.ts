@@ -28,8 +28,16 @@ export const deleteItemResponseSchema = z.object({
 
 /**
  * POST /api/character/equip
+ *
+ * `slot` is optional and only meaningful for hand items (sword/dagger-type
+ * equipment, whose template `equipSlot` is LEFT_HAND or RIGHT_HAND) — it lets
+ * the caller pick which hand to equip into instead of always using the
+ * item's own default. Ignored for any other slot.
  */
-export const equipItemRequestSchema = z.object({ itemId: z.string() }).strict();
+export const equipItemRequestSchema = z.object({
+    itemId: z.string(),
+    slot: z.nativeEnum(EquipmentSlot).optional(),
+}).strict();
 
 export const equipItemResponseSchema = z.object({
     success: z.boolean(),

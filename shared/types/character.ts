@@ -41,6 +41,9 @@ export type Character = {
  */
 export type CharacterWithStats = Character & {
   stats: import('./common').Stats;
+  // The portion of `stats` contributed by currently equipped items — same
+  // keys as Stats, present only for keys equipment actually affects.
+  equipmentBonus: Partial<import('./common').Stats>;
   spriteUrl: string;
 };
 

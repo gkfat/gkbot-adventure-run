@@ -3,7 +3,9 @@
  */
 
 import { z } from 'zod';
-import { attributesSchema } from '../firestore/character.schema';
+import {
+    attributesSchema, equipmentSchema,
+} from '../firestore/character.schema';
 
 const statsSchema = z.object({
     ATK: z.number(),
@@ -14,6 +16,14 @@ const statsSchema = z.object({
     critChance: z.number(),
     critMultiplier: z.number(),
     dodgeChance: z.number(),
+});
+
+// Only the keys equipment actually contributed to are present.
+const equipmentBonusSchema = z.object({
+    ATK: z.number().optional(),
+    DEF: z.number().optional(),
+    HP_MAX: z.number().optional(),
+    actionIntervalSec: z.number().optional(),
 });
 
 const archetypeSchema = z.object({
@@ -66,9 +76,11 @@ export const getCharacterResponseSchema = z.object({
         gems: z.number(),
         attributes: attributesSchema,
         unspentAttributePoints: z.number(),
+        equipment: equipmentSchema,
         nickname: z.string(),
         spriteUrl: z.string(),
         stats: statsSchema,
+        equipmentBonus: equipmentBonusSchema,
     }),
 });
 

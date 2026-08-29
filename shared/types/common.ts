@@ -18,18 +18,22 @@ export enum Rarity {
 }
 
 /**
- * Equipment slots
+ * Equipment slots (6 total)
  */
 export enum EquipmentSlot {
   HEAD = 'HEAD',
   BODY = 'BODY',
   SHOES = 'SHOES',
-  GLOVES = 'GLOVES',
   LEFT_HAND = 'LEFT_HAND',
   RIGHT_HAND = 'RIGHT_HAND',
-  NECKLACE = 'NECKLACE',
   RING = 'RING',
 }
+
+/**
+ * Sword/dagger-type weapons are equippable to either hand — a hand item is
+ * not fixed to the specific slot it happened to generate with.
+ */
+export const HAND_SLOTS: EquipmentSlot[] = [EquipmentSlot.RIGHT_HAND, EquipmentSlot.LEFT_HAND];
 
 /**
  * Character attributes (permanent, player-controlled growth)

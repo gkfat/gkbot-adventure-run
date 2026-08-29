@@ -47,13 +47,46 @@
             v-else-if="character"
             class="text-center character-stage__portrait"
         >
-            <img
-                :src="character.spriteUrl"
-                alt="角色"
-                width="100"
-                height="100"
-                class="character-stage__sprite"
-            >
+            <!-- 裝備欄位：角色圖像左右各 4 格 -->
+            <div class="character-stage__equip-row">
+                <div class="character-stage__equip-col">
+                    <div
+                        v-for="slot in EQUIP_SLOTS_LEFT"
+                        :key="slot"
+                        class="equip-slot"
+                        :style="slotStyle(slot)"
+                        :aria-label="slotLabel(slot, equippedItem(slot))"
+                    >
+                        <GamePixelIcon
+                            :name="slotIcon(slot)"
+                            :size="26"
+                        />
+                    </div>
+                </div>
+
+                <img
+                    :src="character.spriteUrl"
+                    alt="角色"
+                    width="100"
+                    height="100"
+                    class="character-stage__sprite"
+                >
+
+                <div class="character-stage__equip-col">
+                    <div
+                        v-for="slot in EQUIP_SLOTS_RIGHT"
+                        :key="slot"
+                        class="equip-slot"
+                        :style="slotStyle(slot)"
+                        :aria-label="slotLabel(slot, equippedItem(slot))"
+                    >
+                        <GamePixelIcon
+                            :name="slotIcon(slot)"
+                            :size="26"
+                        />
+                    </div>
+                </div>
+            </div>
             <!-- 職業 / 等級 / EXP / HP -->
             <div class="character-stage__box mt-2 mx-auto">
                 <div class="d-flex align-center justify-center ga-2">
@@ -68,8 +101,11 @@
                 <div class="character-stage__bar mt-2">
                     <div class="d-flex align-center justify-space-between mb-1">
                         <span class="text-caption text-medium-emphasis">HP</span>
-                        <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-green));">
-                            {{ character.stats.HP_CURRENT }} / {{ character.stats.HP_MAX }}
+                        <span
+                            class="font-pixel text-caption character-stage__hp-value"
+                            style="color: rgb(var(--v-theme-green));"
+                        >
+                            {{ character.stats.HP_CURRENT }} / {{ hpMaxLabel }}
                         </span>
                     </div>
                     <v-progress-linear
@@ -111,13 +147,20 @@
                             +{{ character.unspentAttributePoints }}
                         </span>
                     </div>
+                    <div
+                        v-if="character.unspentAttributePoints > 0"
+                        class="character-stage__hint"
+                        style="color: rgb(var(--v-theme-warning));"
+                    >
+                        （可分配屬性點）
+                    </div>
                     <div class="character-stage__grid">
                         <div
                             v-for="attr in attributeEntries"
                             :key="attr.label"
                             class="character-stage__stat"
                         >
-                            <span class="text-caption text-medium-emphasis">{{ attr.label }}</span>
+                            <span class="text-caption text-medium-emphasis character-stage__stat-label">{{ attr.label }}</span>
                             <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
                                 {{ attr.value }}
                             </span>
@@ -135,9 +178,21 @@
                             :key="stat.label"
                             class="character-stage__stat"
                         >
-                            <span class="text-caption text-medium-emphasis">{{ stat.label }}</span>
-                            <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
-                                {{ stat.value }}
+                            <span class="text-caption text-medium-emphasis character-stage__stat-label">{{ stat.label }}</span>
+                            <span class="character-stage__stat-value-block">
+                                <span
+                                    class="font-pixel character-stage__stat-value"
+                                    :style="{ color: stat.buffed ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-primary))' }"
+                                >
+                                    {{ stat.value }}
+                                </span>
+                                <span
+                                    v-if="stat.delta"
+                                    class="character-stage__stat-delta"
+                                    style="color: rgb(var(--v-theme-green));"
+                                >
+                                    {{ stat.delta }}
+                                </span>
                             </span>
                         </div>
                     </div>
@@ -149,15 +204,50 @@
 
 <script setup lang="ts">
 import { EXP_TABLE } from '../../../shared/types/character';
+import type { EquipmentSlot } from '../../../shared/types/common';
+import {
+    EQUIP_SLOTS_LEFT, EQUIP_SLOTS_RIGHT, SLOT_PIXEL_ICON, SLOT_LABEL, RARITY_COLOR, resolvePixelIcon,
+} from '../../utils/equipmentDisplay';
 
 const {
     character, loading, error, fetchCharacter,
 } = useCharacter();
+const {
+    itemById, fetchInventory, loaded: inventoryLoaded,
+} = useInventory();
+
+const equippedItem = (slot: EquipmentSlot) => itemById(character.value?.equipment[slot]);
+
+const slotLabel = (slot: EquipmentSlot, item: ReturnType<typeof equippedItem>) => (
+    item ? `${SLOT_LABEL[slot]}：已裝備（${item.rarity}）` : `${SLOT_LABEL[slot]}：空`
+);
+
+const slotStyle = (slot: EquipmentSlot) => {
+    const item = equippedItem(slot);
+    if (!item) {
+        return { borderColor: 'rgba(196, 203, 219, 0.25)', opacity: 0.5 };
+    }
+    return { borderColor: RARITY_COLOR[item.rarity], opacity: 1 };
+};
+
+// Show the equipped item's own picture when the slot is filled, otherwise
+// the generic placeholder for that slot.
+const slotIcon = (slot: EquipmentSlot) => {
+    const item = equippedItem(slot);
+    return item ? resolvePixelIcon(item) : SLOT_PIXEL_ICON[slot];
+};
 
 const hpPercent = computed(() => {
     if (!character.value) return 0;
     const { HP_CURRENT, HP_MAX } = character.value.stats;
     return HP_MAX > 0 ? (HP_CURRENT / HP_MAX) * 100 : 0;
+});
+
+const hpMaxLabel = computed(() => {
+    if (!character.value) return '';
+    const { stats, equipmentBonus } = character.value;
+    const { value, delta } = withEquipmentBonus(stats.HP_MAX, equipmentBonus.HP_MAX, 'int');
+    return delta ? `${value} ${delta}` : value;
 });
 
 const expToNextLevel = computed(() => (character.value ? EXP_TABLE[character.value.level] : undefined));
@@ -178,28 +268,61 @@ const attributeEntries = computed(() => {
     if (!character.value) return [];
     const { attributes } = character.value;
     return [
-        { label: 'STR', value: attributes.STR },
-        { label: 'AGI', value: attributes.AGI },
-        { label: 'CON', value: attributes.CON },
-        { label: 'LUCK', value: attributes.LUCK },
+        { label: '力量', value: attributes.STR },
+        { label: '敏捷', value: attributes.AGI },
+        { label: '體質', value: attributes.CON },
+        { label: '幸運', value: attributes.LUCK },
     ];
 });
 
+type StatFormat = 'int' | 'seconds';
+
+const formatStat = (value: number, format: StatFormat) => (
+    format === 'seconds' ? `${value.toFixed(1)}s` : `${value}`
+);
+
+// `finalValue` (from `stats`) already has the equipment contribution baked
+// in — it is the number actually used in combat. Only the delta (`bonus`)
+// is worth surfacing separately, in parentheses; the pre-equipment base
+// value is not shown anywhere.
+const withEquipmentBonus = (finalValue: number, bonus: number | undefined, format: StatFormat) => {
+    if (!bonus) {
+        return { value: formatStat(finalValue, format), delta: '', buffed: false };
+    }
+    const sign = bonus > 0 ? '+' : '';
+    return {
+        value: formatStat(finalValue, format),
+        delta: `(${sign}${formatStat(bonus, format)})`,
+        buffed: true,
+    };
+};
+
 const statEntries = computed(() => {
     if (!character.value) return [];
-    const { stats } = character.value;
+    const { stats, equipmentBonus } = character.value;
+
     return [
-        { label: 'ATK', value: stats.ATK },
-        { label: 'DEF', value: stats.DEF },
-        { label: '攻速', value: `${stats.actionIntervalSec.toFixed(1)}s` },
-        { label: '爆擊', value: `${Math.round(stats.critChance * 100)}%` },
-        { label: '閃避', value: `${Math.round(stats.dodgeChance * 100)}%` },
+        { label: '攻擊力', ...withEquipmentBonus(stats.ATK, equipmentBonus.ATK, 'int') },
+        { label: '防禦力', ...withEquipmentBonus(stats.DEF, equipmentBonus.DEF, 'int') },
+        {
+            label: '攻速',
+            ...withEquipmentBonus(stats.actionIntervalSec, equipmentBonus.actionIntervalSec, 'seconds'),
+        },
+        {
+            label: '爆擊', value: `${Math.round(stats.critChance * 100)}%`, delta: '', buffed: false,
+        },
+        {
+            label: '閃避', value: `${Math.round(stats.dodgeChance * 100)}%`, delta: '', buffed: false,
+        },
     ];
 });
 
 onMounted(() => {
     if (!character.value) {
         fetchCharacter();
+    }
+    if (!inventoryLoaded.value) {
+        fetchInventory();
     }
 });
 </script>
@@ -215,8 +338,27 @@ onMounted(() => {
         filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
     }
 
+    &__equip-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        max-width: 280px;
+        margin: 0 auto;
+    }
+
+    &__equip-col {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
     &__bar {
         width: 100%;
+    }
+
+    &__hp-value {
+        white-space: nowrap;
     }
 
     &__box {
@@ -254,8 +396,51 @@ onMounted(() => {
         display: flex;
         align-items: baseline;
         justify-content: space-between;
-        gap: 8px;
+        gap: 6px;
+        min-width: 0;
     }
+
+    &__stat-label {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    &__stat-value-block {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        min-width: 0;
+        line-height: 1.3;
+    }
+
+    &__stat-value {
+        font-size: 10px;
+        white-space: nowrap;
+    }
+
+    &__stat-delta {
+        font-size: 9px;
+        white-space: nowrap;
+        opacity: 0.85;
+    }
+
+    &__hint {
+        font-size: 10px;
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }
+}
+
+.equip-slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 2px solid rgba(196, 203, 219, 0.25);
+    border-radius: 6px;
+    background: rgba(196, 203, 219, 0.04);
+    color: rgb(var(--v-theme-primary));
 }
 
 @keyframes character-idle-bob {
