@@ -121,10 +121,11 @@ const selectedIndex = ref(0);
 const selected = computed(() => archetypes.value[selectedIndex.value] ?? archetypes.value[0] ?? null);
 
 const ARCHETYPE_BLURB: Record<string, string> = {
-    barbarian: '血厚防高的近戰肉盾，適合正面硬撼。',
-    rogue: '身手敏捷、攻速飛快，專走靈活風格。',
-    paladin: '防禦與生存力最強，穩紮穩打。',
-    wanderer: '幸運加身，掉落與祝福機率最佳。',
+    fighter: '身體素質最好，最快適應戰鬥的近戰肉盾。',
+    adventurer: '靈活敏捷，擅長探索，非戰鬥的地方總能多發現點東西。',
+    scholar: '知識轉化為力量，越了解這個世界就越強。',
+    tinkerer: '擅長拾荒與修補，總能把撿到的零件變成活下去的辦法。',
+    gambler: '幸運加身，熱愛在風險與回報之間放手一搏。',
 };
 
 const blurb = computed(() => ARCHETYPE_BLURB[selected.value?.archetypeId ?? ''] ?? '');

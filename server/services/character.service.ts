@@ -1,10 +1,14 @@
 import { BaseService } from './base.service';
-import { CharacterRepository, CHARACTER_ROSTER_MAX } from '../repositories/character.repository';
+import {
+    CharacterRepository, CHARACTER_ROSTER_MAX, 
+} from '../repositories/character.repository';
+import { ItemRepository } from '../repositories/item.repository';
 import {
     calculateBaseStats, applyEquipmentStats,
 } from '../constants/stats';
+import { sumEquipmentStats } from './item.service';
 import {
-    CHARACTER_ARCHETYPES, getArchetypeById,
+    SELECTABLE_CHARACTER_ARCHETYPES, getArchetypeById,
 } from '../constants/characterArchetypes';
 import type {
     Character, CharacterWithStats, CharacterSummary, AllocateAttributesInput,
@@ -16,16 +20,18 @@ import {
 export class CharacterService extends BaseService {
     protected serviceName = 'character';
     private characterRepo: CharacterRepository;
+    private itemRepo: ItemRepository;
 
     constructor() {
         super();
         this.characterRepo = new CharacterRepository();
+        this.itemRepo = new ItemRepository();
     }
 
     /**
      * List the caller's characters plus the available archetypes to create new ones from
      */
-    async getRoster(accountId: string): Promise<{ characters: CharacterSummary[]; archetypes: typeof CHARACTER_ARCHETYPES }> {
+    async getRoster(accountId: string): Promise<{ characters: CharacterSummary[]; archetypes: typeof SELECTABLE_CHARACTER_ARCHETYPES }> {
         const characters = await this.characterRepo.listByAccountId(accountId);
 
         return {
@@ -39,17 +45,17 @@ export class CharacterService extends BaseService {
                 className: character.className,
                 spriteUrl: getArchetypeById(character.archetypeId)?.spriteUrl ?? '/images/hero-sprite.png',
             })),
-            archetypes: CHARACTER_ARCHETYPES,
+            archetypes: SELECTABLE_CHARACTER_ARCHETYPES,
         };
     }
 
     /**
      * Create a new character from an archetype. Rejects once the account already
-     * owns CHARACTER_ROSTER_MAX characters, or if the archetypeId is unknown.
+     * owns CHARACTER_ROSTER_MAX characters, or if the archetypeId is unknown or retired.
      */
     async createCharacterFromArchetype(accountId: string, archetypeId: string): Promise<CharacterWithStats> {
         const archetype = getArchetypeById(archetypeId);
-        if (!archetype) {
+        if (!archetype || !archetype.isSelectable) {
             throw new BusinessLogicError('Unknown archetype');
         }
 
@@ -117,7 +123,15 @@ export class CharacterService extends BaseService {
 
     private async withStats(character: Character): Promise<CharacterWithStats> {
         const baseStats = await calculateBaseStats(character.attributes, character.level);
-        const stats = applyEquipmentStats(baseStats, {});
+        const equipmentBonus = await this.getEquipmentBonus(character);
+        const stats = applyEquipmentStats(baseStats, equipmentBonus);
+
+        // Only report keys equipment actually contributes to — sumEquipmentStats
+        // always fills in all four keys (0 for unaffected ones), which would
+        // otherwise show up as a misleading "+0" in the UI.
+        const nonZeroBonus = Object.fromEntries(
+            Object.entries(equipmentBonus).filter(([, value]) => value),
+        );
 
         return {
             ...character,
@@ -126,6 +140,21 @@ export class CharacterService extends BaseService {
                 ...stats,
                 HP_CURRENT: stats.HP_MAX,
             },
+            equipmentBonus: nonZeroBonus,
         };
+    }
+
+    /**
+     * Look up the character's currently equipped items in the `items` collection
+     * and sum their rolled stats into an equipment bonus for stat calculation.
+     */
+    private async getEquipmentBonus(character: Character) {
+        const equippedItemIds = Object.values(character.equipment).filter((id): id is string => Boolean(id));
+        if (equippedItemIds.length === 0) {
+            return {};
+        }
+
+        const equippedItems = await this.itemRepo.getByIds(equippedItemIds);
+        return sumEquipmentStats(equippedItems);
     }
 }
