@@ -20,6 +20,16 @@
 - **多波/多敵生成**：`waveCount`/`enemyCount` 由 `adventure-run-core` 的 `advance` 決定節點時就已經算好並放進 `currentNodeData`（因為這是「決定要打什麼」的職責，屬於狀態機推進），本 change 的 `CombatResolver` 只負責「怎麼打」，輸入已經是確定的 wave/敵人組成。
 - **掉落計算集中在戰鬥結束後一次結算**：金幣/物品/gems 的掉落判定在整場戰鬥模擬完後一次跑完（而非每次擊殺單獨判定再逐一寫入），減少 RNG 呼叫次數與程式複雜度，同時仍保持「每個擊殺事件都各自做一次獨立判定」的語意（只是批次執行而非批次判定邏輯）。
 
+- **敵人資料表（ASSUMPTION，`10_戰鬥模型.md` 不存在於本 repo，`docs/worldview.md` 明確將怪物範本命名/數值留給本 change 決定）**：新增 4 種敵人原型（呼應 worldview 的「維修設施殘存 GkBot 與失控機具」+ `logicard-duel` 的工作/防禦/侵略/雜兵 4 型分野，見 `server/constants/combat.ts`），各自的 base ATK/DEF/HP/actionIntervalSec 在 `enemyLevel=1` 時設定，實際數值透過 `getStatMultipliers()`（`adventure-run-core` 已提供）依 `enemyLevel`/tier 縮放。每次戰鬥的敵人從 4 種原型中依 RNG 隨機選取。crit/dodge 用跟玩家相同的 base 值（`COMBAT_CONFIG.BASE_CRIT_CHANCE`/`BASE_DODGE_CHANCE`/`CRIT_MULTIPLIER`），敵人沒有 AGI 屬性所以不做 per-AGI 加成。
+- **分數/金幣/物品/gems 掉落公式（ASSUMPTION，spec 只說「受 LUCK 影響」沒給係數）**：
+  - `score`：每擊敗一隻敵人 `enemyLevel * 10 * tierMultiplier`（NORMAL=1/ELITE=2/STRONG_ELITE=4）累加——這個值後續會被 `adventure-run-core` 的 `settleRun` 當作 `expGained`，所以間接決定了升級曲線
+  - `gold`：每擊敗一隻敵人基礎 `enemyLevel * 2`，總和乘上 `(1 + LUCK * 0.02)`
+  - 物品掉落：每擊敗一隻敵人 `clamp(0.15 + LUCK * 0.005, 0, 0.40)` 機率掉落一件隨機 EQUIPMENT 模板，`maxRarity` 依節點 tier 封頂（NORMAL→SR、ELITE→SSR、STRONG_ELITE→L，避免雜兵掉傳說裝備）
+  - `blessingPoints`：每場戰鬥勝利獲得 1（NORMAL）/2（ELITE）/3（STRONG_ELITE）點
+  - gems：依 enemyLevel 分級——1~10 級 3% 機率掉 1 顆、11~20 級 6% 機率掉 1~3 顆、21~30 級 10% 機率掉 3~5 顆；`>30` 依 spec scenario 明確指示套用 21~30 級距規則作為 fallback
+- **目標選擇規則（ASSUMPTION）**：玩家固定攻擊目前存活敵人中最早生成的一個（依生成順序），敵人固定攻擊玩家（單一目標）；一波敵人全滅後若還有下一波，立即生成新一波敵人接續戰鬥，玩家 HP 不重置。
+- **前端只顯示結果，不做即時演出**：`combatLog` 在前端以簡化的靜態事件列表呈現（攻擊/暴擊/閃避/死亡），不做逐幀動畫或即時播放——戰鬥本身是伺服器單次模擬完成的（NFR-009），前端只是把已經算好的結果攤開顯示，維持跟後端一致的「一次請求、一次結果」模型，動畫演出留待之後有需求再迭代。
+
 ## Risks / Trade-offs
 
 - [風險] `combatLog` 若戰鬥拖很長（多 wave 多敵）可能造成回應體積偏大 → [可接受]：`waveCountMax=2`、`enemyCountMax=3` 已經限制了戰鬥規模上限，且不落庫只回傳一次

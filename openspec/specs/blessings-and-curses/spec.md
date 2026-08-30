@@ -1,7 +1,13 @@
-## ADDED Requirements
+# blessings-and-curses
+
+## Purpose
+
+冒險 run 內的 Blessing/Curse（RunModifier）：戰鬥累積點數觸發 BLESSING_SELECT 三選一，效果僅在本次 run 有效。
+
+## Requirements
 
 ### Requirement: 祝福點數累積與選擇
-系統 SHALL 依難度累積 `blessingPoints`（擊敗敵人時依 enemyLevel 給予），達門檻時觸發 BLESSING_SELECT 狀態並提供 3 選 1 候選，候選稀有度/品質受角色 LUCK 影響；選擇後的 Blessing 僅在本次 run 有效。
+系統 SHALL 依 combat-engine 已實作的規則累積 `blessingPoints`（每場戰鬥勝利依節點 tier 給予固定點數），達 adventure-run-core 已定義的門檻時觸發 BLESSING_SELECT 狀態並提供 3 選 1 候選，候選稀有度/品質受角色 LUCK 影響；選擇後的 Blessing 僅在本次 run 有效。
 
 #### Scenario: 累積達門檻觸發選擇
 - **WHEN** run 的 `blessingPoints` 累積達到門檻

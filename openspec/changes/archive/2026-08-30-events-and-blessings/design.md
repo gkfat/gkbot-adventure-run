@@ -15,7 +15,7 @@
 ## Decisions
 
 - **祝福點數命名為 `blessingPoints`**：直接沿用 domain-model.yaml 的 ENT-010 欄位命名（分析階段已選定此名稱），不再引入其他命名，避免歧義。
-- **門檻曲線**：初版採固定門檻 `blessingPointsThreshold = 100`，每擊敗一隻敵人依 `enemyLevel` 給予 `blessingPoints += enemyLevel`。達門檻後歸零重新累積，可重複觸發多次 BLESSING_SELECT。此為可調參數，集中放在 `server/constants/blessings.ts`，方便 playtest 微調而不動邏輯（CTX-ASM-005）。
+- **門檻曲線（已被上游 change 實作，本 change 沿用不重新定義）**：`adventure-run-core` 已定義 `NODE_CONFIG.BLESSING_POINTS_THRESHOLD = 3`；`combat-engine` 已實作每場戰鬥依節點 tier 給予固定 `blessingPointsGained`（NORMAL=1／ELITE=2／STRONG_ELITE=3，見 `server/constants/combat.ts` 的 `blessingPointsForVictory`），不是依 enemyLevel 逐格累加。這兩者都已實作並通過瀏覽器測試，本 change 只需沿用，不再自訂第二套門檻/給分數值；`server/constants/blessings.ts` 若要放相關常數，應直接參照既有實作。
 - **祝福候選生成**：固定 3 選 1，候選池依目前 LUCK 值以權重方式偏向更稀有/更強的 Blessing（沿用與 item rarity 類似的 roll 邏輯，但獨立一份權重表，不與物品稀有度混用）。
 - **Curse 觸發時機**：由事件的 choice 結果或特定事件類型直接附加，不透過「候選選擇」介面（詛咒是被動降臨，不像祝福是玩家主動選擇），符合 `11_事件祝福與詛咒.md` 的描述。
 

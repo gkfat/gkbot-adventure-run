@@ -8,6 +8,7 @@
 - 新增事件轉盤：3% 機率掉落 gems 1~5（與其他物品/金幣結果並存）
 - 新增祝福選擇：累積「祝福點數」達門檻觸發 BLESSING_SELECT，候選稀有度/品質受 LUCK 影響
 - 新增 `POST /api/adventure/event/resolve`、`POST /api/adventure/blessing/select`：實作 `adventure-run-core` 定義的 `EventResolver` 介面
+- 新增冒險畫面 EVENT／BLESSING_SELECT 節點的真實畫面：取代佔位文字，EVENT 顯示事件描述與 choices（若有）、BLESSING_SELECT 顯示 3 選 1 候選卡片
 
 ## Capabilities
 
@@ -22,6 +23,8 @@
 - 新增 `server/constants/blessings.ts`：Blessing/Curse 效果定義（RunModifier 的具體內容，例如 +ATK、+HP、掉落提升、-DEF、商店更貴…）
 - 新增 `server/services/event.service.ts`：事件選定、choice 結算、轉盤判定
 - 新增 `server/services/blessing.service.ts`：祝福點數累積、候選生成（受 LUCK 影響）、選擇後寫入 run 的 active modifiers
+- 修改 `app/pages/adventure.vue`：EVENT/BLESSING_SELECT 節點改為真實互動畫面
+- 修改 `app/composables/useAdventureRun.ts`：新增 `resolveEvent(characterId, choiceIndex?)`、`selectBlessing(characterId, blessingId)`
 - 依賴 `deterministic-rng`（`adventure-run-core` change）
 - 依賴 `quests-and-achievements` 的 `incrementProgress`（gems 掉落來源之一，也可能影響任務進度）
 - 對應分析：FR-039、FR-058~059、FR-071~074、UC-024、UC-029~030、AGG-009/VO-009（domain-model.yaml）、API-025/026（api-model.yaml）、DATA-005（data-model.yaml）、RULE-015

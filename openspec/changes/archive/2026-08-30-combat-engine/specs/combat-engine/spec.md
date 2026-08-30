@@ -43,3 +43,10 @@
 #### Scenario: enemyLevel 超出已定義範圍
 - **WHEN** enemyLevel > 30（FR-040 尚未定案的情境）
 - **THEN** 系統套用 20~30 級距的既有 gems 掉落規則作為 fallback，並標記此為 fallback 行為（供之後規則確認後調整）
+
+### Requirement: 冒險畫面顯示戰鬥結果
+系統 SHALL 讓玩家在 COMBAT 節點的冒險畫面上主動觸發戰鬥，並在戰鬥結束後看到 combatSummary 與 combatLog。
+
+#### Scenario: 玩家觸發戰鬥
+- **WHEN** 玩家在冒險畫面的 COMBAT 節點點擊「開始戰鬥」
+- **THEN** 系統呼叫 `POST /api/adventure/combat/start`，並在完成後顯示勝負、回合數、掉落物與簡化版戰鬥紀錄

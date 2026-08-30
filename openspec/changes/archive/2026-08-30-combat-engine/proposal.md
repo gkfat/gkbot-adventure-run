@@ -9,6 +9,9 @@
 - 套用生效中的 Blessing/Curse（`RunModifier`）於攻防與掉落計算
 - 依 LUCK 調整金幣掉落量與物品掉落機率；依 enemyLevel 分級決定 gems 掉落（含 FR-040 的 needs-review 延伸規則）
 - 新增 `POST /api/adventure/combat/start`：實作 `adventure-run-core` 定義的 `CombatResolver` 介面
+- 新增冒險畫面（`app/pages/adventure.vue`）COMBAT 節點的真實畫面：取代 `adventure-run-core` 留下的「戰鬥尚未開放」佔位，改為「開始戰鬥」按鈕觸發戰鬥、顯示 combatSummary 與簡化版 combatLog；戰鬥結束後沿用既有的 RESOLUTION 畫面繼續流程
+
+> 更新（2026-08-30）：先前規劃只涵蓋後端，經討論後確認本 change 也需涵蓋 COMBAT 節點的最小前端（冒險畫面的開始戰鬥按鈕 + 戰鬥結果顯示），取代 adventure-run-core 留下的佔位畫面。
 
 ## Capabilities
 
@@ -19,6 +22,8 @@
 
 - 實作 `adventure-run-core` change 定義的 `CombatResolver` 介面，取代其 stub
 - 新增 `server/services/combat.service.ts`：時間軸自動戰鬥模擬（依 `actionIntervalSec` 排序攻擊順序）
+- 修改 `app/pages/adventure.vue`：COMBAT 節點改為「開始戰鬥」按鈕 + 戰鬥結果顯示（取代佔位文字）
+- 修改 `app/composables/useAdventureRun.ts`：新增 `startCombat(characterId)` 封裝 `POST /api/adventure/combat/start`
 - 依賴 `character-progression` 的 stats 計算（含裝備加成）作為戰鬥雙方數值輸入
 - 依賴 `deterministic-rng` capability（`adventure-run-core` change）取得 crit/dodge/掉落的隨機判定
 - 依賴 `items-and-equipment` 的 `ItemService.generateItemInstance`（戰鬥掉落裝備）
