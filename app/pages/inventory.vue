@@ -60,6 +60,13 @@
                             :aria-label="slotLabel(slot)"
                             @click="openSlotDetail(slot)"
                         >
+                            <span
+                                v-if="itemById(character?.equipment[slot])"
+                                class="pixel-slot__rarity font-pixel"
+                                :style="{ background: RARITY_COLOR[itemById(character?.equipment[slot])!.rarity] }"
+                            >
+                                {{ itemById(character?.equipment[slot])!.rarity }}
+                            </span>
                             <GamePixelIcon
                                 :name="slotIcon(slot)"
                                 :size="30"
@@ -108,6 +115,12 @@
                     :style="{ borderColor: RARITY_COLOR[item.rarity] }"
                     @click="openDetail(item)"
                 >
+                    <span
+                        class="pixel-slot__rarity font-pixel"
+                        :style="{ background: RARITY_COLOR[item.rarity] }"
+                    >
+                        {{ item.rarity }}
+                    </span>
                     <GamePixelIcon
                         :name="resolvePixelIcon(item)"
                         :size="32"
@@ -141,87 +154,7 @@
         </template>
 
         <!-- 物品詳情 dialog -->
-        <v-dialog
-            v-model="detailOpen"
-            max-width="300"
-        >
-            <div
-                v-if="detailItem"
-                class="item-detail pa-4"
-            >
-                <div class="d-flex align-center ga-3 mb-3">
-                    <div
-                        class="pixel-slot pixel-slot--item pixel-slot--detail"
-                        :style="{ borderColor: RARITY_COLOR[detailItem.rarity] }"
-                    >
-                        <GamePixelIcon
-                            :name="resolvePixelIcon(detailItem)"
-                            :size="40"
-                        />
-                    </div>
-                    <div>
-                        <div
-                            class="font-pixel text-subtitle-1"
-                            :style="{ color: RARITY_COLOR[detailItem.rarity] }"
-                        >
-                            {{ detailInfo?.name }}
-                        </div>
-                        <div class="text-caption text-medium-emphasis mb-1">
-                            稀有度 {{ detailItem.rarity }}
-                        </div>
-                        <div class="text-body-2">
-                            {{ detailInfo?.effectText }}
-                        </div>
-                    </div>
-                </div>
-
-                <p class="text-body-2 text-medium-emphasis mb-3">
-                    {{ detailInfo?.flavor }}
-                </p>
-
-                <div
-                    v-if="isEquipped(detailItem)"
-                    class="item-detail__equipped-tag text-caption font-pixel mb-3"
-                >
-                    <v-icon
-                        icon="mdi-check-bold"
-                        size="12"
-                        class="mr-1"
-                    />
-                    裝備中
-                </div>
-
-                <div
-                    v-if="equipActionError"
-                    class="text-body-2 mb-3"
-                    style="color: rgb(var(--v-theme-warning));"
-                >
-                    {{ equipActionError }}
-                </div>
-
-                <SystemBtn
-                    v-if="detailItem.type === 'EQUIPMENT'"
-                    block
-                    variant="flat"
-                    :color="isEquipped(detailItem) ? 'warning' : 'primary'"
-                    class="text-none mb-2"
-                    :loading="equipActionLoading"
-                    @click="isEquipped(detailItem) ? handleUnequip(detailItem) : handleEquip(detailItem)"
-                >
-                    {{ isEquipped(detailItem) ? '卸下' : '裝備' }}
-                </SystemBtn>
-
-                <SystemBtn
-                    block
-                    variant="outlined"
-                    color="primary"
-                    class="text-none"
-                    @click="detailOpen = false"
-                >
-                    關閉
-                </SystemBtn>
-            </div>
-        </v-dialog>
+        <GameItemDetailDialog ref="itemDetailDialogRef" />
     </div>
 </template>
 
@@ -229,7 +162,7 @@
 import type { EquipmentSlot } from '../../shared/types/common';
 import {
     EQUIP_SLOTS_ALL, SLOT_PIXEL_ICON, SLOT_LABEL, RARITY_COLOR, RARITY_ORDER_DESC,
-    resolvePixelIcon, describeItem, pickTargetSlot, primaryStatValue,
+    resolvePixelIcon, primaryStatValue, primaryStatMagnitude,
     equippedStatValue, equippedStatColor, type ItemLike,
 } from '../utils/equipmentDisplay';
 
@@ -244,7 +177,7 @@ useHead({
 });
 
 const {
-    character, loading: characterLoading, error: characterError, fetchCharacter, equipItem, unequipItem,
+    character, loading: characterLoading, error: characterError, fetchCharacter,
 } = useCharacter();
 const {
     items, loading: inventoryLoading, loaded: inventoryLoaded, error: inventoryError, itemById, fetchInventory,
@@ -260,14 +193,23 @@ const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
 
 const filter = ref<FilterKey>('ALL');
 
+// Second-level grouping when both types are shown together (filter === 'ALL')
+const TYPE_ORDER: string[] = ['EQUIPMENT', 'POTION'];
+
 const sortedItems = computed(() => {
     const filtered = filter.value === 'ALL'
         ? items.value
         : items.value.filter(item => item.type === filter.value);
 
-    return [...filtered].sort(
-        (a, b) => RARITY_ORDER_DESC.indexOf(a.rarity) - RARITY_ORDER_DESC.indexOf(b.rarity),
-    );
+    return [...filtered].sort((a, b) => {
+        const rarityDiff = RARITY_ORDER_DESC.indexOf(a.rarity) - RARITY_ORDER_DESC.indexOf(b.rarity);
+        if (rarityDiff) return rarityDiff;
+
+        const typeDiff = TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type);
+        if (typeDiff) return typeDiff;
+
+        return primaryStatMagnitude(b) - primaryStatMagnitude(a);
+    });
 });
 
 const slotLabel = (slot: EquipmentSlot) => {
@@ -297,60 +239,18 @@ const isEquipped = (item: { itemId: string }) => (
     Object.values(character.value?.equipment ?? {}).includes(item.itemId)
 );
 
-const detailOpen = ref(false);
-const detailItem = ref<ItemLike & { itemId: string } | null>(null);
-const detailInfo = computed(() => (detailItem.value ? describeItem(detailItem.value) : null));
-
-const equipActionLoading = ref(false);
-const equipActionError = ref<string | null>(null);
+// eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
+type ItemDetailDialog = { open: (item: ItemLike & { itemId: string }) => void };
+const itemDetailDialogRef = ref<ItemDetailDialog | null>(null);
 
 const openDetail = (item: ItemLike & { itemId: string }) => {
-    detailItem.value = item;
-    equipActionError.value = null;
-    detailOpen.value = true;
+    itemDetailDialogRef.value?.open(item);
 };
 
 const openSlotDetail = (slot: EquipmentSlot) => {
     const item = itemById(character.value?.equipment[slot]);
     if (item) {
         openDetail(item);
-    }
-};
-
-const findEquippedSlot = (item: { itemId: string }): EquipmentSlot | undefined => {
-    const entry = Object.entries(character.value?.equipment ?? {}).find(([, id]) => id === item.itemId);
-    return entry?.[0] as EquipmentSlot | undefined;
-};
-
-const handleEquip = async (item: ItemLike & { itemId: string }) => {
-    equipActionLoading.value = true;
-    equipActionError.value = null;
-
-    const slot = pickTargetSlot(item, character.value?.equipment ?? {});
-    const success = await equipItem(item.itemId, slot);
-
-    equipActionLoading.value = false;
-    if (success) {
-        detailOpen.value = false;
-    } else {
-        equipActionError.value = '裝備失敗，請稍後再試';
-    }
-};
-
-const handleUnequip = async (item: ItemLike & { itemId: string }) => {
-    const slot = findEquippedSlot(item);
-    if (!slot) return;
-
-    equipActionLoading.value = true;
-    equipActionError.value = null;
-
-    const success = await unequipItem(slot);
-
-    equipActionLoading.value = false;
-    if (success) {
-        detailOpen.value = false;
-    } else {
-        equipActionError.value = '卸下失敗，請稍後再試';
     }
 };
 
@@ -507,6 +407,18 @@ onMounted(() => {
             background: #14171c;
             white-space: nowrap;
         }
+    }
+
+    &__rarity {
+        position: absolute;
+        top: -6px;
+        left: -6px;
+        padding: 0 2px;
+        font-size: 7px;
+        line-height: 1.4;
+        color: #14171c;
+        border-radius: 2px;
+        white-space: nowrap;
     }
 
     &__badge {

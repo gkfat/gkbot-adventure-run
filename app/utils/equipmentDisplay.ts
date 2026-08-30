@@ -159,7 +159,7 @@ const STAT_DISPLAY_ORDER: {
     {
         key: 'actionSpeedMod',
         effectLabel: v => `攻擊間隔 ${v > 0 ? '+' : ''}${v}s`,
-        compact: v => `+${Math.abs(v).toFixed(2)}`,
+        compact: v => `${v >= 0 ? '+' : '-'}${Math.abs(v).toFixed(2)}`,
     },
     {
         key: 'healPercent', effectLabel: v => `使用後回復 ${v}% 生命值`, compact: v => `+${Math.round(v)}`, 
@@ -179,6 +179,19 @@ export function primaryStatValue(item: ItemLike): string | null {
         if (value) return compact(value);
     }
     return null;
+}
+
+/**
+ * Raw magnitude of an item's primary stat (same stat primaryStatValue()
+ * picks) — used for numeric sorting in the inventory grid, where the
+ * formatted "+N"/"-N" string isn't directly comparable.
+ */
+export function primaryStatMagnitude(item: ItemLike): number {
+    for (const { key } of STAT_DISPLAY_ORDER) {
+        const value = item.stats[key];
+        if (value) return Math.abs(value);
+    }
+    return 0;
 }
 
 /**

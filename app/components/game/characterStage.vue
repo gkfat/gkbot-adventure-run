@@ -45,18 +45,96 @@
         <!-- 角色顯示 -->
         <div
             v-else-if="character"
-            class="text-center character-stage__portrait"
+            class="w-100 text-center character-stage__portrait"
         >
+            <!-- LV / 職業 + 屬性 + 可分配屬性點：合併為單一精簡區塊，寬度 100% -->
+            <div class="character-stage__box character-stage__summary">
+                <div class="character-stage__summary-grid">
+                    <div class="character-stage__summary-col">
+                        <div class="font-pixel text-caption" style="color: rgb(var(--v-theme-green));">
+                            LV {{ character.level }}
+                        </div>
+                        <div class="text-body-2 text-medium-emphasis">
+                            {{ character.className }}
+                        </div>
+                    </div>
+
+                    <div class="character-stage__summary-col character-stage__col--divided">
+                        <v-row dense>
+                            <v-col
+                                v-for="attr in attributeEntries"
+                                :key="attr.label"
+                                cols="6"
+                                class="character-stage__stat"
+                            >
+                                <span class="text-caption text-medium-emphasis character-stage__stat-label">{{ attr.label }}</span>
+                                <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
+                                    {{ attr.value }}
+                                </span>
+                            </v-col>
+                        </v-row>
+                    </div>
+
+                    <div class="character-stage__summary-col character-stage__col--divided character-stage__summary-col--points">
+                        <span class="text-caption text-medium-emphasis">可分配</span>
+                        <span
+                            class="font-pixel text-caption"
+                            :style="{ color: character.unspentAttributePoints > 0 ? 'rgb(var(--v-theme-warning))' : 'rgb(var(--v-theme-primary))' }"
+                        >
+                            +{{ character.unspentAttributePoints }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 戰鬥數值：每格 col-4 -->
+            <div class="character-stage__box character-stage__combat my-2">
+                <v-row dense>
+                    <v-col
+                        v-for="stat in statEntries"
+                        :key="stat.label"
+                        cols="4"
+                        class="character-stage__combat-stat"
+                    >
+                        <span class="text-caption text-medium-emphasis character-stage__stat-label">{{ stat.label }}</span>
+                        <span class="character-stage__stat-value-block">
+                            <span
+                                class="font-pixel character-stage__stat-value"
+                                :style="{ color: stat.buffed ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-primary))' }"
+                            >
+                                {{ stat.value }}
+                            </span>
+                            <span
+                                v-if="stat.delta"
+                                class="character-stage__stat-delta"
+                                style="color: rgb(var(--v-theme-green));"
+                            >
+                                {{ stat.delta }}
+                            </span>
+                        </span>
+                    </v-col>
+                </v-row>
+            </div>
+
             <!-- 裝備欄位：角色圖像左右各 4 格 -->
-            <div class="character-stage__equip-row">
+            <div class="character-stage__equip-row my-5">
                 <div class="character-stage__equip-col">
-                    <div
+                    <button
                         v-for="slot in EQUIP_SLOTS_LEFT"
                         :key="slot"
-                        class="equip-slot"
+                        type="button"
+                        class="equip-slot pixel-press"
                         :style="slotStyle(slot)"
                         :aria-label="slotLabel(slot, equippedItem(slot))"
+                        @click="openSlotDetail(slot)"
                     >
+                        <span
+                            v-if="equippedItem(slot)"
+                            class="equip-slot__rarity font-pixel"
+                            :style="{ background: RARITY_COLOR[equippedItem(slot)!.rarity] }"
+                        >
+                            {{ equippedItem(slot)!.rarity }}
+                        </span>
                         <GamePixelIcon
                             :name="slotIcon(slot)"
                             :size="26"
@@ -68,25 +146,34 @@
                         >
                             {{ slotValue(slot) }}
                         </span>
-                    </div>
+                    </button>
                 </div>
 
                 <img
                     :src="breatheFrameUrl(character.spriteUrl, breathStep)"
                     alt="角色"
-                    width="100"
-                    height="100"
+                    width="140"
+                    height="140"
                     class="character-stage__sprite"
                 >
 
                 <div class="character-stage__equip-col">
-                    <div
+                    <button
                         v-for="slot in EQUIP_SLOTS_RIGHT"
                         :key="slot"
-                        class="equip-slot"
+                        type="button"
+                        class="equip-slot pixel-press"
                         :style="slotStyle(slot)"
                         :aria-label="slotLabel(slot, equippedItem(slot))"
+                        @click="openSlotDetail(slot)"
                     >
+                        <span
+                            v-if="equippedItem(slot)"
+                            class="equip-slot__rarity font-pixel"
+                            :style="{ background: RARITY_COLOR[equippedItem(slot)!.rarity] }"
+                        >
+                            {{ equippedItem(slot)!.rarity }}
+                        </span>
                         <GamePixelIcon
                             :name="slotIcon(slot)"
                             :size="26"
@@ -98,124 +185,16 @@
                         >
                             {{ slotValue(slot) }}
                         </span>
-                    </div>
-                </div>
-            </div>
-            <!-- 職業 / 等級 / EXP / HP -->
-            <div class="character-stage__box mt-2 mx-auto">
-                <div class="d-flex align-center justify-center ga-2">
-                    <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-green));">
-                        LV {{ character.level }}
-                    </span>
-                    <span class="text-body-2 text-medium-emphasis">
-                        {{ character.className }}
-                    </span>
-                </div>
-
-                <div class="character-stage__bar mt-2">
-                    <div class="d-flex align-center justify-space-between mb-1">
-                        <span class="text-caption text-medium-emphasis">HP</span>
-                        <span
-                            class="font-pixel text-caption character-stage__hp-value"
-                            style="color: rgb(var(--v-theme-green));"
-                        >
-                            {{ character.stats.HP_CURRENT }} / {{ hpMaxLabel }}
-                        </span>
-                    </div>
-                    <v-progress-linear
-                        :model-value="hpPercent"
-                        color="green"
-                        bg-color="dark"
-                        height="6"
-                        rounded
-                    />
-                </div>
-
-                <div class="character-stage__bar mt-2">
-                    <div class="d-flex align-center justify-space-between mb-1">
-                        <span class="text-caption text-medium-emphasis">EXP</span>
-                        <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
-                            {{ expLabel }}
-                        </span>
-                    </div>
-                    <v-progress-linear
-                        :model-value="expPercent"
-                        color="primary"
-                        bg-color="dark"
-                        height="6"
-                        rounded
-                    />
+                    </button>
                 </div>
             </div>
 
-            <!-- 屬性 / 戰鬥數值：同一 row，各佔一半 -->
-            <div class="character-stage__box character-stage__cols mt-2 mx-auto">
-                <div class="character-stage__col">
-                    <div class="d-flex align-center justify-space-between mb-1">
-                        <span class="text-caption text-medium-emphasis">屬性</span>
-                        <span
-                            v-if="character.unspentAttributePoints > 0"
-                            class="font-pixel text-caption"
-                            style="color: rgb(var(--v-theme-warning));"
-                        >
-                            +{{ character.unspentAttributePoints }}
-                        </span>
-                    </div>
-                    <div
-                        v-if="character.unspentAttributePoints > 0"
-                        class="character-stage__hint"
-                        style="color: rgb(var(--v-theme-warning));"
-                    >
-                        （可分配屬性點）
-                    </div>
-                    <div class="character-stage__grid">
-                        <div
-                            v-for="attr in attributeEntries"
-                            :key="attr.label"
-                            class="character-stage__stat"
-                        >
-                            <span class="text-caption text-medium-emphasis character-stage__stat-label">{{ attr.label }}</span>
-                            <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
-                                {{ attr.value }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="character-stage__col character-stage__col--divided">
-                    <div class="mb-1">
-                        <span class="text-caption text-medium-emphasis">戰鬥數值</span>
-                    </div>
-                    <div class="character-stage__grid">
-                        <div
-                            v-for="stat in statEntries"
-                            :key="stat.label"
-                            class="character-stage__stat"
-                        >
-                            <span class="text-caption text-medium-emphasis character-stage__stat-label">{{ stat.label }}</span>
-                            <span class="character-stage__stat-value-block">
-                                <span
-                                    class="font-pixel character-stage__stat-value"
-                                    :style="{ color: stat.buffed ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-primary))' }"
-                                >
-                                    {{ stat.value }}
-                                </span>
-                                <span
-                                    v-if="stat.delta"
-                                    class="character-stage__stat-delta"
-                                    style="color: rgb(var(--v-theme-green));"
-                                >
-                                    {{ stat.delta }}
-                                </span>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+            <!-- 裝備詳情 dialog -->
+            <GameItemDetailDialog ref="itemDetailDialogRef" />
             <!-- 開始/繼續冒險 -->
             <SystemBtn
                 block
+                size="x-large"
                 variant="flat"
                 color="primary"
                 class="text-none mt-3 mx-auto character-stage__adventure-cta"
@@ -229,7 +208,6 @@
 </template>
 
 <script setup lang="ts">
-import { EXP_TABLE } from '../../../shared/types/character';
 import { getStageDisplayName } from '../../../shared/types/adventure';
 import type { EquipmentSlot } from '../../../shared/types/common';
 import {
@@ -294,32 +272,16 @@ const slotIcon = (slot: EquipmentSlot) => {
 const slotValue = (slot: EquipmentSlot) => equippedStatValue(equippedItem(slot));
 const slotValueColor = (slot: EquipmentSlot) => equippedStatColor(equippedItem(slot));
 
-const hpPercent = computed(() => {
-    if (!character.value) return 0;
-    const { HP_CURRENT, HP_MAX } = character.value.stats;
-    return HP_MAX > 0 ? (HP_CURRENT / HP_MAX) * 100 : 0;
-});
+// eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
+type ItemDetailDialog = { open: (item: NonNullable<ReturnType<typeof equippedItem>>) => void };
+const itemDetailDialogRef = ref<ItemDetailDialog | null>(null);
 
-const hpMaxLabel = computed(() => {
-    if (!character.value) return '';
-    const { stats, equipmentBonus } = character.value;
-    const { value, delta } = withEquipmentBonus(stats.HP_MAX, equipmentBonus.HP_MAX, 'int');
-    return delta ? `${value} ${delta}` : value;
-});
-
-const expToNextLevel = computed(() => (character.value ? EXP_TABLE[character.value.level] : undefined));
-
-const expPercent = computed(() => {
-    if (!character.value) return 0;
-    if (!expToNextLevel.value) return 100; // 已滿等
-    return Math.min(100, (character.value.exp / expToNextLevel.value) * 100);
-});
-
-const expLabel = computed(() => {
-    if (!character.value) return '';
-    if (!expToNextLevel.value) return `${character.value.exp}（已滿等）`;
-    return `${character.value.exp} / ${expToNextLevel.value}`;
-});
+const openSlotDetail = (slot: EquipmentSlot) => {
+    const item = equippedItem(slot);
+    if (item) {
+        itemDetailDialogRef.value?.open(item);
+    }
+};
 
 const attributeEntries = computed(() => {
     if (!character.value) return [];
@@ -359,6 +321,7 @@ const statEntries = computed(() => {
     const { stats, equipmentBonus } = character.value;
 
     return [
+        { label: 'HP', ...withEquipmentBonus(stats.HP_MAX, equipmentBonus.HP_MAX, 'int') },
         { label: '攻擊力', ...withEquipmentBonus(stats.ATK, equipmentBonus.ATK, 'int') },
         { label: '防禦力', ...withEquipmentBonus(stats.DEF, equipmentBonus.DEF, 'int') },
         {
@@ -415,14 +378,6 @@ watch(character, (value) => {
         gap: 12px;
     }
 
-    &__bar {
-        width: 100%;
-    }
-
-    &__hp-value {
-        white-space: nowrap;
-    }
-
     &__box {
         width: 100%;
         max-width: 280px;
@@ -432,26 +387,45 @@ watch(character, (value) => {
         border-radius: 3px;
     }
 
-    &__cols {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        column-gap: 12px;
-        padding: 10px 12px;
+    &__summary {
+        max-width: none;
+        padding: 8px 12px;
     }
 
-    &__col {
+    &__summary-grid {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        column-gap: 12px;
+    }
+
+    &__summary-col {
         min-width: 0;
 
-        &--divided {
-            padding-left: 12px;
-            border-left: 1px solid rgba(196, 203, 219, 0.12);
+        &--points {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
         }
     }
 
-    &__grid {
-        display: grid;
-        grid-template-columns: 1fr;
-        row-gap: 5px;
+    &__col--divided {
+        padding-left: 12px;
+        border-left: 1px solid rgba(196, 203, 219, 0.12);
+    }
+
+    &__combat {
+        max-width: none;
+        padding: 8px 12px;
+    }
+
+    &__combat-stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        text-align: center;
     }
 
     &__stat {
@@ -469,8 +443,10 @@ watch(character, (value) => {
 
     &__stat-value-block {
         display: flex;
-        flex-direction: column;
-        align-items: flex-end;
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: center;
+        gap: 4px;
         min-width: 0;
         line-height: 1.3;
     }
@@ -485,12 +461,6 @@ watch(character, (value) => {
         white-space: nowrap;
         opacity: 0.85;
     }
-
-    &__hint {
-        font-size: 10px;
-        line-height: 1.2;
-        margin-bottom: 4px;
-    }
 }
 
 .equip-slot {
@@ -500,10 +470,12 @@ watch(character, (value) => {
     justify-content: center;
     width: 40px;
     height: 40px;
+    padding: 0;
     border: 2px solid rgba(196, 203, 219, 0.25);
     border-radius: 6px;
     background: rgba(196, 203, 219, 0.04);
     color: rgb(var(--v-theme-primary));
+    cursor: pointer;
 
     &__value {
         position: absolute;
@@ -514,6 +486,18 @@ watch(character, (value) => {
         font-size: 9px;
         line-height: 1.3;
         background: #14171c;
+        white-space: nowrap;
+    }
+
+    &__rarity {
+        position: absolute;
+        top: -6px;
+        left: -6px;
+        padding: 0 2px;
+        font-size: 7px;
+        line-height: 1.4;
+        color: #14171c;
+        border-radius: 2px;
         white-space: nowrap;
     }
 }

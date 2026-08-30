@@ -236,7 +236,15 @@
                             class="adventure-page__enemy-row"
                         >
                             <div class="d-flex align-center justify-space-between">
-                                <span class="text-body-2">{{ enemy.name }}</span>
+                                <span class="text-body-2">
+                                    <span
+                                        class="font-pixel text-caption adventure-page__enemy-tier"
+                                        :style="{ color: TIER_COLOR[combatNodeData.tier] }"
+                                    >
+                                        {{ TIER_LABEL[combatNodeData.tier] }}
+                                    </span>
+                                    {{ enemy.name }}
+                                </span>
                                 <span class="text-caption text-medium-emphasis">HP {{ enemy.hp }}</span>
                             </div>
                             <div class="text-caption text-medium-emphasis">
@@ -417,6 +425,26 @@ useHead({
     title: '冒險',
     meta: [{ name: 'description', content: 'GkBot Adventure Run 冒險進行畫面' }],
 });
+
+const TIER_LABEL: Record<NodeType, string> = {
+    [NodeType.COMBAT]: '普通',
+    [NodeType.ELITE]: '菁英',
+    [NodeType.STRONG_ELITE]: '強敵',
+    [NodeType.BOSS]: '頭目',
+    [NodeType.EVENT]: '',
+    [NodeType.REST]: '',
+    [NodeType.CHOICE]: '',
+};
+
+const TIER_COLOR: Record<NodeType, string> = {
+    [NodeType.COMBAT]: 'rgb(var(--v-theme-primary))',
+    [NodeType.ELITE]: 'rgb(var(--v-theme-green))',
+    [NodeType.STRONG_ELITE]: '#c084fc',
+    [NodeType.BOSS]: 'rgb(var(--v-theme-warning))',
+    [NodeType.EVENT]: 'rgb(var(--v-theme-primary))',
+    [NodeType.REST]: 'rgb(var(--v-theme-primary))',
+    [NodeType.CHOICE]: 'rgb(var(--v-theme-primary))',
+};
 
 const {
     character, loading: characterLoading, fetchCharacter,
@@ -606,6 +634,10 @@ onMounted(() => {
         &:not(:last-child) {
             border-bottom: 1px solid rgba(196, 203, 219, 0.1);
         }
+    }
+
+    &__enemy-tier {
+        margin-right: 4px;
     }
 
     &__settlement {

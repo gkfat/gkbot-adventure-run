@@ -147,7 +147,7 @@ const handleHomeTap = () => {
         width: 52px;
         height: 52px;
         margin-top: -26px;
-        border-radius: 50%;
+        border-radius: 8px;
         border: 3px solid rgb(var(--v-theme-background));
         background: rgb(var(--v-theme-green));
         color: rgb(var(--v-theme-background));
