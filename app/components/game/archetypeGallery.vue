@@ -18,7 +18,7 @@
                     @click="selectedIndex = index"
                 >
                     <img
-                        :src="archetype.spriteUrl"
+                        :src="breatheFrameUrl(archetype.spriteUrl, breathStep)"
                         :alt="archetype.className"
                         width="84"
                         height="84"
@@ -111,11 +111,14 @@
 </template>
 
 <script setup lang="ts">
+import { breatheFrameUrl } from '../../utils/spriteDisplay';
+
 defineEmits<{ cancel: [] }>();
 
 const {
     archetypes, roster, loading, createCharacter,
 } = useCharacter();
+const breathStep = useIdleBreathingFrame();
 
 const selectedIndex = ref(0);
 const selected = computed(() => archetypes.value[selectedIndex.value] ?? archetypes.value[0] ?? null);

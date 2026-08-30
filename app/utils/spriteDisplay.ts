@@ -1,0 +1,25 @@
+/**
+ * Idle-breathing animation frames are stored alongside each archetype's base
+ * sprite as `{name}-breathe-{1,2,3}.png` (torso-only movement; level 3 is the
+ * inhale peak), so frames can be derived from `spriteUrl` without a separate
+ * field on the character/archetype schema.
+ *
+ * The step sequence below walks the levels up then back down (0,1,2,3,2,1)
+ * so the loop reads as 3 inhale frames followed by 3 exhale frames, and
+ * wraps seamlessly back to rest (level 0) as it repeats.
+ */
+const BREATH_LEVEL_SEQUENCE = [
+    0,
+    1,
+    2,
+    3,
+    2,
+    1,
+] as const;
+
+export const BREATH_FRAME_COUNT = BREATH_LEVEL_SEQUENCE.length;
+
+export const breatheFrameUrl = (spriteUrl: string, step: number) => {
+    const level = BREATH_LEVEL_SEQUENCE[step] ?? 0;
+    return level === 0 ? spriteUrl : spriteUrl.replace(/\.png$/, `-breathe-${level}.png`);
+};

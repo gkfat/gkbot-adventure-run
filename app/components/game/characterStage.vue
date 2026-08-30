@@ -72,7 +72,7 @@
                 </div>
 
                 <img
-                    :src="character.spriteUrl"
+                    :src="breatheFrameUrl(character.spriteUrl, breathStep)"
                     alt="角色"
                     width="100"
                     height="100"
@@ -230,11 +230,13 @@
 
 <script setup lang="ts">
 import { EXP_TABLE } from '../../../shared/types/character';
+import { getStageDisplayName } from '../../../shared/types/adventure';
 import type { EquipmentSlot } from '../../../shared/types/common';
 import {
     EQUIP_SLOTS_LEFT, EQUIP_SLOTS_RIGHT, SLOT_PIXEL_ICON, SLOT_LABEL, RARITY_COLOR, resolvePixelIcon,
     equippedStatValue, equippedStatColor,
 } from '../../utils/equipmentDisplay';
+import { breatheFrameUrl } from '../../utils/spriteDisplay';
 
 const {
     character, loading, error, fetchCharacter,
@@ -245,10 +247,13 @@ const {
 const {
     currentRun, hasActiveRun, loading: adventureLoading, fetchCurrent: fetchCurrentRun, start: startAdventure,
 } = useAdventureRun();
+const breathStep = useIdleBreathingFrame();
 
-const adventureCtaLabel = computed(() => (
-    hasActiveRun.value ? `繼續冒險（第 ${(currentRun.value?.step ?? 0) + 1} 關）` : '開始冒險'
-));
+const adventureCtaLabel = computed(() => {
+    if (!hasActiveRun.value || !currentRun.value) return '開始冒險';
+    const stageName = getStageDisplayName(currentRun.value.chapterIndex, currentRun.value.stageIndexInChapter);
+    return `繼續冒險（${stageName}）`;
+});
 
 const handleAdventureCta = async () => {
     if (!character.value) return;
@@ -388,7 +393,6 @@ watch(character, (value) => {
 
     &__sprite {
         image-rendering: pixelated;
-        animation: character-idle-bob 2.4s ease-in-out infinite;
         filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
     }
 
@@ -510,18 +514,4 @@ watch(character, (value) => {
     }
 }
 
-@keyframes character-idle-bob {
-    0%, 100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(-6px);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .character-stage__sprite {
-        animation: none;
-    }
-}
 </style>
