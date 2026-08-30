@@ -11,13 +11,39 @@
 
 import { BaseRepository } from './base.repository';
 import {
-    AdventureStateType, type AdventureRun,
+    AdventureStateType, STAGE_CONFIG, type AdventureRun,
 } from '../../shared/types/adventure';
 import { adventureRunSchema } from '../../shared/schemas/firestore/adventure.schema';
 import {
     DatabaseError, NotFoundError,
 } from '../../shared/types/errors';
 import { random } from '../services/rng.service';
+
+/**
+ * Inclusive uniform integer in [min, max] from a single RNG draw in [0, 1).
+ */
+function rollInRange(rngValue: number, min: number, max: number): number {
+    return min + Math.floor(rngValue * (max - min + 1));
+}
+
+/**
+ * Backfill Stage fields with defaults for run documents written before
+ * `adventure-stage-progression`/`single-stage-run-settlement` shipped
+ * (design.md Migration Plan: "不做資料回填" — tolerate `undefined` as
+ * stage 1/node 0 instead). Every read path must go through this so
+ * `adventureRunSchema` (which requires these fields) and the state machine
+ * both see consistent defaults — without it, an old run document fails
+ * schema validation.
+ */
+function withStageDefaults(run: AdventureRun): AdventureRun {
+    return {
+        ...run,
+        chapterIndex: run.chapterIndex ?? 0,
+        stageNodeIndex: run.stageNodeIndex ?? 0,
+        stageNodeCount: run.stageNodeCount ?? STAGE_CONFIG.NODE_COUNT_MIN,
+        expEarned: run.expEarned ?? 0,
+    };
+}
 
 export class AdventureRunRepository extends BaseRepository<AdventureRun> {
     protected collectionName = 'adventureRuns';
@@ -30,22 +56,34 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
         characterId: string;
         accountId: string;
         playerHpMax: number;
+        chapterIndex: number;
     }): Promise<AdventureRun> {
         try {
             const docRef = this.collection.doc();
             const timestamp = Date.now();
+            const seed = crypto.randomUUID();
+
+            // Roll the Stage's node count deterministically from the fresh
+            // seed — no existing doc yet, so this can't go through
+            // RngService.next()/consumeRng().
+            const stageNodeCount = rollInRange(random(seed, 0), STAGE_CONFIG.NODE_COUNT_MIN, STAGE_CONFIG.NODE_COUNT_MAX);
 
             const run: AdventureRun = adventureRunSchema.parse({
                 runId: docRef.id,
                 characterId: params.characterId,
                 accountId: params.accountId,
 
-                seed: crypto.randomUUID(),
-                rngIndex: 0,
+                seed,
+                rngIndex: 1,
 
                 state: AdventureStateType.INIT,
                 step: 0,
                 lastRestStep: 0,
+
+                chapterIndex: params.chapterIndex,
+                stageNodeIndex: 0,
+                stageNodeCount,
+
                 startedAt: timestamp,
 
                 playerHp: params.playerHpMax,
@@ -57,7 +95,7 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
 
                 runInventory: [],
 
-                score: 0,
+                expEarned: 0,
                 goldEarned: 0,
                 gemsEarned: 0,
 
@@ -89,11 +127,22 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
             if (snapshot.empty) {
                 return null;
             }
-            return snapshot.docs[0]!.data() as AdventureRun;
+            return withStageDefaults(snapshot.docs[0]!.data() as AdventureRun);
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Unknown error';
             throw new DatabaseError(`Failed to query active adventure run: ${message}`);
         }
+    }
+
+    /**
+     * Get a run document by ID (see BaseRepository.getById) with Chapter/
+     * Stage fields backfilled — overridden so both this and the inherited
+     * `getByIdOrThrow` (used by `saveCheckpoint`) return consistent defaults
+     * for pre-migration run documents.
+     */
+    override async getById(id: string): Promise<AdventureRun | null> {
+        const run = await super.getById(id);
+        return run ? withStageDefaults(run) : null;
     }
 
     /**

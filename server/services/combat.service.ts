@@ -16,7 +16,7 @@ import {
 } from '../constants/difficulty';
 import {
     ENEMY_ARCHETYPES, ENEMY_COMBAT_STATS,
-    scoreForKill, goldForKill, applyLuckToGold, itemDropChance,
+    expForKill, goldForKill, applyLuckToGold, itemDropChance,
     blessingPointsForVictory, maxDropRarity, gemsDropTier, DROP_ITEM_CONTEXT,
 } from '../constants/combat';
 import { generateItemInstance } from './item.service';
@@ -38,10 +38,11 @@ const EQUIPMENT_TEMPLATE_IDS = Object.values(ITEM_TEMPLATES)
 // CombatContext.tier reuses NodeType's combat-tier members; EnemyTier
 // (difficulty.ts) is combat-engine's own vocabulary for the same three
 // tiers — map between them at the one seam where they meet.
-const NODE_TYPE_TO_ENEMY_TIER: Record<CombatContext['tier'], EnemyTier> = {
+export const NODE_TYPE_TO_ENEMY_TIER: Record<CombatContext['tier'], EnemyTier> = {
     [NodeType.COMBAT]: 'NORMAL',
     [NodeType.ELITE]: 'ELITE',
     [NodeType.STRONG_ELITE]: 'STRONG_ELITE',
+    [NodeType.BOSS]: 'BOSS',
 };
 
 /**
@@ -149,7 +150,7 @@ export class CombatService extends BaseService implements CombatResolver {
         const encountered: CombatUnit[] = [];
 
         for (let wave = 0; wave < context.waveCount && player.hp > 0; wave++) {
-            const enemies = await this.spawnWave(run.runId, context);
+            const enemies = await this.spawnWave(run.runId, context, wave === 0 ? context.firstWaveArchetypeIndices : undefined);
             encountered.push(...enemies);
             const alive = [...enemies];
 
@@ -182,7 +183,7 @@ export class CombatService extends BaseService implements CombatResolver {
         const rewards = victory
             ? await this.computeRewards(run, context, defeated, character.attributes.LUCK, activeModifiers)
             : {
-                scoreGained: 0, goldDropped: 0, gemsDropped: 0, itemsDropped: [], blessingPointsGained: 0,
+                expGained: 0, goldDropped: 0, gemsDropped: 0, itemsDropped: [], blessingPointsGained: 0,
             };
 
         return {
@@ -197,15 +198,23 @@ export class CombatService extends BaseService implements CombatResolver {
         };
     }
 
-    private async spawnWave(runId: string, context: CombatContext): Promise<CombatUnit[]> {
+    /**
+     * `archetypeIndices`, when provided (wave 0 only — see design.md), pins
+     * each enemy slot to the archetype already decided and shown to the
+     * player at node-generation time, instead of rolling a fresh one here.
+     */
+    private async spawnWave(runId: string, context: CombatContext, archetypeIndices?: number[]): Promise<CombatUnit[]> {
         const enemyLevel = context.enemyLevel;
         const multipliers = getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier]);
 
         const enemies: CombatUnit[] = [];
         for (let i = 0; i < context.enemyCountPerWave; i++) {
-             
-            const roll = await this.rngService.next(runId);
-            const archetype = ENEMY_ARCHETYPES[Math.floor(roll * ENEMY_ARCHETYPES.length)] as typeof ENEMY_ARCHETYPES[number];
+            let archetypeIndex = archetypeIndices?.[i];
+            if (archetypeIndex === undefined) {
+                const roll = await this.rngService.next(runId);
+                archetypeIndex = Math.floor(roll * ENEMY_ARCHETYPES.length);
+            }
+            const archetype = ENEMY_ARCHETYPES[archetypeIndex] as typeof ENEMY_ARCHETYPES[number];
 
             enemies.push({
                 id: crypto.randomUUID(),
@@ -254,15 +263,19 @@ export class CombatService extends BaseService implements CombatResolver {
     private async computeRewards(
         run: AdventureRun, context: CombatContext, defeated: CombatUnit[], luck: number, activeModifiers: RunModifier[],
     ) {
-        let scoreGained = 0;
+        let expGained = 0;
         let goldBase = 0;
         let gemsDropped = 0;
         const itemsDropped: ItemInstance[] = [];
-        const dropChance = itemDropChance(luck) * combinedDropRateMultiplier(activeModifiers);
+        // Boss is the Stage's narrative climax — guarantee at least one drop
+        // per kill, bypassing the LUCK-gated chance (design.md "Boss 保底掉落").
+        const dropChance = context.tier === NodeType.BOSS
+            ? 1
+            : itemDropChance(luck) * combinedDropRateMultiplier(activeModifiers);
         const gemsTier = gemsDropTier(context.enemyLevel);
 
         for (let i = 0; i < defeated.length; i++) {
-            scoreGained += scoreForKill(context.enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier]);
+            expGained += expForKill(context.enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier]);
             goldBase += goldForKill(context.enemyLevel);
              
             const dropRoll = await this.rngService.next(run.runId);
@@ -293,7 +306,7 @@ export class CombatService extends BaseService implements CombatResolver {
         const blessingPointsGained = defeated.length > 0 ? blessingPointsForVictory(NODE_TYPE_TO_ENEMY_TIER[context.tier]) : 0;
 
         return {
-            scoreGained,
+            expGained,
             goldDropped: applyLuckToGold(goldBase, luck),
             gemsDropped,
             itemsDropped,

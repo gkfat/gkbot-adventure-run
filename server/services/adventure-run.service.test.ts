@@ -45,6 +45,9 @@ vi.mock('./combat.service', () => ({
     CombatService: vi.fn().mockImplementation(function CombatServiceMock() {
         return { resolve: combatResolveMock };
     }),
+    NODE_TYPE_TO_ENEMY_TIER: {
+        COMBAT: 'NORMAL', ELITE: 'ELITE', STRONG_ELITE: 'STRONG_ELITE', BOSS: 'BOSS',
+    },
 }));
 
 vi.mock('./event.service', () => ({
@@ -129,13 +132,15 @@ function baseRun(overrides: Partial<AdventureRun> = {}): AdventureRun {
         curses: [],
         blessingPoints: 0,
         runInventory: [],
-        score: 0,
+        expEarned: 0,
         goldEarned: 0,
         gemsEarned: 0,
         lastActivityAt: Date.now(),
         updatedAt: Date.now(),
         ...overrides,
-    };
+    } as AdventureRun; // chapterIndex/stageNodeIndex/stageNodeCount deliberately
+    // omitted from the base object — some tests exercise the migration
+    // fallback (see resolveStageFields) where a run doc lacks them entirely.
 }
 
 beforeEach(() => {
@@ -149,6 +154,12 @@ beforeEach(() => {
     saveCheckpointMock.mockImplementation(async (runId: string, patch: Record<string, unknown>) => ({
         ...baseRun(), ...patch,
     }));
+    settleRunRewardsMock.mockResolvedValue({
+        character: { level: 1 }, leveledUp: false, unspentAttributePointsGained: 0,
+    });
+    // Default RNG draw for tests that don't care about the exact value —
+    // buildCombatNodeData always consumes at least one draw per enemy slot.
+    rngNextMock.mockResolvedValue(0);
 });
 
 describe('AdventureRunService.startRun', () => {
@@ -168,16 +179,16 @@ describe('AdventureRunService.startRun', () => {
         await expect(service.startRun('account-1', 'char-1')).rejects.toMatchObject({ details: { run: expect.not.objectContaining({ seed: expect.anything() }) } });
     });
 
-    it('creates a run sized to the character\'s current HP_MAX when none is active', async () => {
+    it('creates a run sized to the character\'s current HP_MAX and current nextChapterIndex when none is active', async () => {
         getActiveByCharacterIdMock.mockResolvedValue(null);
-        getCharacterWithStatsMock.mockResolvedValue({ stats: { HP_MAX: 150 } });
+        getCharacterWithStatsMock.mockResolvedValue({ stats: { HP_MAX: 150 }, nextChapterIndex: 2 });
         createRunMock.mockResolvedValue(baseRun({ playerHpMax: 150 }));
 
         const service = new AdventureRunService();
         await service.startRun('account-1', 'char-1');
 
         expect(createRunMock).toHaveBeenCalledWith({
-            characterId: 'char-1', accountId: 'account-1', playerHpMax: 150,
+            characterId: 'char-1', accountId: 'account-1', playerHpMax: 150, chapterIndex: 2,
         });
     });
 });
@@ -197,7 +208,7 @@ describe('AdventureRunService.advance — node generation priority', () => {
             state: AdventureStateType.REST,
             currentNodeType: NodeType.REST,
         }));
-        expect(result.state).toBe(AdventureStateType.REST);
+        expect(result.run.state).toBe(AdventureStateType.REST);
     });
 
     it('produces a Strong Elite combat node on step % 9 == 0 when the rest guarantee has not triggered', async () => {
@@ -215,6 +226,51 @@ describe('AdventureRunService.advance — node generation priority', () => {
                 enemyLevel: 5, tier: NodeType.STRONG_ELITE, 
             }),
         }));
+    });
+
+    it('Stage boundary (Boss) takes priority over the guaranteed Rest rule', async () => {
+        // stageNodeIndex=9, stageNodeCount=10 -> last node of the stage; also
+        // step-lastRestStep=5 >= 4 would normally guarantee Rest — Boss wins.
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            step: 5, lastRestStep: 0, stageNodeIndex: 9, stageNodeCount: 10,
+        }));
+
+        const service = new AdventureRunService();
+        const result = await service.advance('account-1', 'char-1');
+
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            state: AdventureStateType.COMBAT,
+            currentNodeType: NodeType.BOSS,
+            currentNodeData: expect.objectContaining({ tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1 }),
+        }));
+        expect(result.run.currentNodeType).toBe(NodeType.BOSS);
+    });
+
+    it('Stage boundary (Boss) takes priority over the fixed Strong Elite cadence', async () => {
+        // step=9 -> step % 9 == 0 would normally force Strong Elite — Boss wins.
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            step: 9, lastRestStep: 8, stageNodeIndex: 14, stageNodeCount: 15,
+        }));
+
+        const service = new AdventureRunService();
+        await service.advance('account-1', 'char-1');
+
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            currentNodeType: NodeType.BOSS,
+        }));
+    });
+
+    it('treats missing chapter/stage fields as chapter 1/stage 1 (migration fallback) and does not trigger Boss', async () => {
+        // No chapterIndex/stageNodeIndex/stageNodeCount on the run doc at all.
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            step: 1, lastRestStep: 0,
+        }));
+        rngNextMock.mockResolvedValue(0);
+
+        const service = new AdventureRunService();
+        const result = await service.advance('account-1', 'char-1');
+
+        expect(result.run.currentNodeType).not.toBe(NodeType.BOSS);
     });
 
     it('falls back to a weighted random pick using RngService when neither guarantee applies', async () => {
@@ -321,22 +377,70 @@ describe('AdventureRunService.getCurrentRun — auto-settlement on DISCONNECT', 
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
             state: AdventureStateType.EXPLORING,
             runInventory: [droppedItem],
-            score: 42,
+            expEarned: 42,
             goldEarned: 10,
             gemsEarned: 1,
             lastActivityAt: Date.now() - 20 * 60 * 1000, // past the 15-minute reconnect window
         }));
-        createItemMock.mockResolvedValue(undefined);
-        addItemMock.mockRejectedValue(new BusinessLogicError('Inventory is full'));
-        settleRunRewardsMock.mockResolvedValue({ leveledUp: false });
 
         const service = new AdventureRunService();
         const result = await service.getCurrentRun('account-1', 'char-1');
 
-        expect(result).toBeNull();
+        expect(result.run).toBeNull();
+        // DISCONNECT is a failure — item transfer is skipped entirely (single-stage-run-settlement:
+        // only COMPLETED keeps gold/gems/items), so createItem/addItem are never even attempted.
+        expect(createItemMock).not.toHaveBeenCalled();
+        expect(addItemMock).not.toHaveBeenCalled();
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
             state: AdventureStateType.ENDED,
             endReason: 'DISCONNECT',
+        }));
+        expect(result.settlement).toEqual(expect.objectContaining({
+            endReason: 'DISCONNECT',
+            goldEarned: 0,
+            gemsEarned: 0,
+            items: [],
+            expGained: 42,
+            forfeitedGold: 10,
+            forfeitedGems: 1,
+            forfeitedItems: [droppedItem],
+        }));
+    });
+
+    it('a COMPLETED settlement (reached via advance(), not getCurrentRun) keeps gold/gems and transfers items, reporting untransferred ones', async () => {
+        const droppedItem = {
+            itemId: 'drop-1',
+            templateId: 'salvaged_wrench',
+            type: ItemType.EQUIPMENT,
+            rarity: Rarity.N,
+            stats: {},
+            source: ItemSource.DROP,
+            characterId: 'char-1',
+            createdAt: Date.now(),
+        };
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.RESOLUTION,
+            currentNodeType: NodeType.BOSS,
+            runInventory: [droppedItem],
+            expEarned: 42,
+            goldEarned: 10,
+            gemsEarned: 1,
+        }));
+        createItemMock.mockResolvedValue(undefined);
+        addItemMock.mockRejectedValue(new BusinessLogicError('Inventory is full'));
+
+        const service = new AdventureRunService();
+        const result = await service.advance('account-1', 'char-1');
+
+        expect(result.settlement).toEqual(expect.objectContaining({
+            endReason: 'COMPLETED',
+            goldEarned: 10,
+            gemsEarned: 1,
+            items: [],
+            untransferredItemIds: ['drop-1'],
+            forfeitedGold: 0,
+            forfeitedGems: 0,
+            forfeitedItems: [],
         }));
     });
 });
@@ -358,30 +462,35 @@ describe('AdventureRunService.resolveCombat', () => {
         await expect(service.resolveCombat('account-1', 'char-1')).rejects.toThrow(BusinessLogicError);
     });
 
+    const firstWaveEnemies = [
+        {
+            archetypeIndex: 0, name: 'Test Enemy', description: 'flavor', level: 5, hp: 60,
+        },
+    ];
+
     it('on victory: applies rewards, moves to RESOLUTION, and caps runInventory at 50', async () => {
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
             state: AdventureStateType.COMBAT,
             currentNodeData: {
-                enemyLevel: 5, tier: NodeType.ELITE, 
+                enemyLevel: 5, tier: NodeType.ELITE, waveCount: 1, enemyCountPerWave: 1, firstWaveEnemies,
             },
-            score: 100,
+            expEarned: 100,
             goldEarned: 20,
             gemsEarned: 3,
             blessingPoints: 1,
         }));
-        rngNextMock.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
         combatResolveMock.mockResolvedValue({
             victory: true,
             roundCount: 3,
             playerHpRemaining: 80,
-            scoreGained: 50,
+            expGained: 50,
             goldDropped: 10,
             gemsDropped: 2,
             itemsDropped: [],
             blessingPointsGained: 2,
             enemies: [
                 {
-                    enemyId: 'e1', name: 'Test Enemy', level: 5, 
+                    enemyId: 'e1', name: 'Test Enemy', level: 5,
                 },
             ],
             combatLog: [
@@ -397,47 +506,84 @@ describe('AdventureRunService.resolveCombat', () => {
         expect(combatResolveMock).toHaveBeenCalledWith(
             expect.objectContaining({ runId: 'run-1' }),
             expect.objectContaining({
-                enemyLevel: 5, tier: NodeType.ELITE, 
+                enemyLevel: 5, tier: NodeType.ELITE, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
             }),
         );
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
             state: AdventureStateType.RESOLUTION,
             playerHp: 80,
-            score: 150,
+            expEarned: 150,
             goldEarned: 30,
             gemsEarned: 5,
             blessingPoints: 3,
         }));
         expect(result.summary.victory).toBe(true);
         expect(result.combatLog).toHaveLength(1);
+        expect(result.settlement).toBeUndefined();
     });
 
-    it('on defeat: settles the run with endReason=DEAD in a single checkpoint', async () => {
+    it('reads waveCount/enemyCountPerWave/firstWaveArchetypeIndices from the node data decided at generation time, without rolling', async () => {
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
             state: AdventureStateType.COMBAT,
             currentNodeData: {
-                enemyLevel: 5, tier: NodeType.COMBAT, 
+                enemyLevel: 8, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveEnemies,
             },
-            runInventory: [],
         }));
-        rngNextMock.mockResolvedValueOnce(0.9).mockResolvedValueOnce(0.9);
+        combatResolveMock.mockResolvedValue({
+            victory: true,
+            roundCount: 1,
+            playerHpRemaining: 90,
+            expGained: 80,
+            goldDropped: 16,
+            gemsDropped: 0,
+            itemsDropped: [],
+            blessingPointsGained: 5,
+            enemies: [{ enemyId: 'boss-1', name: 'Boss', level: 8 }],
+            combatLog: [],
+        });
+
+        const service = new AdventureRunService();
+        await service.resolveCombat('account-1', 'char-1');
+
+        expect(rngNextMock).not.toHaveBeenCalled();
+        expect(combatResolveMock).toHaveBeenCalledWith(
+            expect.objectContaining({ runId: 'run-1' }),
+            expect.objectContaining({
+                enemyLevel: 8, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+            }),
+        );
+    });
+
+    it('on defeat: settles the run with endReason=DEAD, forfeiting gold/gems/items but keeping EXP', async () => {
+        const droppedItem = {
+            itemId: 'drop-1', templateId: 'salvaged_wrench', type: ItemType.EQUIPMENT, rarity: Rarity.N, stats: {}, source: ItemSource.DROP, characterId: 'char-1', createdAt: Date.now(),
+        };
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.COMBAT,
+            currentNodeData: {
+                enemyLevel: 5, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveEnemies,
+            },
+            runInventory: [droppedItem],
+            expEarned: 30,
+            goldEarned: 15,
+            gemsEarned: 2,
+        }));
         combatResolveMock.mockResolvedValue({
             victory: false,
             roundCount: 2,
             playerHpRemaining: 0,
-            scoreGained: 0,
+            expGained: 0,
             goldDropped: 0,
             gemsDropped: 0,
             itemsDropped: [],
             blessingPointsGained: 0,
             enemies: [
                 {
-                    enemyId: 'e1', name: 'Test Enemy', level: 5, 
+                    enemyId: 'e1', name: 'Test Enemy', level: 5,
                 },
             ],
             combatLog: [],
         });
-        settleRunRewardsMock.mockResolvedValue({ leveledUp: false });
 
         const service = new AdventureRunService();
         const result = await service.resolveCombat('account-1', 'char-1');
@@ -448,7 +594,21 @@ describe('AdventureRunService.resolveCombat', () => {
             endReason: 'DEAD',
             playerHp: 0,
         }));
+        expect(createItemMock).not.toHaveBeenCalled();
+        expect(settleRunRewardsMock).toHaveBeenCalledWith('char-1', expect.objectContaining({
+            goldEarned: 0, gemsEarned: 0, expGained: 30, endReason: 'DEAD',
+        }));
         expect(result.summary.victory).toBe(false);
+        expect(result.settlement).toEqual(expect.objectContaining({
+            endReason: 'DEAD',
+            goldEarned: 0,
+            gemsEarned: 0,
+            items: [],
+            expGained: 30,
+            forfeitedGold: 15,
+            forfeitedGems: 2,
+            forfeitedItems: [droppedItem],
+        }));
     });
 });
 
@@ -546,6 +706,66 @@ describe('AdventureRunService.advanceFromResolution — BLESSING_SELECT candidat
             state: AdventureStateType.BLESSING_SELECT,
             currentNodeData: { candidates: expect.any(Array) },
         }));
+    });
+});
+
+describe('AdventureRunService — Stage completion settles the run (single-stage-run-settlement)', () => {
+    it('a non-Boss node only advances stageNodeIndex, leaving chapterIndex untouched', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.RESOLUTION,
+            currentNodeType: NodeType.COMBAT,
+            chapterIndex: 2, stageNodeIndex: 3, stageNodeCount: 15,
+        }));
+
+        const service = new AdventureRunService();
+        await service.advance('account-1', 'char-1');
+
+        expect(rngNextMock).not.toHaveBeenCalled();
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            state: AdventureStateType.EXPLORING,
+            stageNodeIndex: 4,
+        }));
+        const [, patch] = saveCheckpointMock.mock.calls[0] as [string, Record<string, unknown>];
+        expect(patch).not.toHaveProperty('chapterIndex');
+        expect(patch).not.toHaveProperty('endReason');
+    });
+
+    it('Boss victory settles the run as COMPLETED instead of advancing to a next stage', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.RESOLUTION,
+            currentNodeType: NodeType.BOSS,
+            chapterIndex: 2, stageNodeIndex: 14, stageNodeCount: 15,
+            expEarned: 500, goldEarned: 20, gemsEarned: 3,
+        }));
+
+        const service = new AdventureRunService();
+        const result = await service.advance('account-1', 'char-1');
+
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            state: AdventureStateType.ENDED,
+            endReason: 'COMPLETED',
+        }));
+        expect(settleRunRewardsMock).toHaveBeenCalledWith('char-1', expect.objectContaining({
+            goldEarned: 20, gemsEarned: 3, expGained: 500, endReason: 'COMPLETED',
+        }));
+        expect(result.settlement?.endReason).toBe('COMPLETED');
+        expect(result.settlement?.goldEarned).toBe(20);
+    });
+
+    it('Boss victory settles immediately even when blessingPoints has reached the threshold (skips BLESSING_SELECT)', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.RESOLUTION,
+            currentNodeType: NodeType.BOSS,
+            stageNodeIndex: 14, stageNodeCount: 15,
+            blessingPoints: 99,
+        }));
+
+        const service = new AdventureRunService();
+        const result = await service.advance('account-1', 'char-1');
+
+        expect(generateCandidatesMock).not.toHaveBeenCalled();
+        expect(result.run.state).toBe(AdventureStateType.ENDED);
+        expect(result.settlement).toBeDefined();
     });
 });
 

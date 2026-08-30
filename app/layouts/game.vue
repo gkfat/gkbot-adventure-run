@@ -18,7 +18,7 @@
                 <slot />
             </main>
 
-            <GameBottomNav v-if="selectedCharacterId" />
+            <GameBottomNav v-if="selectedCharacterId && !isAdventurePage" />
         </div>
 
         <GameAccountDrawer v-model="drawerOpen" />
@@ -39,6 +39,10 @@ const drawerOpen = ref(false);
 
 // 選角/建立角色畫面（尚未選定角色）不顯示底部導覽列
 const { selectedCharacterId } = useCharacter();
+
+// 冒險進行中畫面版面吃緊，隱藏底部導覽列
+const route = useRoute();
+const isAdventurePage = computed(() => route.path === '/adventure');
 </script>
 
 <style scoped lang="scss">

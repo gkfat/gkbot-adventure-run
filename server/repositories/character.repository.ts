@@ -11,6 +11,7 @@
 import { BaseRepository } from './base.repository';
 import type { Character } from '../../shared/types/character';
 import { EXP_TABLE } from '../../shared/types/character';
+import { AdventureEndReason } from '../../shared/types/adventure';
 import { characterSchema } from '../../shared/schemas/firestore/character.schema';
 import {
     DatabaseError, NotFoundError,
@@ -24,8 +25,24 @@ import {
 
 export const CHARACTER_ROSTER_MAX = 3;
 
+/**
+ * Backfill `nextChapterIndex` for character documents written before
+ * `single-stage-run-settlement` shipped (same "不做資料回填" tolerance
+ * pattern as AdventureRunRepository.withStageDefaults).
+ */
+function withNextChapterDefault(character: Character): Character {
+    return {
+        ...character, nextChapterIndex: character.nextChapterIndex ?? 0,
+    };
+}
+
 export class CharacterRepository extends BaseRepository<Character> {
     protected collectionName = 'characters';
+
+    override async getById(id: string): Promise<Character | null> {
+        const character = await super.getById(id);
+        return character ? withNextChapterDefault(character) : null;
+    }
 
     /**
      * Default display name for a newly created character, derived from its class
@@ -76,6 +93,8 @@ export class CharacterRepository extends BaseRepository<Character> {
             unspentAttributePoints: 0,
 
             equipment: {},
+
+            nextChapterIndex: 0,
 
             nickname: this.generateArchetypeNickname(archetype.className, characterId),
 
@@ -185,15 +204,20 @@ export class CharacterRepository extends BaseRepository<Character> {
      * Apply an adventure run's settlement rewards: clamp gold/gems into the
      * character's totals, grant EXP, and roll any level-ups (ASSUMPTION,
      * undocumented elsewhere: +1 unspentAttributePoint per level — see
-     * adventure-run-core/design.md). Runs inside a transaction since it's a
-     * read-modify-write on the same document a concurrent equip/attribute
-     * allocation could also be touching.
+     * adventure-run-core/design.md). `goldEarned`/`gemsEarned` are 0 when the
+     * caller already decided the run failed (single-stage-run-settlement:
+     * only a `COMPLETED` run keeps gold/gems — that decision is made by the
+     * caller, not here). `nextChapterIndex` (which facility theme the
+     * character's next run starts at) only advances on `COMPLETED`. Runs
+     * inside a transaction since it's a read-modify-write on the same
+     * document a concurrent equip/attribute allocation could also be touching.
      */
     async settleRunRewards(characterId: string, rewards: {
         goldEarned: number;
         gemsEarned: number;
         expGained: number;
-    }): Promise<{ character: Character; leveledUp: boolean }> {
+        endReason: AdventureEndReason;
+    }): Promise<{ character: Character; leveledUp: boolean; unspentAttributePointsGained: number }> {
         const docRef = this.getDocumentRef(characterId);
 
         try {
@@ -202,7 +226,7 @@ export class CharacterRepository extends BaseRepository<Character> {
                 if (!doc.exists) {
                     throw new NotFoundError('character');
                 }
-                const character = doc.data() as Character;
+                const character = withNextChapterDefault(doc.data() as Character);
 
                 const gold = clamp(character.gold + rewards.goldEarned, 0, RESOURCE_LIMITS.GOLD_MAX - 1);
                 const gems = clamp(character.gems + rewards.gemsEarned, 0, RESOURCE_LIMITS.GEMS_MAX - 1);
@@ -220,15 +244,21 @@ export class CharacterRepository extends BaseRepository<Character> {
                     exp = 0;
                 }
 
+                const nextChapterIndex = rewards.endReason === AdventureEndReason.COMPLETED
+                    ? character.nextChapterIndex + 1
+                    : character.nextChapterIndex;
+
                 const updated: Character = {
-                    ...character, gold, gems, level, exp, unspentAttributePoints,
+                    ...character, gold, gems, level, exp, unspentAttributePoints, nextChapterIndex,
                 };
                 tx.update(docRef, {
-                    gold, gems, level, exp, unspentAttributePoints, updatedAt: Date.now(),
+                    gold, gems, level, exp, unspentAttributePoints, nextChapterIndex, updatedAt: Date.now(),
                 });
 
                 return {
-                    character: updated, leveledUp: level > character.level,
+                    character: updated,
+                    leveledUp: level > character.level,
+                    unspentAttributePointsGained: level - character.level,
                 };
             });
         } catch (error: unknown) {

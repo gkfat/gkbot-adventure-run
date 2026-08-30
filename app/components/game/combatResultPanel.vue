@@ -2,7 +2,7 @@
     <div class="combat-result-panel">
         <div class="d-flex ga-4 text-caption text-medium-emphasis mb-2">
             <span>回合 {{ result.summary.roundCount }}</span>
-            <span v-if="result.summary.scoreGained">分數 +{{ result.summary.scoreGained }}</span>
+            <span v-if="result.summary.expGained">EXP +{{ result.summary.expGained }}</span>
             <span v-if="result.summary.goldDropped">金幣 +{{ result.summary.goldDropped }}</span>
             <span v-if="result.summary.gemsDropped">寶石 +{{ result.summary.gemsDropped }}</span>
         </div>

@@ -17,21 +17,140 @@
             </div>
         </div>
 
+        <!-- 結算頁：run 已結束（COMPLETED/DEAD/DISCONNECT），顯示這次遠征的結算摘要 -->
+        <div
+            v-else-if="lastSettlement"
+            class="d-flex flex-column align-center fill-height px-4 py-6 adventure-page__settlement"
+        >
+            <div
+                class="font-pixel text-subtitle-1 mb-4"
+                :style="{ color: settlementIsSuccess ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-warning))' }"
+            >
+                {{ settlementIsSuccess ? '遠征成功' : '冒險失敗' }}
+            </div>
+
+            <div
+                v-if="lastSettlement.leveledUp"
+                class="adventure-page__levelup mb-4 text-center"
+            >
+                <div class="font-pixel text-h6" style="color: rgb(var(--v-theme-warning));">
+                    LEVEL UP!
+                </div>
+                <div class="text-body-2 text-medium-emphasis">
+                    LV {{ lastSettlement.newLevel }}
+                </div>
+            </div>
+
+            <div class="adventure-page__box mb-3" style="width: 100%;">
+                <div class="d-flex align-center justify-space-between mb-1">
+                    <span class="text-caption text-medium-emphasis">EXP</span>
+                    <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
+                        +{{ lastSettlement.expGained }}
+                    </span>
+                </div>
+                <v-progress-linear
+                    :model-value="expDisplayPercent"
+                    color="primary"
+                    bg-color="dark"
+                    height="8"
+                    rounded
+                />
+            </div>
+
+            <div class="adventure-page__box mb-3" style="width: 100%;">
+                <div class="d-flex ga-4 text-caption text-medium-emphasis mb-2">
+                    <span>金幣 +{{ lastSettlement.goldEarned }}</span>
+                    <span>寶石 +{{ lastSettlement.gemsEarned }}</span>
+                </div>
+                <div
+                    v-if="lastSettlement.items.length"
+                    class="d-flex flex-wrap ga-2"
+                >
+                    <div
+                        v-for="item in lastSettlement.items"
+                        :key="item.itemId"
+                        class="adventure-page__item-chip"
+                        :style="{ borderColor: RARITY_COLOR[item.rarity] }"
+                    >
+                        <span
+                            class="adventure-page__item-chip-rarity font-pixel"
+                            :style="{ background: RARITY_COLOR[item.rarity] }"
+                        >
+                            {{ item.rarity }}
+                        </span>
+                        <GamePixelIcon
+                            :name="resolvePixelIcon(item)"
+                            :size="20"
+                        />
+                        {{ describeItem(item).name }}
+                    </div>
+                </div>
+                <div
+                    v-else
+                    class="text-caption text-medium-emphasis"
+                >
+                    沒有取得物品
+                </div>
+            </div>
+
+            <div
+                v-if="!settlementIsSuccess"
+                class="adventure-page__box adventure-page__box--forfeited mb-3"
+                style="width: 100%;"
+            >
+                <div class="text-caption mb-2" style="color: rgb(var(--v-theme-warning));">
+                    因戰敗作廢
+                </div>
+                <div class="d-flex ga-4 text-caption text-medium-emphasis mb-2">
+                    <span>金幣 {{ lastSettlement.forfeitedGold }}</span>
+                    <span>寶石 {{ lastSettlement.forfeitedGems }}</span>
+                </div>
+                <div
+                    v-if="lastSettlement.forfeitedItems.length"
+                    class="d-flex flex-wrap ga-2"
+                >
+                    <div
+                        v-for="item in lastSettlement.forfeitedItems"
+                        :key="item.itemId"
+                        class="adventure-page__item-chip adventure-page__item-chip--forfeited"
+                    >
+                        <span
+                            class="adventure-page__item-chip-rarity font-pixel"
+                            :style="{ background: RARITY_COLOR[item.rarity] }"
+                        >
+                            {{ item.rarity }}
+                        </span>
+                        <GamePixelIcon
+                            :name="resolvePixelIcon(item)"
+                            :size="20"
+                        />
+                        {{ describeItem(item).name }}
+                    </div>
+                </div>
+            </div>
+
+            <div
+                v-if="lastSettlement.unspentAttributePointsGained > 0"
+                class="text-caption text-medium-emphasis mb-4 text-center"
+            >
+                獲得 {{ lastSettlement.unspentAttributePointsGained }} 點可分配屬性點，回到角色畫面分配吧
+            </div>
+
+            <SystemBtn
+                variant="flat"
+                color="primary"
+                class="text-none"
+                @click="handleReturnHome"
+            >
+                返回首頁
+            </SystemBtn>
+        </div>
+
         <!-- 沒有進行中的冒險 -->
         <div
             v-else-if="!currentRun"
             class="d-flex flex-column align-center justify-center fill-height px-6 text-center"
         >
-            <div
-                v-if="lastCombatResult && !lastCombatResult.summary.victory"
-                class="adventure-page__box mb-4"
-                style="width: 100%;"
-            >
-                <div class="font-pixel text-subtitle-2 mb-2" style="color: rgb(var(--v-theme-warning));">
-                    戰鬥失敗
-                </div>
-                <GameCombatResultPanel :result="lastCombatResult" />
-            </div>
             <div class="text-body-2 text-medium-emphasis mb-4">
                 目前沒有進行中的冒險
             </div>
@@ -50,9 +169,13 @@
             <div class="adventure-page__box mb-3">
                 <div class="d-flex align-center justify-space-between mb-2">
                     <span class="font-pixel text-subtitle-1" style="color: rgb(var(--v-theme-green));">
-                        第 {{ currentRun.step + 1 }} 關
+                        {{ stageDisplayName }}
                     </span>
                     <span class="text-caption text-medium-emphasis">{{ stateLabel }}</span>
+                </div>
+
+                <div class="text-caption text-medium-emphasis mb-2">
+                    {{ currentRun.stageNodeIndex + 1 }} / {{ currentRun.stageNodeCount }}
                 </div>
 
                 <div class="adventure-page__bar mb-2">
@@ -72,7 +195,7 @@
                 </div>
 
                 <div class="d-flex ga-4 text-caption text-medium-emphasis">
-                    <span>分數 {{ currentRun.score }}</span>
+                    <span>EXP {{ currentRun.expEarned }}</span>
                     <span>金幣 +{{ currentRun.goldEarned }}</span>
                     <span>寶石 +{{ currentRun.gemsEarned }}</span>
                 </div>
@@ -92,12 +215,42 @@
                     </div>
                     <GameCombatResultPanel :result="lastCombatResult" />
                 </template>
-                <div
-                    v-else
-                    class="text-body-2 text-medium-emphasis text-center py-2"
-                >
-                    遭遇敵人，準備戰鬥
-                </div>
+                <template v-else>
+                    <div
+                        v-if="currentRun.currentNodeType === NodeType.BOSS"
+                        class="font-pixel text-subtitle-2 mb-2"
+                        style="color: rgb(var(--v-theme-warning));"
+                    >
+                        ⚠ BOSS 戰
+                    </div>
+                    <div class="text-body-2 text-medium-emphasis text-center mb-2">
+                        {{ currentRun.currentNodeType === NodeType.BOSS ? '關卡頭目現身，準備迎戰' : '遭遇敵人，準備戰鬥' }}
+                    </div>
+                    <div
+                        v-if="combatNodeData"
+                        class="d-flex flex-column ga-2"
+                    >
+                        <div
+                            v-for="(enemy, index) in combatNodeData.firstWaveEnemies"
+                            :key="index"
+                            class="adventure-page__enemy-row"
+                        >
+                            <div class="d-flex align-center justify-space-between">
+                                <span class="text-body-2">{{ enemy.name }}</span>
+                                <span class="text-caption text-medium-emphasis">HP {{ enemy.hp }}</span>
+                            </div>
+                            <div class="text-caption text-medium-emphasis">
+                                {{ enemy.description }}
+                            </div>
+                        </div>
+                        <div
+                            v-if="combatNodeData.waveCount > 1"
+                            class="text-caption text-medium-emphasis text-center mt-1"
+                        >
+                            偵測到後續增援，數量不明
+                        </div>
+                    </div>
+                </template>
             </div>
 
             <!-- EVENT：顯示事件描述；有 choices 顯示選項，沒有則直接可繼續。結果在 EVENT/RESOLUTION 都顯示，直到玩家繼續前進 -->
@@ -250,9 +403,10 @@
 </template>
 
 <script setup lang="ts">
-import { AdventureStateType } from '../../shared/types/adventure';
-import { describeItem, type ItemLike } from '../utils/equipmentDisplay';
-import type { EventNodeData, BlessingNodeData } from '../composables/useAdventureRun';
+import { AdventureStateType, NodeType, getStageDisplayName } from '../../shared/types/adventure';
+import { EXP_TABLE } from '../../shared/types/character';
+import { describeItem, resolvePixelIcon, RARITY_COLOR, type ItemLike } from '../utils/equipmentDisplay';
+import type { EventNodeData, BlessingNodeData, CombatNodeData } from '../composables/useAdventureRun';
 
 definePageMeta({
     middleware: ['auth'],
@@ -270,10 +424,45 @@ const {
 const {
     currentRun, loading: runLoading, error: runError, checked, fetchCurrent, advance, useHealingItem,
     startCombat, lastCombatResult, resolveEvent, selectBlessing, lastEventResult,
+    lastSettlement, clearSettlement,
 } = useAdventureRun();
 const {
     items: permanentItems, fetchInventory, loaded: inventoryLoaded,
 } = useInventory();
+
+const stageDisplayName = computed(() => {
+    if (!currentRun.value) return '';
+    return getStageDisplayName(currentRun.value.chapterIndex);
+});
+
+const combatNodeData = computed(() => (
+    currentRun.value?.state === AdventureStateType.COMBAT
+        ? currentRun.value.currentNodeData as CombatNodeData
+        : null
+));
+
+const settlementIsSuccess = computed(() => lastSettlement.value?.endReason === 'COMPLETED');
+
+// 結算頁的 EXP 進度條動畫：掛載後才把目標值設進去，讓 v-progress-linear 內建的
+// model-value 變化動畫播放一次「從 0 長到目前進度」的效果。
+const expDisplayPercent = ref(0);
+
+const settlementExpTargetPercent = computed(() => {
+    if (!character.value) return 0;
+    const threshold = EXP_TABLE[character.value.level];
+    if (!threshold) return 100; // 已滿等
+    return Math.min(100, (character.value.exp / threshold) * 100);
+});
+
+watch(lastSettlement, async (settlement) => {
+    if (!settlement) return;
+    expDisplayPercent.value = 0;
+    await fetchCharacter();
+    await nextTick();
+    setTimeout(() => {
+        expDisplayPercent.value = settlementExpTargetPercent.value;
+    }, 100);
+});
 
 const hpPercent = computed(() => {
     if (!currentRun.value || currentRun.value.playerHpMax <= 0) return 0;
@@ -357,6 +546,11 @@ const handleSelectBlessing = async (blessingId: string) => {
     await selectBlessing(character.value.characterId, blessingId);
 };
 
+const handleReturnHome = () => {
+    clearSettlement();
+    navigateTo('/main');
+};
+
 watch(character, (value) => {
     if (value) fetchCurrent(value.characterId);
 }, { immediate: true });
@@ -384,6 +578,10 @@ onMounted(() => {
             justify-content: center;
             min-height: 80px;
         }
+
+        &--forfeited {
+            border-color: rgba(255, 82, 82, 0.4);
+        }
     }
 
     &__bar {
@@ -400,6 +598,68 @@ onMounted(() => {
         &:not(:last-child) {
             border-bottom: 1px solid rgba(196, 203, 219, 0.1);
         }
+    }
+
+    &__enemy-row {
+        padding: 6px 0;
+
+        &:not(:last-child) {
+            border-bottom: 1px solid rgba(196, 203, 219, 0.1);
+        }
+    }
+
+    &__settlement {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    &__levelup {
+        animation: settlement-levelup-pop 0.4s ease-out;
+    }
+
+    &__item-chip {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        font-size: 11px;
+        border: 1px solid rgba(196, 203, 219, 0.25);
+        border-radius: 3px;
+        background: rgba(196, 203, 219, 0.04);
+
+        &--forfeited {
+            opacity: 0.5;
+            text-decoration: line-through;
+            border-color: rgba(255, 82, 82, 0.4);
+        }
+    }
+
+    &__item-chip-rarity {
+        position: absolute;
+        top: -6px;
+        left: -6px;
+        padding: 0 2px;
+        font-size: 7px;
+        line-height: 1.4;
+        color: #14171c;
+        border-radius: 2px;
+        white-space: nowrap;
+    }
+}
+
+@keyframes settlement-levelup-pop {
+    0% {
+        transform: scale(0.6);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
     }
 }
 </style>

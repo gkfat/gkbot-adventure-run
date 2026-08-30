@@ -21,20 +21,23 @@ import { CharacterService } from './character.service';
 import { ItemRepository } from '../repositories/item.repository';
 import { InventoryRepository } from '../repositories/inventory.repository';
 import { RngService } from './rng.service';
-import { CombatService } from './combat.service';
+import {
+    CombatService, NODE_TYPE_TO_ENEMY_TIER,
+} from './combat.service';
 import { EventService } from './event.service';
 import { BlessingService } from './blessing.service';
 import {
     NoopLeaderboardUpdater, NoopProgressTracker,
 } from './adventure-run-stubs';
 import {
-    getEnemyLevel, rollWaveCount, rollEnemyCount,
+    getEnemyLevel, getStatMultipliers, rollWaveCount, rollEnemyCount,
 } from '../constants/difficulty';
+import { ENEMY_ARCHETYPES } from '../constants/combat';
 import {
-    AdventureStateType, AdventureEndReason, NodeType, NODE_CONFIG,
+    AdventureStateType, AdventureEndReason, NodeType, NODE_CONFIG, STAGE_CONFIG,
     type AdventureRun, type LeaderboardUpdater, type ProgressTracker,
     type CombatResolver, type CombatContext, type CombatResolution, type CombatSummary, type CombatLogEntry,
-    type EventResult, type RunModifier,
+    type EventResult, type RunModifier, type SettleSummary, type EnemyPreview,
 } from '../../shared/types/adventure';
 import type { Character } from '../../shared/types/character';
 import type { ItemInstance } from '../../shared/types/item';
@@ -58,16 +61,6 @@ export function stripSeed(run: AdventureRun): Omit<AdventureRun, 'seed'> {
     return publicRun as Omit<AdventureRun, 'seed'>;
 }
 
-export type SettleResult = {
-    finalScore: number;
-    goldEarned: number;
-    gemsEarned: number;
-    itemsEarned: number;
-    expGained: number;
-    leveledUp: boolean;
-    untransferredItemIds: string[];
-};
-
 // Weighted-random node type picked when neither the rest guarantee nor the
 // elite cadence triggers (see NODE_CONFIG.WEIGHTED_NODE_WEIGHTS).
 const WEIGHTED_NODE_TYPES: { type: NodeType; weight: number }[] = [
@@ -85,6 +78,23 @@ const WEIGHTED_NODE_TYPES: { type: NodeType; weight: number }[] = [
     },
 ];
 const WEIGHTED_NODE_TOTAL = WEIGHTED_NODE_TYPES.reduce((sum, entry) => sum + entry.weight, 0);
+
+// Stage fields are optional on old (pre-migration) run documents — see
+// design.md Migration Plan: tolerate `undefined` as "stage 1, node 0" rather
+// than backfilling data.
+type StageFields = {
+    chapterIndex: number;
+    stageNodeIndex: number;
+    stageNodeCount: number;
+};
+
+function resolveStageFields(run: AdventureRun): StageFields {
+    return {
+        chapterIndex: run.chapterIndex ?? 0,
+        stageNodeIndex: run.stageNodeIndex ?? 0,
+        stageNodeCount: run.stageNodeCount ?? STAGE_CONFIG.NODE_COUNT_MIN,
+    };
+}
 
 export class AdventureRunService extends BaseService {
     protected serviceName = 'adventure-run';
@@ -136,54 +146,62 @@ export class AdventureRunService extends BaseService {
             characterId,
             accountId,
             playerHpMax: characterWithStats.stats.HP_MAX,
+            chapterIndex: characterWithStats.nextChapterIndex,
         });
     }
 
     /**
      * Resume the character's active run, if any. Detects an expired
      * reconnect window (NODE_CONFIG.RECONNECT_WINDOW_MS) and auto-settles
-     * with endReason=DISCONNECT before returning null.
+     * with endReason=DISCONNECT before returning null — the settlement
+     * summary is still returned once so the caller can render it.
      */
-    async getCurrentRun(accountId: string, characterId: string): Promise<AdventureRun | null> {
+    async getCurrentRun(accountId: string, characterId: string): Promise<{ run: AdventureRun | null; settlement?: SettleSummary }> {
         await this.requireOwnedCharacter(accountId, characterId);
 
         const run = await this.runRepo.getActiveByCharacterId(characterId);
         if (!run) {
-            return null;
+            return { run: null };
         }
 
         if (Date.now() - run.lastActivityAt > NODE_CONFIG.RECONNECT_WINDOW_MS) {
-            await this.settleRun(run, AdventureEndReason.DISCONNECT);
-            return null;
+            const { settlement } = await this.settleRun(run, AdventureEndReason.DISCONNECT);
+            return { run: null, settlement };
         }
 
-        return run;
+        return { run };
     }
 
     /**
      * Advance the run's state machine by one checkpoint. See the module
      * doc comment for why COMBAT/EVENT nodes throw instead of resolving.
+     * Returns a `settlement` alongside the run only when this call happened
+     * to end it (Boss victory — see `advanceFromResolution`).
      */
-    async advance(accountId: string, characterId: string): Promise<AdventureRun> {
+    async advance(accountId: string, characterId: string): Promise<{ run: AdventureRun; settlement?: SettleSummary }> {
         await this.requireOwnedCharacter(accountId, characterId);
         const run = await this.requireActiveRun(characterId);
 
         switch (run.state) {
         case AdventureStateType.INIT:
-            return this.runRepo.saveCheckpoint(run.runId, {
-                state: AdventureStateType.EXPLORING,
-                lastActivityAt: Date.now(),
-            });
+            return {
+                run: await this.runRepo.saveCheckpoint(run.runId, {
+                    state: AdventureStateType.EXPLORING,
+                    lastActivityAt: Date.now(),
+                }),
+            };
 
         case AdventureStateType.EXPLORING:
-            return this.advanceFromExploring(run);
+            return { run: await this.advanceFromExploring(run) };
 
         case AdventureStateType.REST:
-            return this.runRepo.saveCheckpoint(run.runId, {
-                state: AdventureStateType.RESOLUTION,
-                lastRestStep: run.step,
-                lastActivityAt: Date.now(),
-            });
+            return {
+                run: await this.runRepo.saveCheckpoint(run.runId, {
+                    state: AdventureStateType.RESOLUTION,
+                    lastRestStep: run.step,
+                    lastActivityAt: Date.now(),
+                }),
+            };
 
         case AdventureStateType.COMBAT:
             throw new BusinessLogicError('Use POST /api/adventure/combat/start to resolve a COMBAT node, not advance()');
@@ -252,19 +270,26 @@ export class AdventureRunService extends BaseService {
 
     /**
      * Resolve the run's current COMBAT node via `CombatResolver` (combat-engine).
-     * Rolls waveCount/enemyCountPerWave here (not in `advanceFromExploring`,
-     * which only decides enemyLevel/tier — see its comment) since they're
-     * only needed once combat is actually resolved. On victory, applies
-     * rewards and moves to RESOLUTION; on defeat, settles with `endReason=DEAD`.
+     * `waveCount`/`enemyCountPerWave`/the first wave's enemy roster were all
+     * already decided in `advanceFromExploring` (so the pre-fight screen can
+     * preview them) — this just reads them back out of `currentNodeData`.
+     * On victory, applies rewards and moves to RESOLUTION; on defeat, settles
+     * with `endReason=DEAD` (only EXP is kept — see `settleRun`).
      */
-    async resolveCombat(accountId: string, characterId: string): Promise<{ combatLog: CombatLogEntry[]; summary: CombatSummary }> {
+    async resolveCombat(accountId: string, characterId: string): Promise<{ combatLog: CombatLogEntry[]; summary: CombatSummary; settlement?: SettleSummary }> {
         await this.requireOwnedCharacter(accountId, characterId);
         const run = await this.requireActiveRun(characterId);
 
         if (run.state !== AdventureStateType.COMBAT) {
             throw new BusinessLogicError('Can only resolve combat at a COMBAT node');
         }
-        const nodeData = run.currentNodeData as { enemyLevel: number; tier: CombatContext['tier'] } | undefined;
+        const nodeData = run.currentNodeData as {
+            enemyLevel: number;
+            tier: CombatContext['tier'];
+            waveCount: number;
+            enemyCountPerWave: number;
+            firstWaveEnemies: EnemyPreview[];
+        } | undefined;
         if (!nodeData || typeof nodeData.enemyLevel !== 'number') {
             throw new BusinessLogicError('Run has no combat node context to resolve');
         }
@@ -272,8 +297,9 @@ export class AdventureRunService extends BaseService {
         const context: CombatContext = {
             enemyLevel: nodeData.enemyLevel,
             tier: nodeData.tier,
-            waveCount: rollWaveCount(run.step, await this.rngService.next(run.runId)),
-            enemyCountPerWave: rollEnemyCount(run.step, await this.rngService.next(run.runId)),
+            waveCount: nodeData.waveCount,
+            enemyCountPerWave: nodeData.enemyCountPerWave,
+            firstWaveArchetypeIndices: nodeData.firstWaveEnemies.map(enemy => enemy.archetypeIndex),
         };
 
         const resolution = await this.combatResolver.resolve(run, context);
@@ -290,7 +316,7 @@ export class AdventureRunService extends BaseService {
             await this.runRepo.saveCheckpoint(run.runId, {
                 state: AdventureStateType.RESOLUTION,
                 playerHp: resolution.playerHpRemaining,
-                score: run.score + resolution.scoreGained,
+                expEarned: run.expEarned + resolution.expGained,
                 goldEarned: run.goldEarned + resolution.goldDropped,
                 gemsEarned: run.gemsEarned + resolution.gemsDropped,
                 blessingPoints: run.blessingPoints + resolution.blessingPointsGained,
@@ -302,17 +328,20 @@ export class AdventureRunService extends BaseService {
             await this.progressTracker.incrementProgress({
                 accountId: run.accountId, characterId: run.characterId, type: 'ENEMY_KILLED', amount: resolution.enemies.length,
             });
-        } else {
-            await this.settleRun({
-                ...run, playerHp: 0,
-            }, AdventureEndReason.DEAD, {
-                playerHp: 0,
-                lastCombatSummary: summary,
-            });
+            return {
+                combatLog: resolution.combatLog, summary,
+            };
         }
 
+        const { settlement } = await this.settleRun({
+            ...run, playerHp: 0,
+        }, AdventureEndReason.DEAD, {
+            playerHp: 0,
+            lastCombatSummary: summary,
+        });
+
         return {
-            combatLog: resolution.combatLog, summary,
+            combatLog: resolution.combatLog, summary, settlement,
         };
     }
 
@@ -381,9 +410,14 @@ export class AdventureRunService extends BaseService {
             throw new ValidationError('blessingId is not among the current candidates');
         }
 
+        // Boss nodes always settle immediately in advanceFromResolution and
+        // never reach BLESSING_SELECT (see design.md), so this is always a
+        // non-Boss node — plain stageNodeIndex advance.
+        const { stageNodeIndex } = resolveStageFields(run);
         await this.runRepo.saveCheckpoint(run.runId, {
             state: AdventureStateType.EXPLORING,
             step: run.step + 1,
+            stageNodeIndex: stageNodeIndex + 1,
             blessings: [...run.blessings, chosen.modifierId],
             blessingPoints: 0,
             currentNodeType: FieldValue.delete(),
@@ -418,10 +452,14 @@ export class AdventureRunService extends BaseService {
     }
 
     /**
-     * Node generation priority: guaranteed Rest > fixed elite cadence >
-     * weighted random (see spec.md "節點生成優先序").
+     * Node generation priority: Stage boundary (Boss) > guaranteed Rest >
+     * fixed elite cadence > weighted random (see spec.md "節點生成優先序").
      */
     private async decideNextNode(run: AdventureRun): Promise<NodeType> {
+        const { stageNodeIndex, stageNodeCount } = resolveStageFields(run);
+        if (stageNodeIndex === stageNodeCount - 1) {
+            return NodeType.BOSS;
+        }
         if (run.step - run.lastRestStep >= NODE_CONFIG.REST_GUARANTEED_INTERVAL) {
             return NodeType.REST;
         }
@@ -463,96 +501,166 @@ export class AdventureRunService extends BaseService {
                 ...(template.choices ? { choices: template.choices.map(choice => ({ label: choice.label })) } : {}),
             };
         } else {
-            // COMBAT / ELITE / STRONG_ELITE
+            // COMBAT / ELITE / STRONG_ELITE / BOSS
             patch.state = AdventureStateType.COMBAT;
-            patch.currentNodeData = {
-                pending: true,
-                enemyLevel: getEnemyLevel(run.step),
-                tier: nodeType,
-            };
+            patch.currentNodeData = await this.buildCombatNodeData(run, nodeType);
         }
 
         return this.runRepo.saveCheckpoint(run.runId, patch);
     }
 
-    private async advanceFromResolution(run: AdventureRun): Promise<AdventureRun> {
+    /**
+     * Decide everything a COMBAT/ELITE/STRONG_ELITE/BOSS node needs up
+     * front — enemyLevel, waveCount/enemyCountPerWave, and the first wave's
+     * enemy roster (archetype/name/description/hp) — so the pre-fight
+     * "遭遇敵人" screen can preview it before `resolveCombat` runs. Later
+     * waves (if any) are still rolled inside combat.service at resolve time
+     * (see single-stage-run-settlement/design.md — "後續波次保持神秘").
+     */
+    private async buildCombatNodeData(run: AdventureRun, tier: CombatContext['tier']) {
+        const enemyLevel = getEnemyLevel(run.step);
+        const isBoss = tier === NodeType.BOSS;
+        const waveCount = isBoss ? 1 : rollWaveCount(run.step, await this.rngService.next(run.runId));
+        const enemyCountPerWave = isBoss ? 1 : rollEnemyCount(run.step, await this.rngService.next(run.runId));
+
+        const multipliers = getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[tier]);
+        const firstWaveEnemies: EnemyPreview[] = [];
+        for (let i = 0; i < enemyCountPerWave; i++) {
+            const roll = await this.rngService.next(run.runId);
+            const archetypeIndex = Math.floor(roll * ENEMY_ARCHETYPES.length);
+            const archetype = ENEMY_ARCHETYPES[archetypeIndex] as typeof ENEMY_ARCHETYPES[number];
+            firstWaveEnemies.push({
+                archetypeIndex,
+                name: archetype.name,
+                description: archetype.description,
+                level: enemyLevel,
+                hp: Math.round(archetype.baseHp * multipliers.hp),
+            });
+        }
+
+        return {
+            pending: true,
+            enemyLevel,
+            tier,
+            waveCount,
+            enemyCountPerWave,
+            firstWaveEnemies,
+        };
+    }
+
+    /**
+     * Leaving RESOLUTION: a Boss victory always ends the run right here
+     * (single-stage-run-settlement — one Stage = one run), skipping
+     * BLESSING_SELECT entirely even if blessingPoints has reached the
+     * threshold (picking a Blessing the run won't live to use is pointless).
+     * Any other node just advances stageNodeIndex, or routes into
+     * BLESSING_SELECT once enough blessingPoints have accumulated.
+     */
+    private async advanceFromResolution(run: AdventureRun): Promise<{ run: AdventureRun; settlement?: SettleSummary }> {
+        if (run.currentNodeType === NodeType.BOSS) {
+            return this.settleRun(run, AdventureEndReason.COMPLETED);
+        }
+
         if (run.blessingPoints >= NODE_CONFIG.BLESSING_POINTS_THRESHOLD) {
             const character = await this.characterRepo.getByIdOrThrow(run.characterId, 'character');
             const candidates = await this.blessingService.generateCandidates(run.runId, character.attributes.LUCK);
 
-            return this.runRepo.saveCheckpoint(run.runId, {
+            const updated = await this.runRepo.saveCheckpoint(run.runId, {
                 state: AdventureStateType.BLESSING_SELECT,
                 currentNodeData: { candidates },
                 lastActivityAt: Date.now(),
             });
+            return { run: updated };
         }
 
-        return this.runRepo.saveCheckpoint(run.runId, {
+        const { stageNodeIndex } = resolveStageFields(run);
+        const updated = await this.runRepo.saveCheckpoint(run.runId, {
             state: AdventureStateType.EXPLORING,
             step: run.step + 1,
+            stageNodeIndex: stageNodeIndex + 1,
             currentNodeType: FieldValue.delete(),
             currentNodeData: FieldValue.delete(),
             lastActivityAt: Date.now(),
         });
+        return { run: updated };
     }
 
     /**
-     * Settle a run: transfer its run-inventory items into the permanent
-     * inventory (500-cap aware — items that don't fit are reported, not
-     * dropped), grant gold/gems/EXP (clamped, level-ups included), notify
-     * the leaderboard/quest stubs, and mark the run ENDED.
+     * Settle a run: EXP is always granted regardless of `endReason`, but
+     * gold/gems/run-inventory items only survive when `endReason = COMPLETED`
+     * — a failed run (DEAD/DISCONNECT) forfeits everything else (see
+     * single-stage-run-settlement/design.md — "冒險失敗時只會取得 exp").
+     * Transfers surviving items into the permanent inventory (500-cap aware
+     * — items that don't fit are reported, not dropped), grants EXP/gold/gems
+     * (clamped, level-ups included), notifies the leaderboard/quest stubs,
+     * and marks the run ENDED with a persisted, once-returned settlement summary.
      */
     private async settleRun(
         run: AdventureRun, endReason: AdventureEndReason, extraPatch: Record<string, unknown> = {},
-    ): Promise<SettleResult> {
-        const untransferred: ItemInstance[] = [];
-        let transferredCount = 0;
+    ): Promise<{ run: AdventureRun; settlement: SettleSummary }> {
+        const isSuccess = endReason === AdventureEndReason.COMPLETED;
 
-        for (const item of run.runInventory) {
-            try {
-                await this.itemRepo.createItem(item);
-                await this.inventoryRepo.addItem(run.characterId, item.itemId);
-                transferredCount += 1;
-            } catch (error: unknown) {
-                if (error instanceof BusinessLogicError) {
-                    untransferred.push(item);
-                    continue;
+        const items: ItemInstance[] = [];
+        const untransferred: ItemInstance[] = [];
+
+        if (isSuccess) {
+            for (const item of run.runInventory) {
+                try {
+                    await this.itemRepo.createItem(item);
+                    await this.inventoryRepo.addItem(run.characterId, item.itemId);
+                    items.push(item);
+                } catch (error: unknown) {
+                    if (error instanceof BusinessLogicError) {
+                        untransferred.push(item);
+                        continue;
+                    }
+                    throw error;
                 }
-                throw error;
             }
         }
 
-        // ASSUMPTION (see design.md): EXP granted 1:1 with the run's score.
-        const expGained = run.score;
-        const { leveledUp } = await this.characterRepo.settleRunRewards(run.characterId, {
-            goldEarned: run.goldEarned,
-            gemsEarned: run.gemsEarned,
-            expGained,
+        const goldEarned = isSuccess ? run.goldEarned : 0;
+        const gemsEarned = isSuccess ? run.gemsEarned : 0;
+        const expGained = run.expEarned;
+
+        const { character, leveledUp, unspentAttributePointsGained } = await this.characterRepo.settleRunRewards(run.characterId, {
+            goldEarned, gemsEarned, expGained, endReason,
         });
 
+        // ASSUMPTION (see design.md): leaderboard's `score` param is fed
+        // expEarned until the leaderboard capability is redesigned (it's
+        // currently a no-op stub).
         await this.leaderboardUpdater.updateIfBetter({
-            accountId: run.accountId, characterId: run.characterId, score: run.score,
+            accountId: run.accountId, characterId: run.characterId, score: expGained,
         });
         await this.progressTracker.incrementProgress({
             accountId: run.accountId, characterId: run.characterId, type: 'ADVENTURE_COMPLETED', amount: 1,
         });
 
-        await this.runRepo.saveCheckpoint(run.runId, {
+        const settlement: SettleSummary = {
+            endReason,
+            goldEarned,
+            gemsEarned,
+            items,
+            untransferredItemIds: untransferred.map(item => item.itemId),
+            expGained,
+            leveledUp,
+            newLevel: character.level,
+            unspentAttributePointsGained,
+            forfeitedGold: isSuccess ? 0 : run.goldEarned,
+            forfeitedGems: isSuccess ? 0 : run.gemsEarned,
+            forfeitedItems: isSuccess ? [] : run.runInventory,
+        };
+
+        const updatedRun = await this.runRepo.saveCheckpoint(run.runId, {
             ...extraPatch,
             state: AdventureStateType.ENDED,
             endReason,
             endedAt: Date.now(),
             lastActivityAt: Date.now(),
+            settlement,
         });
 
-        return {
-            finalScore: run.score,
-            goldEarned: run.goldEarned,
-            gemsEarned: run.gemsEarned,
-            itemsEarned: transferredCount,
-            expGained,
-            leveledUp,
-            untransferredItemIds: untransferred.map(item => item.itemId),
-        };
+        return { run: updatedRun, settlement };
     }
 }

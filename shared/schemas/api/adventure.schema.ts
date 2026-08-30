@@ -7,7 +7,7 @@ import {
     AdventureStateType, NodeType, 
 } from '../../types';
 import {
-    adventureRunSchema, combatSummarySchema,
+    adventureRunSchema, combatSummarySchema, settleSummarySchema,
 } from '../firestore/adventure.schema';
 import { itemInstanceSchema } from '../firestore/item.schema';
 
@@ -53,6 +53,9 @@ export const getCurrentAdventureQuerySchema = z.object({ characterId: z.string()
 export const getCurrentAdventureResponseSchema = z.object({
     success: z.boolean(),
     data: publicAdventureRunSchema.nullable(),
+    // Present only when this call auto-settled the run (reconnect window
+    // expired) — see single-stage-run-settlement/design.md.
+    settlement: settleSummarySchema.optional(),
 });
 
 /**
@@ -69,6 +72,9 @@ export const advanceAdventureResponseSchema = z.object({
         state: z.nativeEnum(AdventureStateType),
         step: z.number(),
         nodeType: z.nativeEnum(NodeType).optional(),
+        // Present only when this call ended the run (Boss victory) — see
+        // single-stage-run-settlement/design.md.
+        settlement: settleSummarySchema.optional(),
     }),
 });
 
@@ -97,6 +103,9 @@ export const startCombatResponseSchema = z.object({
             targetHpRemaining: z.number().optional(),
         })),
         summary: combatSummarySchema,
+        // Present only when this call ended the run (defeat) — see
+        // single-stage-run-settlement/design.md.
+        settlement: settleSummarySchema.optional(),
     }),
 });
 

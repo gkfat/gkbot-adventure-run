@@ -29,6 +29,15 @@ describe('getStatMultipliers', () => {
         expect(elite.hp).toBeGreaterThan(normal.hp);
         expect(strongElite.hp).toBeGreaterThan(elite.hp);
     });
+
+    it('BOSS multipliers exceed STRONG_ELITE across hp/atk/def at the same enemyLevel', () => {
+        const strongElite = getStatMultipliers(6, 'STRONG_ELITE');
+        const boss = getStatMultipliers(6, 'BOSS');
+
+        expect(boss.hp).toBeGreaterThan(strongElite.hp);
+        expect(boss.atk).toBeGreaterThan(strongElite.atk);
+        expect(boss.def).toBeGreaterThan(strongElite.def);
+    });
 });
 
 describe('rollWaveCount / rollEnemyCount', () => {

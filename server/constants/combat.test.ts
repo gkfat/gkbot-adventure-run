@@ -2,16 +2,16 @@ import {
     describe, it, expect, 
 } from 'vitest';
 import {
-    scoreForKill, goldForKill, applyLuckToGold, itemDropChance,
+    expForKill, goldForKill, applyLuckToGold, itemDropChance,
     blessingPointsForVictory, maxDropRarity, gemsDropTier, ENEMY_ARCHETYPES,
 } from './combat';
 import { Rarity } from '../../shared/types/common';
 
-describe('scoreForKill / goldForKill', () => {
+describe('expForKill / goldForKill', () => {
     it('scales with enemyLevel and stacks the tier multiplier', () => {
-        expect(scoreForKill(5, 'NORMAL')).toBe(50);
-        expect(scoreForKill(5, 'ELITE')).toBe(100);
-        expect(scoreForKill(5, 'STRONG_ELITE')).toBe(200);
+        expect(expForKill(5, 'NORMAL')).toBe(50);
+        expect(expForKill(5, 'ELITE')).toBe(100);
+        expect(expForKill(5, 'STRONG_ELITE')).toBe(200);
     });
 
     it('gold ignores tier (spec only ties tier to score/rarity, not gold)', () => {
@@ -75,6 +75,12 @@ describe('ENEMY_ARCHETYPES', () => {
             expect(archetype.baseDef).toBeGreaterThan(0);
             expect(archetype.baseHp).toBeGreaterThan(0);
             expect(archetype.actionIntervalSec).toBeGreaterThan(0);
+        }
+    });
+
+    it('has a non-empty description for every archetype (pre-fight enemy preview)', () => {
+        for (const archetype of ENEMY_ARCHETYPES) {
+            expect(archetype.description.length).toBeGreaterThan(0);
         }
     });
 });

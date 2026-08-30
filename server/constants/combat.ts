@@ -17,6 +17,7 @@ import type { EnemyTier } from './difficulty';
 
 export type EnemyArchetype = {
     name: string;
+    description: string;
     baseAtk: number;
     baseDef: number;
     baseHp: number;
@@ -25,18 +26,20 @@ export type EnemyArchetype = {
 
 // Four archetypes echoing worldview.md's "維修設施殘存 GkBot 與失控機具" +
 // logicard-duel's 工作/防禦/侵略/雜兵 flavor split (not required to map 1:1).
+// ASSUMPTION (single-stage-run-settlement): descriptions aren't defined
+// anywhere else — short flavor text for the pre-fight enemy preview.
 export const ENEMY_ARCHETYPES: EnemyArchetype[] = [
     {
-        name: '維修型 GkBot', baseAtk: 8, baseDef: 4, baseHp: 60, actionIntervalSec: 2.5,
+        name: '維修型 GkBot', description: '殘存的維修機具，機械手臂仍徒勞地執行著早已過期的保養指令。', baseAtk: 8, baseDef: 4, baseHp: 60, actionIntervalSec: 2.5,
     },
     {
-        name: '保全機具', baseAtk: 6, baseDef: 8, baseHp: 80, actionIntervalSec: 3.0,
+        name: '保全機具', description: '失控的保全單位，將任何靠近的生物體視為入侵者。', baseAtk: 6, baseDef: 8, baseHp: 80, actionIntervalSec: 3.0,
     },
     {
-        name: '失控搬運機', baseAtk: 12, baseDef: 2, baseHp: 50, actionIntervalSec: 2.2,
+        name: '失控搬運機', description: '原本負責搬運零件的機具，如今橫衝直撞、不辨敵我。', baseAtk: 12, baseDef: 2, baseHp: 50, actionIntervalSec: 2.2,
     },
     {
-        name: '廢棄零件堆', baseAtk: 4, baseDef: 2, baseHp: 30, actionIntervalSec: 3.5,
+        name: '廢棄零件堆', description: '拼湊而成的殘骸堆，靠著殘留電力勉強驅動、行動遲緩。', baseAtk: 4, baseDef: 2, baseHp: 30, actionIntervalSec: 3.5,
     },
 ];
 
@@ -48,20 +51,20 @@ export const ENEMY_COMBAT_STATS = {
     dodgeChance: COMBAT_CONFIG.BASE_DODGE_CHANCE,
 } as const;
 
-const TIER_SCORE_MULTIPLIER: Record<EnemyTier, number> = {
-    NORMAL: 1, ELITE: 2, STRONG_ELITE: 4,
+const TIER_EXP_MULTIPLIER: Record<EnemyTier, number> = {
+    NORMAL: 1, ELITE: 2, STRONG_ELITE: 4, BOSS: 8,
 };
 
 const TIER_BLESSING_POINTS: Record<EnemyTier, number> = {
-    NORMAL: 1, ELITE: 2, STRONG_ELITE: 3,
+    NORMAL: 1, ELITE: 2, STRONG_ELITE: 3, BOSS: 5,
 };
 
 const TIER_MAX_DROP_RARITY: Record<EnemyTier, Rarity> = {
-    NORMAL: Rarity.SR, ELITE: Rarity.SSR, STRONG_ELITE: Rarity.L,
+    NORMAL: Rarity.SR, ELITE: Rarity.SSR, STRONG_ELITE: Rarity.L, BOSS: Rarity.L,
 };
 
-export function scoreForKill(enemyLevel: number, tier: EnemyTier): number {
-    return enemyLevel * 10 * TIER_SCORE_MULTIPLIER[tier];
+export function expForKill(enemyLevel: number, tier: EnemyTier): number {
+    return enemyLevel * 10 * TIER_EXP_MULTIPLIER[tier];
 }
 
 export function goldForKill(enemyLevel: number): number {

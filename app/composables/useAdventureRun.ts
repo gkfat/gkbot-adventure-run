@@ -1,7 +1,8 @@
 import type {
-    AdventureStateType, NodeType, CombatSummary, CombatLogEntry,
+    AdventureStateType, AdventureEndReason, NodeType, CombatSummary, CombatLogEntry, EnemyPreview,
 } from '../../shared/types/adventure';
 import type { Rarity } from '../../shared/types/common';
+import type { ItemInstance } from '../../shared/types/item';
 
 export type {
     AdventureStateType, NodeType,
@@ -33,25 +34,59 @@ export type AdventureRunView = {
     characterId: string;
     state: AdventureStateType;
     step: number;
+    chapterIndex: number;
+    stageNodeIndex: number;
+    stageNodeCount: number;
     currentNodeType?: NodeType;
     currentNodeData?: unknown;
     playerHp: number;
     playerHpMax: number;
     blessingPoints: number;
     runInventory: AdventureRunItem[];
-    score: number;
+    expEarned: number;
     goldEarned: number;
     gemsEarned: number;
+};
+
+// Settlement summary — run ended (any reason), see single-stage-run-settlement.
+export type SettlementView = {
+    endReason: AdventureEndReason;
+    goldEarned: number;
+    gemsEarned: number;
+    items: ItemInstance[];
+    untransferredItemIds: string[];
+    expGained: number;
+    leveledUp: boolean;
+    newLevel: number;
+    unspentAttributePointsGained: number;
+    forfeitedGold: number;
+    forfeitedGems: number;
+    forfeitedItems: ItemInstance[];
+};
+
+// Shape of `currentNodeData` while state=COMBAT (set by advanceFromExploring).
+export type CombatNodeData = {
+    enemyLevel: number;
+    tier: NodeType;
+    waveCount: number;
+    enemyCountPerWave: number;
+    firstWaveEnemies: EnemyPreview[];
 };
 
 type GetCurrentResponse = {
     success: boolean;
     data: AdventureRunView | null;
+    settlement?: SettlementView;
 };
 
 type AdvanceResponse = {
     success: boolean;
-    data: { state: AdventureStateType; step: number; nodeType?: NodeType };
+    data: {
+        state: AdventureStateType;
+        step: number;
+        nodeType?: NodeType;
+        settlement?: SettlementView;
+    };
 };
 
 type HealResponse = {
@@ -65,6 +100,7 @@ type HealResponse = {
 export type CombatApiResult = {
     combatLog: CombatLogEntry[];
     summary: CombatSummary;
+    settlement?: SettlementView;
 };
 
 type StartCombatResponse = {
@@ -119,6 +155,7 @@ const error = ref<string | null>(null);
 const checked = ref(false); // whether fetchCurrent has resolved at least once
 const lastCombatResult = ref<CombatApiResult | null>(null);
 const lastEventResult = ref<EventOutcome | null>(null);
+const lastSettlement = ref<SettlementView | null>(null);
 
 /**
  * Adventure Run Composable
@@ -138,6 +175,9 @@ export const useAdventureRun = () => {
         try {
             const response = await api.get<GetCurrentResponse>('/api/adventure/current', { query: { characterId } });
             currentRun.value = response.data;
+            if (response.settlement) {
+                lastSettlement.value = response.settlement;
+            }
             return response.data;
         } catch (err: unknown) {
             console.error('[useAdventureRun] Failed to fetch current run:', err);
@@ -179,7 +219,10 @@ export const useAdventureRun = () => {
         error.value = null;
 
         try {
-            await api.post<AdvanceResponse>('/api/adventure/advance', { characterId });
+            const response = await api.post<AdvanceResponse>('/api/adventure/advance', { characterId });
+            if (response.data.settlement) {
+                lastSettlement.value = response.data.settlement;
+            }
             await fetchCurrent(characterId);
             // RESOLUTION is the only state that should display a previous
             // node's result — clear both once we've left it, so a later
@@ -229,6 +272,9 @@ export const useAdventureRun = () => {
         try {
             const response = await api.post<StartCombatResponse>('/api/adventure/combat/start', { characterId });
             lastCombatResult.value = response.data;
+            if (response.data.settlement) {
+                lastSettlement.value = response.data.settlement;
+            }
             await fetchCurrent(characterId);
             return true;
         } catch (err: unknown) {
@@ -282,6 +328,13 @@ export const useAdventureRun = () => {
         }
     };
 
+    /**
+     * 玩家在結算頁按下「返回首頁」後呼叫，清空本地暫存的結算摘要。
+     */
+    const clearSettlement = () => {
+        lastSettlement.value = null;
+    };
+
     return {
         currentRun: computed(() => currentRun.value),
         hasActiveRun: computed(() => currentRun.value !== null),
@@ -290,6 +343,7 @@ export const useAdventureRun = () => {
         checked: computed(() => checked.value),
         lastCombatResult: computed(() => lastCombatResult.value),
         lastEventResult: computed(() => lastEventResult.value),
+        lastSettlement: computed(() => lastSettlement.value),
         fetchCurrent,
         start,
         advance,
@@ -297,5 +351,6 @@ export const useAdventureRun = () => {
         startCombat,
         resolveEvent,
         selectBlessing,
+        clearSettlement,
     };
 };

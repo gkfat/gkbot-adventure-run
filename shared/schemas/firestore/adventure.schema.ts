@@ -15,14 +15,14 @@ export const combatSummarySchema = z.object({
     victory: z.boolean(),
     roundCount: z.number().int().min(0),
     playerHpRemaining: z.number().min(0),
-  
+
     // Rewards
-    scoreGained: z.number().int().min(0),
+    expGained: z.number().int().min(0),
     goldDropped: z.number().int().min(0),
     gemsDropped: z.number().int().min(0),
     itemsDropped: z.array(itemInstanceSchema),
     blessingPointsGained: z.number().int().min(0),
-  
+
     // Enemy info
     enemies: z.array(z.object({
         enemyId: z.string(),
@@ -30,6 +30,24 @@ export const combatSummarySchema = z.object({
         level: z.number().int().min(1),
     })),
     completedAt: z.number(),
+}).strict();
+
+/**
+ * Run settlement summary schema — see single-stage-run-settlement/design.md.
+ */
+export const settleSummarySchema = z.object({
+    endReason: z.nativeEnum(AdventureEndReason),
+    goldEarned: z.number().int().min(0),
+    gemsEarned: z.number().int().min(0),
+    items: z.array(itemInstanceSchema),
+    untransferredItemIds: z.array(z.string()),
+    expGained: z.number().int().min(0),
+    leveledUp: z.boolean(),
+    newLevel: z.number().int().min(1),
+    unspentAttributePointsGained: z.number().int().min(0),
+    forfeitedGold: z.number().int().min(0),
+    forfeitedGems: z.number().int().min(0),
+    forfeitedItems: z.array(itemInstanceSchema),
 }).strict();
 
 /**
@@ -49,6 +67,12 @@ export const adventureRunSchema = z.object({
     state: z.nativeEnum(AdventureStateType),
     step: z.number().int().min(0),
     lastRestStep: z.number().int().min(0),
+
+    // Stage progression (adventure-stage-progression)
+    chapterIndex: z.number().int().min(0),
+    stageNodeIndex: z.number().int().min(0),
+    stageNodeCount: z.number().int().min(0),
+
     startedAt: z.number(),
     endedAt: z.number().optional(),
     endReason: z.nativeEnum(AdventureEndReason).optional(),
@@ -70,12 +94,15 @@ export const adventureRunSchema = z.object({
     runInventory: z.array(itemInstanceSchema).max(RESOURCE_LIMITS.INVENTORY_RUN_MAX),
   
     // Rewards accumulated
-    score: z.number().int().min(0),
+    expEarned: z.number().int().min(0),
     goldEarned: z.number().int().min(0),
     gemsEarned: z.number().int().min(0),
-  
+
     // Combat/event history
     lastCombatSummary: combatSummarySchema.optional(),
+
+    // Settlement summary, written once when the run ends
+    settlement: settleSummarySchema.optional(),
   
     // Reconnection tracking
     lastActivityAt: z.number(),

@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
         }
 
         const adventureRunService = new AdventureRunService();
-        const run = await adventureRunService.getCurrentRun(authUser.uid, parseResult.data.characterId);
+        const { run, settlement } = await adventureRunService.getCurrentRun(authUser.uid, parseResult.data.characterId);
 
         logRequest({
             severity: 'INFO',
@@ -43,6 +43,7 @@ export default defineEventHandler(async (event) => {
         const response = {
             success: true,
             data: run ? stripSeed(run) : null,
+            settlement,
         };
 
         return getCurrentAdventureResponseSchema.parse(response);

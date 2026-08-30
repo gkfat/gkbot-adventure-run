@@ -250,9 +250,13 @@ const {
 const breathStep = useIdleBreathingFrame();
 
 const adventureCtaLabel = computed(() => {
-    if (!hasActiveRun.value || !currentRun.value) return '開始冒險';
-    const stageName = getStageDisplayName(currentRun.value.chapterIndex, currentRun.value.stageIndexInChapter);
-    return `繼續冒險（${stageName}）`;
+    if (hasActiveRun.value && currentRun.value) {
+        const stageName = getStageDisplayName(currentRun.value.chapterIndex);
+        return `繼續冒險（${stageName}）`;
+    }
+    if (!character.value) return '開始冒險';
+    const stageName = getStageDisplayName(character.value.nextChapterIndex);
+    return `開始冒險（${stageName}）`;
 });
 
 const handleAdventureCta = async () => {

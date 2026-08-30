@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
         }
 
         const adventureRunService = new AdventureRunService();
-        const run = await adventureRunService.advance(authUser.uid, parseResult.data.characterId);
+        const { run, settlement } = await adventureRunService.advance(authUser.uid, parseResult.data.characterId);
 
         logRequest({
             severity: 'INFO',
@@ -45,6 +45,7 @@ export default defineEventHandler(async (event) => {
                 state: run.state,
                 step: run.step,
                 nodeType: run.currentNodeType,
+                settlement,
             },
         };
 

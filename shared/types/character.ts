@@ -24,9 +24,13 @@ export type Character = {
   // Attributes (permanent growth)
   attributes: Attributes;
   unspentAttributePoints: number; // Gained 3 per level up
-  
+
   // Equipment (slot -> itemId mapping)
   equipment: Partial<Record<EquipmentSlot, string>>;
+
+  // Facility theme for the character's next adventure run (single-stage-run-settlement);
+  // only advances when a run COMPLETEs, so DEAD/DISCONNECT retries the same theme.
+  nextChapterIndex: number;
 
   // Leaderboard display
   nickname: string;           // Display name; auto-generated on creation, player can override

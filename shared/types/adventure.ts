@@ -29,6 +29,7 @@ export enum AdventureEndReason {
   QUIT = 'QUIT',             // Player quit (reserved for admin)
   DISCONNECT = 'DISCONNECT', // Disconnected beyond reconnect window
   TIMEOUT = 'TIMEOUT',       // Reserved, not used initially
+  COMPLETED = 'COMPLETED',   // Boss defeated — the Stage was cleared
 };
 
 /**
@@ -38,6 +39,7 @@ export enum NodeType {
   COMBAT = 'COMBAT',             // Normal combat
   ELITE = 'ELITE',               // Elite combat (every 5 steps)
   STRONG_ELITE = 'STRONG_ELITE', // Strong elite (every 9 steps)
+  BOSS = 'BOSS',                 // Boss combat (last node of a Stage)
   EVENT = 'EVENT',               // Random event
   REST = 'REST',                 // Rest node
   CHOICE = 'CHOICE',             // Decision fork
@@ -76,7 +78,7 @@ export type CombatResult = {
   playerHpRemaining: number;
 
   // Rewards (if victory)
-  scoreGained: number;
+  expGained: number;
   goldDropped: number;
   gemsDropped: number;
   itemsDropped: ItemInstance[];
@@ -135,14 +137,30 @@ export type EventResult = {
 };
 
 /**
+ * Enemy roster entry decided at node-generation time so the pre-fight
+ * "遭遇敵人" screen can show it before the player triggers combat. Only the
+ * first wave is decided this early — see single-stage-run-settlement/design.md.
+ */
+export type EnemyPreview = {
+  archetypeIndex: number;
+  name: string;
+  description: string;
+  level: number;
+  hp: number;
+};
+
+/**
  * Context passed to CombatResolver.resolve() — everything it needs to run a
  * single combat node without reaching back into the run's own persistence.
  */
 export type CombatContext = {
   enemyLevel: number;
-  tier: NodeType.COMBAT | NodeType.ELITE | NodeType.STRONG_ELITE;
+  tier: NodeType.COMBAT | NodeType.ELITE | NodeType.STRONG_ELITE | NodeType.BOSS;
   waveCount: number;
   enemyCountPerWave: number;
+  // Archetype selection for wave 0, decided at node-generation time (see
+  // EnemyPreview). Waves >= 1 still roll their own archetypes in combat.service.
+  firstWaveArchetypeIndices: number[];
 };
 
 /**
@@ -185,6 +203,31 @@ export type ProgressTracker = {
 };
 
 /**
+ * Full settlement summary for a run, computed once when the run ends
+ * (any `AdventureEndReason`). Persisted on `AdventureRun.settlement` for
+ * audit purposes, and returned once via the API response that triggered the
+ * settlement (advance/combat/current) — see single-stage-run-settlement/design.md.
+ *
+ * `goldEarned`/`gemsEarned`/`items` reflect what was actually applied to the
+ * character (0/[] when `endReason` isn't COMPLETED); `forfeited*` reflect
+ * what the run had accumulated but lost on failure (0/[] on COMPLETED).
+ */
+export type SettleSummary = {
+  endReason: AdventureEndReason;
+  goldEarned: number;
+  gemsEarned: number;
+  items: ItemInstance[];
+  untransferredItemIds: string[];
+  expGained: number;
+  leveledUp: boolean;
+  newLevel: number;
+  unspentAttributePointsGained: number;
+  forfeitedGold: number;
+  forfeitedGems: number;
+  forfeitedItems: ItemInstance[];
+};
+
+/**
  * Run modifier (blessings/curses)
  */
 export type RunModifier = {
@@ -216,6 +259,14 @@ export type AdventureRun = {
   state: AdventureStateType;
   step: number;
   lastRestStep: number;       // step at which the last Rest node occurred (0 = start); drives the guaranteed-rest rule
+
+  // Stage progression (adventure-stage-progression) — chapterIndex is a
+  // snapshot of the character's nextChapterIndex at run creation; the run
+  // itself never advances it (single-stage-run-settlement/design.md).
+  chapterIndex: number;          // 0-based, drives facility theme cycling
+  stageNodeIndex: number;        // 0-based, resets to 0 on stage change
+  stageNodeCount: number;        // node count for this stage, rolled once at stage start
+
   startedAt: Timestamp;
   endedAt?: Timestamp;
   endReason?: AdventureEndReason;
@@ -237,12 +288,15 @@ export type AdventureRun = {
   runInventory: ItemInstance[];
   
   // Rewards accumulated
-  score: number;
+  expEarned: number;
   goldEarned: number;
   gemsEarned: number;
-  
+
   // Combat/event history (optional, for anti-cheat)
   lastCombatSummary?: CombatSummary;
+
+  // Settlement summary, written once when the run ends (any endReason)
+  settlement?: SettleSummary;
   
   // Reconnection tracking
   lastActivityAt: Timestamp;
@@ -359,3 +413,34 @@ export const DIFFICULTY_CONFIG = {
     ENEMY_3_PER_STEP: 0.006,
     ENEMY_3_CAP: 0.45,
 } as const;
+
+/**
+ * Stage structure configuration (adventure-stage-progression).
+ * ASSUMPTION (undocumented elsewhere, see design.md): NODE_COUNT range and
+ * FACILITY_THEMES are invented values, freely tunable. FACILITY_THEMES
+ * follows docs/worldview.md 第 2 節 table order and may keep growing.
+ */
+export const STAGE_CONFIG = {
+    NODE_COUNT_MIN: 10,
+    NODE_COUNT_MAX: 20,             // inclusive, decisive RNG uniform roll at stage start
+    FACILITY_THEMES: [
+        '廢棄補給站', '廢棄研究所', '廢棄維修廠', '崩壞VR體驗館',
+        '廢棄工廠', '荒廢遊樂場', '廢棄百貨公司', '無主小賣店',
+    ],
+} as const;
+
+/**
+ * The facility theme for a given chapter — cycles through STAGE_CONFIG.FACILITY_THEMES.
+ */
+export function getFacilityTheme(chapterIndex: number): string {
+    return STAGE_CONFIG.FACILITY_THEMES[chapterIndex % STAGE_CONFIG.FACILITY_THEMES.length] as string;
+}
+
+/**
+ * Display name for a stage, e.g. "廢棄研究所" — single-stage-run-settlement:
+ * a run is always exactly one Stage now, so there is no chapter-internal
+ * stage number worth showing.
+ */
+export function getStageDisplayName(chapterIndex: number): string {
+    return getFacilityTheme(chapterIndex);
+}

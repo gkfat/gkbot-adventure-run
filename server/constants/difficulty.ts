@@ -11,7 +11,7 @@
 import { DIFFICULTY_CONFIG } from '../../shared/types/adventure';
 import { clamp } from '../../shared/types/common';
 
-export type EnemyTier = 'NORMAL' | 'ELITE' | 'STRONG_ELITE';
+export type EnemyTier = 'NORMAL' | 'ELITE' | 'STRONG_ELITE' | 'BOSS';
 
 /**
  * `enemyLevel = 1 + floor(step / ENEMY_LEVEL_STEP_DIVISOR)`
@@ -44,6 +44,11 @@ export function getStatMultipliers(enemyLevel: number, tier: EnemyTier): { hp: n
             hp: DIFFICULTY_CONFIG.STRONG_ELITE_HP_MULT,
             atk: DIFFICULTY_CONFIG.STRONG_ELITE_ATK_MULT,
             def: DIFFICULTY_CONFIG.STRONG_ELITE_DEF_MULT,
+        },
+        // ASSUMPTION (see design.md): BOSS multipliers extend the Elite/Strong
+        // Elite progression, higher than STRONG_ELITE across all three stats.
+        BOSS: {
+            hp: 4.0, atk: 2.8, def: 2.0,
         },
     }[tier];
 

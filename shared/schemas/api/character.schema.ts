@@ -81,6 +81,7 @@ export const getCharacterResponseSchema = z.object({
         spriteUrl: z.string(),
         stats: statsSchema,
         equipmentBonus: equipmentBonusSchema,
+        nextChapterIndex: z.number(),
     }),
 });
 
