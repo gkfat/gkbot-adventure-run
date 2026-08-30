@@ -1,16 +1,16 @@
 import {
     defineEventHandler, readBody,
 } from 'h3';
-import { requireAuth } from '../../utils/auth';
-import { AdventureRunService } from '../../services/adventure-run.service';
+import { requireAuth } from '../../../utils/auth';
+import { AdventureRunService } from '../../../services/adventure-run.service';
 import {
-    endAdventureRequestSchema, endAdventureResponseSchema,
-} from '../../../shared/schemas/api/adventure.schema';
-import { toH3Error } from '../../utils/errorHandler';
+    startCombatRequestSchema, startCombatResponseSchema,
+} from '../../../../shared/schemas/api/adventure.schema';
+import { toH3Error } from '../../../utils/errorHandler';
 import {
     AppError, ValidationError,
-} from '../../../shared/types/errors';
-import { logRequest } from '../../utils/logger';
+} from '../../../../shared/types/errors';
+import { logRequest } from '../../../utils/logger';
 
 export default defineEventHandler(async (event) => {
     const startTime = Date.now();
@@ -20,17 +20,17 @@ export default defineEventHandler(async (event) => {
         const authUser = await requireAuth(event);
 
         const body = await readBody(event);
-        const parseResult = endAdventureRequestSchema.safeParse(body);
+        const parseResult = startCombatRequestSchema.safeParse(body);
         if (!parseResult.success) {
             throw new ValidationError('Invalid request', parseResult.error.flatten());
         }
 
         const adventureRunService = new AdventureRunService();
-        const result = await adventureRunService.endRun(authUser.uid, parseResult.data.characterId);
+        const result = await adventureRunService.resolveCombat(authUser.uid, parseResult.data.characterId);
 
         logRequest({
             severity: 'INFO',
-            message: 'Adventure run ended',
+            message: 'Combat resolved',
             method: event.method,
             path: event.path,
             status: 200,
@@ -44,11 +44,11 @@ export default defineEventHandler(async (event) => {
             data: result,
         };
 
-        return endAdventureResponseSchema.parse(response);
+        return startCombatResponseSchema.parse(response);
     } catch (error: unknown) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to end adventure run',
+            message: 'Failed to resolve combat',
             method: event.method,
             path: event.path,
             status: error instanceof AppError ? error.statusCode : 500,

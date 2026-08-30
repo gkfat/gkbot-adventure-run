@@ -74,21 +74,36 @@ export type CombatResult = {
   victory: boolean;
   roundCount: number;
   playerHpRemaining: number;
-  
+
   // Rewards (if victory)
   scoreGained: number;
   goldDropped: number;
   gemsDropped: number;
   itemsDropped: ItemInstance[];
   blessingPointsGained: number;
+
+  // Enemies encountered this combat (included here, not just on CombatSummary,
+  // so the caller can build combatSummary/combatLog display without a second
+  // channel back from CombatResolver.resolve()).
+  enemies: Array<{ enemyId: string; name: string; level: number }>;
 };
 
 /**
  * Combat summary (stored in run doc)
  */
 export type CombatSummary = CombatResult & {
-  enemies: Array<{ enemyId: string; name: string; level: number }>;
   completedAt: Timestamp;
+};
+
+/**
+ * Full output of CombatResolver.resolve() — the persistable CombatResult
+ * plus the turn-by-turn combatLog. The log is NOT part of CombatSummary
+ * (design.md Non-Goal: not persisted to the run document, only returned
+ * once via the API response) — callers must destructure it out before
+ * writing `run.lastCombatSummary`.
+ */
+export type CombatResolution = CombatResult & {
+  combatLog: CombatLogEntry[];
 };
 
 /**
@@ -138,7 +153,7 @@ export type CombatContext = {
  * side effects on `run` itself, so the state machine stays the single writer.
  */
 export type CombatResolver = {
-  resolve(run: AdventureRun, context: CombatContext): Promise<CombatResult>;
+  resolve(run: AdventureRun, context: CombatContext): Promise<CombatResolution>;
 };
 
 /**
@@ -147,7 +162,7 @@ export type CombatResolver = {
  * CombatResolver.
  */
 export type EventResolver = {
-  resolve(run: AdventureRun): Promise<EventResult>;
+  resolve(run: AdventureRun, choiceIndex?: number): Promise<EventResult>;
 };
 
 /**
@@ -246,16 +261,13 @@ export const ALLOWED_TRANSITIONS: Record<AdventureStateType, AdventureStateType[
         AdventureStateType.COMBAT,
         AdventureStateType.EVENT,
         AdventureStateType.REST,
-        AdventureStateType.ENDED,
     ],
+    // COMBAT -> ENDED is the death path (endReason=DEAD), not a player choice —
+    // there is no voluntary quit; only DISCONNECT (timeout) and DEAD end a run early.
     [AdventureStateType.COMBAT]: [AdventureStateType.RESOLUTION, AdventureStateType.ENDED],
     [AdventureStateType.EVENT]: [AdventureStateType.RESOLUTION],
     [AdventureStateType.REST]: [AdventureStateType.RESOLUTION],
-    [AdventureStateType.RESOLUTION]: [
-        AdventureStateType.BLESSING_SELECT,
-        AdventureStateType.EXPLORING,
-        AdventureStateType.ENDED,
-    ],
+    [AdventureStateType.RESOLUTION]: [AdventureStateType.BLESSING_SELECT, AdventureStateType.EXPLORING],
     [AdventureStateType.BLESSING_SELECT]: [AdventureStateType.EXPLORING],
     [AdventureStateType.ENDED]: [],
 };

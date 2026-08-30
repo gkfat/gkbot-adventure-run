@@ -7,8 +7,9 @@ import {
     AdventureStateType, NodeType, 
 } from '../../types';
 import {
-    adventureRunSchema, combatSummarySchema, 
+    adventureRunSchema, combatSummarySchema,
 } from '../firestore/adventure.schema';
+import { itemInstanceSchema } from '../firestore/item.schema';
 
 /**
  * POST /api/adventure/start — request body
@@ -72,6 +73,11 @@ export const advanceAdventureResponseSchema = z.object({
 });
 
 /**
+ * POST /api/adventure/combat/start — request body
+ */
+export const startCombatRequestSchema = z.object({ characterId: z.string() }).strict();
+
+/**
  * POST /api/adventure/combat/start
  */
 export const startCombatResponseSchema = z.object({
@@ -95,25 +101,34 @@ export const startCombatResponseSchema = z.object({
 });
 
 /**
- * POST /api/adventure/event/resolve
+ * POST /api/adventure/event/resolve — request body
  */
-export const resolveEventRequestSchema = z.object({ choiceIndex: z.number().int().min(0).optional() }).strict();
+export const resolveEventRequestSchema = z.object({
+    characterId: z.string(),
+    choiceIndex: z.number().int().min(0).optional(),
+}).strict();
 
 export const resolveEventResponseSchema = z.object({
     success: z.boolean(),
     data: z.object({
+        eventId: z.string(),
         eventType: z.string(),
         description: z.string(),
         hpHealed: z.number().optional(),
+        blessingGranted: z.string().optional(),
+        curseApplied: z.string().optional(),
         goldGained: z.number().optional(),
         gemsGained: z.number().optional(),
+        itemsGained: z.array(itemInstanceSchema).optional(),
     }),
 });
 
 /**
- * POST /api/adventure/blessing/select
+ * POST /api/adventure/blessing/select — request body
  */
-export const selectBlessingRequestSchema = z.object({ blessingId: z.string() }).strict();
+export const selectBlessingRequestSchema = z.object({
+    characterId: z.string(), blessingId: z.string(),
+}).strict();
 
 export const selectBlessingResponseSchema = z.object({
     success: z.boolean(),
@@ -138,35 +153,11 @@ export const restHealResponseSchema = z.object({
 });
 
 /**
- * POST /api/adventure/end
- */
-export const endAdventureResponseSchema = z.object({
-    success: z.boolean(),
-    data: z.object({
-        finalScore: z.number(),
-        goldEarned: z.number(),
-        gemsEarned: z.number(),
-        itemsEarned: z.number(),
-        expGained: z.number(),
-        leveledUp: z.boolean(),
-        // Items that couldn't be transferred into the permanent inventory
-        // because it was already full (spec: adventure-run-lifecycle ->
-        // "永久背包已滿時的結算" — must be surfaced, not silently dropped).
-        untransferredItemIds: z.array(z.string()),
-    }),
-});
-
-/**
  * POST /api/adventure/rest/heal — request body
  */
 export const restHealRequestSchema = z.object({
     characterId: z.string(), itemId: z.string(),
 }).strict();
-
-/**
- * POST /api/adventure/end — request body
- */
-export const endAdventureRequestSchema = z.object({ characterId: z.string() }).strict();
 
 export type StartAdventureRequest = z.infer<typeof startAdventureRequestSchema>;
 export type StartAdventureResponse = z.infer<typeof startAdventureResponseSchema>;
@@ -174,6 +165,7 @@ export type GetCurrentAdventureQuery = z.infer<typeof getCurrentAdventureQuerySc
 export type GetCurrentAdventureResponse = z.infer<typeof getCurrentAdventureResponseSchema>;
 export type AdvanceAdventureRequest = z.infer<typeof advanceAdventureRequestSchema>;
 export type AdvanceAdventureResponse = z.infer<typeof advanceAdventureResponseSchema>;
+export type StartCombatRequest = z.infer<typeof startCombatRequestSchema>;
 export type StartCombatResponse = z.infer<typeof startCombatResponseSchema>;
 export type ResolveEventRequest = z.infer<typeof resolveEventRequestSchema>;
 export type ResolveEventResponse = z.infer<typeof resolveEventResponseSchema>;
@@ -181,5 +173,3 @@ export type SelectBlessingRequest = z.infer<typeof selectBlessingRequestSchema>;
 export type SelectBlessingResponse = z.infer<typeof selectBlessingResponseSchema>;
 export type RestHealRequest = z.infer<typeof restHealRequestSchema>;
 export type RestHealResponse = z.infer<typeof restHealResponseSchema>;
-export type EndAdventureRequest = z.infer<typeof endAdventureRequestSchema>;
-export type EndAdventureResponse = z.infer<typeof endAdventureResponseSchema>;

@@ -2,12 +2,15 @@
  * Adventure Run Service — the state machine that drives a single run:
  * start/resume/advance/end, node generation, and rest-node healing.
  *
- * COMBAT and EVENT nodes are intentionally NOT resolved here (see
- * proposal.md's "實作順序建議" and design.md's Non-Goals): `advance()` sets
- * the run into the COMBAT/EVENT state with enough context for a future
- * `combat-engine`/`events-and-blessings` implementation to pick up, but
- * calling `advance()` again while stuck there throws — those two changes
- * are what actually resolves them.
+ * COMBAT and EVENT nodes are NOT resolved via `advance()` (see proposal.md's
+ * "實作順序建議" and design.md's Non-Goals) — `advance()` only sets the run
+ * into the COMBAT/EVENT state with enough context for a dedicated resolver
+ * endpoint to pick up; calling `advance()` again while stuck there throws.
+ * COMBAT is resolved via `resolveCombat()` (combat-engine's
+ * `POST /api/adventure/combat/start`). EVENT is resolved via `resolveEvent()`
+ * (events-and-blessings' `POST /api/adventure/event/resolve`). BLESSING_SELECT
+ * candidates are generated here (`advanceFromResolution`) and picked via
+ * `selectBlessing()` (events-and-blessings' `POST /api/adventure/blessing/select`).
  */
 
 import { FieldValue } from 'firebase-admin/firestore';
@@ -18,18 +21,27 @@ import { CharacterService } from './character.service';
 import { ItemRepository } from '../repositories/item.repository';
 import { InventoryRepository } from '../repositories/inventory.repository';
 import { RngService } from './rng.service';
+import { CombatService } from './combat.service';
+import { EventService } from './event.service';
+import { BlessingService } from './blessing.service';
 import {
-    NoopLeaderboardUpdater, NoopProgressTracker, 
+    NoopLeaderboardUpdater, NoopProgressTracker,
 } from './adventure-run-stubs';
-import { getEnemyLevel } from '../constants/difficulty';
+import {
+    getEnemyLevel, rollWaveCount, rollEnemyCount,
+} from '../constants/difficulty';
 import {
     AdventureStateType, AdventureEndReason, NodeType, NODE_CONFIG,
     type AdventureRun, type LeaderboardUpdater, type ProgressTracker,
+    type CombatResolver, type CombatContext, type CombatResolution, type CombatSummary, type CombatLogEntry,
+    type EventResult, type RunModifier,
 } from '../../shared/types/adventure';
 import type { Character } from '../../shared/types/character';
 import type { ItemInstance } from '../../shared/types/item';
 import { ItemType } from '../../shared/types/item';
-import { clamp } from '../../shared/types/common';
+import {
+    clamp, RESOURCE_LIMITS,
+} from '../../shared/types/common';
 import {
     NotFoundError, ConflictError, BusinessLogicError, ValidationError,
 } from '../../shared/types/errors';
@@ -84,6 +96,9 @@ export class AdventureRunService extends BaseService {
     private rngService: RngService;
     private leaderboardUpdater: LeaderboardUpdater;
     private progressTracker: ProgressTracker;
+    private combatResolver: CombatResolver;
+    private eventService: EventService;
+    private blessingService: BlessingService;
 
     constructor() {
         super();
@@ -95,6 +110,9 @@ export class AdventureRunService extends BaseService {
         this.rngService = new RngService();
         this.leaderboardUpdater = new NoopLeaderboardUpdater();
         this.progressTracker = new NoopProgressTracker();
+        this.combatResolver = new CombatService();
+        this.eventService = new EventService();
+        this.blessingService = new BlessingService();
     }
 
     /**
@@ -168,16 +186,16 @@ export class AdventureRunService extends BaseService {
             });
 
         case AdventureStateType.COMBAT:
+            throw new BusinessLogicError('Use POST /api/adventure/combat/start to resolve a COMBAT node, not advance()');
+
         case AdventureStateType.EVENT:
-            throw new BusinessLogicError(
-                'This node cannot be resolved yet (combat-engine/events-and-blessings not implemented)',
-            );
+            throw new BusinessLogicError('Use POST /api/adventure/event/resolve to resolve an EVENT node, not advance()');
 
         case AdventureStateType.RESOLUTION:
             return this.advanceFromResolution(run);
 
         case AdventureStateType.BLESSING_SELECT:
-            throw new BusinessLogicError('Blessing selection is not implemented yet (events-and-blessings)');
+            throw new BusinessLogicError('Use POST /api/adventure/blessing/select to pick a blessing, not advance()');
 
         case AdventureStateType.ENDED:
             throw new BusinessLogicError('This run has already ended');
@@ -185,22 +203,6 @@ export class AdventureRunService extends BaseService {
         default:
             throw new BusinessLogicError(`Unknown run state: ${run.state}`);
         }
-    }
-
-    /**
-     * End the run early (player-initiated, from EXPLORING or RESOLUTION —
-     * the only two states ALLOWED_TRANSITIONS permits an ENDED exit from
-     * outside the disconnect/death paths). Settles and returns the summary.
-     */
-    async endRun(accountId: string, characterId: string): Promise<SettleResult> {
-        await this.requireOwnedCharacter(accountId, characterId);
-        const run = await this.requireActiveRun(characterId);
-
-        if (run.state !== AdventureStateType.EXPLORING && run.state !== AdventureStateType.RESOLUTION) {
-            throw new BusinessLogicError('Can only end a run while exploring or at a resolution checkpoint');
-        }
-
-        return this.settleRun(run, AdventureEndReason.QUIT);
     }
 
     /**
@@ -246,6 +248,150 @@ export class AdventureRunService extends BaseService {
         return {
             hpHealed, hpCurrent,
         };
+    }
+
+    /**
+     * Resolve the run's current COMBAT node via `CombatResolver` (combat-engine).
+     * Rolls waveCount/enemyCountPerWave here (not in `advanceFromExploring`,
+     * which only decides enemyLevel/tier — see its comment) since they're
+     * only needed once combat is actually resolved. On victory, applies
+     * rewards and moves to RESOLUTION; on defeat, settles with `endReason=DEAD`.
+     */
+    async resolveCombat(accountId: string, characterId: string): Promise<{ combatLog: CombatLogEntry[]; summary: CombatSummary }> {
+        await this.requireOwnedCharacter(accountId, characterId);
+        const run = await this.requireActiveRun(characterId);
+
+        if (run.state !== AdventureStateType.COMBAT) {
+            throw new BusinessLogicError('Can only resolve combat at a COMBAT node');
+        }
+        const nodeData = run.currentNodeData as { enemyLevel: number; tier: CombatContext['tier'] } | undefined;
+        if (!nodeData || typeof nodeData.enemyLevel !== 'number') {
+            throw new BusinessLogicError('Run has no combat node context to resolve');
+        }
+
+        const context: CombatContext = {
+            enemyLevel: nodeData.enemyLevel,
+            tier: nodeData.tier,
+            waveCount: rollWaveCount(run.step, await this.rngService.next(run.runId)),
+            enemyCountPerWave: rollEnemyCount(run.step, await this.rngService.next(run.runId)),
+        };
+
+        const resolution = await this.combatResolver.resolve(run, context);
+        const combatResult: Partial<CombatResolution> = { ...resolution };
+        delete combatResult.combatLog;
+        const summary: CombatSummary = {
+            ...(combatResult as Omit<CombatResolution, 'combatLog'>), completedAt: Date.now(),
+        };
+
+        const runInventory = [...run.runInventory, ...resolution.itemsDropped]
+            .slice(0, RESOURCE_LIMITS.INVENTORY_RUN_MAX);
+
+        if (resolution.victory) {
+            await this.runRepo.saveCheckpoint(run.runId, {
+                state: AdventureStateType.RESOLUTION,
+                playerHp: resolution.playerHpRemaining,
+                score: run.score + resolution.scoreGained,
+                goldEarned: run.goldEarned + resolution.goldDropped,
+                gemsEarned: run.gemsEarned + resolution.gemsDropped,
+                blessingPoints: run.blessingPoints + resolution.blessingPointsGained,
+                runInventory,
+                lastCombatSummary: summary,
+                currentNodeData: FieldValue.delete(),
+                lastActivityAt: Date.now(),
+            });
+            await this.progressTracker.incrementProgress({
+                accountId: run.accountId, characterId: run.characterId, type: 'ENEMY_KILLED', amount: resolution.enemies.length,
+            });
+        } else {
+            await this.settleRun({
+                ...run, playerHp: 0,
+            }, AdventureEndReason.DEAD, {
+                playerHp: 0,
+                lastCombatSummary: summary,
+            });
+        }
+
+        return {
+            combatLog: resolution.combatLog, summary,
+        };
+    }
+
+    /**
+     * Resolve the run's current EVENT node via `EventService`. Applies
+     * whichever outcome fields are present (heal/gold/gems/items/blessing/
+     * curse) and moves to RESOLUTION — same "single writer" pattern as
+     * `resolveCombat`.
+     */
+    async resolveEvent(accountId: string, characterId: string, choiceIndex?: number): Promise<EventResult> {
+        await this.requireOwnedCharacter(accountId, characterId);
+        const run = await this.requireActiveRun(characterId);
+
+        if (run.state !== AdventureStateType.EVENT) {
+            throw new BusinessLogicError('Can only resolve an event at an EVENT node');
+        }
+
+        const result = await this.eventService.resolve(run, choiceIndex);
+
+        const patch: Record<string, unknown> = {
+            state: AdventureStateType.RESOLUTION,
+            currentNodeData: FieldValue.delete(),
+            lastActivityAt: Date.now(),
+        };
+        if (result.hpHealed) {
+            patch.playerHp = clamp(run.playerHp + result.hpHealed, 0, run.playerHpMax);
+        }
+        if (result.goldGained) {
+            patch.goldEarned = run.goldEarned + result.goldGained;
+        }
+        if (result.gemsGained) {
+            patch.gemsEarned = run.gemsEarned + result.gemsGained;
+        }
+        if (result.itemsGained?.length) {
+            patch.runInventory = [...run.runInventory, ...result.itemsGained].slice(0, RESOURCE_LIMITS.INVENTORY_RUN_MAX);
+        }
+        if (result.blessingGranted) {
+            patch.blessings = [...run.blessings, result.blessingGranted];
+        }
+        if (result.curseApplied) {
+            patch.curses = [...run.curses, result.curseApplied];
+        }
+
+        await this.runRepo.saveCheckpoint(run.runId, patch);
+        return result;
+    }
+
+    /**
+     * Select one of the current BLESSING_SELECT candidates. Since
+     * `advanceFromResolution` skips its usual `step + 1` when routing into
+     * BLESSING_SELECT (see there), this is the one that increments it —
+     * BLESSING_SELECT -> EXPLORING is a direct edge (ALLOWED_TRANSITIONS),
+     * there is no separate RESOLUTION checkpoint after picking.
+     */
+    async selectBlessing(accountId: string, characterId: string, blessingId: string): Promise<RunModifier> {
+        await this.requireOwnedCharacter(accountId, characterId);
+        const run = await this.requireActiveRun(characterId);
+
+        if (run.state !== AdventureStateType.BLESSING_SELECT) {
+            throw new BusinessLogicError('Can only select a blessing at a BLESSING_SELECT node');
+        }
+
+        const nodeData = run.currentNodeData as { candidates?: RunModifier[] } | undefined;
+        const chosen = nodeData?.candidates?.find(candidate => candidate.modifierId === blessingId);
+        if (!chosen) {
+            throw new ValidationError('blessingId is not among the current candidates');
+        }
+
+        await this.runRepo.saveCheckpoint(run.runId, {
+            state: AdventureStateType.EXPLORING,
+            step: run.step + 1,
+            blessings: [...run.blessings, chosen.modifierId],
+            blessingPoints: 0,
+            currentNodeType: FieldValue.delete(),
+            currentNodeData: FieldValue.delete(),
+            lastActivityAt: Date.now(),
+        });
+
+        return chosen;
     }
 
     // ---- internals ----------------------------------------------------
@@ -308,8 +454,14 @@ export class AdventureRunService extends BaseService {
             patch.state = AdventureStateType.REST;
             patch.currentNodeData = FieldValue.delete();
         } else if (nodeType === NodeType.EVENT || nodeType === NodeType.CHOICE) {
+            const template = await this.eventService.selectEvent(run.runId);
             patch.state = AdventureStateType.EVENT;
-            patch.currentNodeData = { pending: true };
+            patch.currentNodeData = {
+                eventTemplateId: template.id,
+                eventType: template.type,
+                description: template.description,
+                ...(template.choices ? { choices: template.choices.map(choice => ({ label: choice.label })) } : {}),
+            };
         } else {
             // COMBAT / ELITE / STRONG_ELITE
             patch.state = AdventureStateType.COMBAT;
@@ -325,8 +477,12 @@ export class AdventureRunService extends BaseService {
 
     private async advanceFromResolution(run: AdventureRun): Promise<AdventureRun> {
         if (run.blessingPoints >= NODE_CONFIG.BLESSING_POINTS_THRESHOLD) {
+            const character = await this.characterRepo.getByIdOrThrow(run.characterId, 'character');
+            const candidates = await this.blessingService.generateCandidates(run.runId, character.attributes.LUCK);
+
             return this.runRepo.saveCheckpoint(run.runId, {
                 state: AdventureStateType.BLESSING_SELECT,
+                currentNodeData: { candidates },
                 lastActivityAt: Date.now(),
             });
         }
@@ -346,7 +502,9 @@ export class AdventureRunService extends BaseService {
      * dropped), grant gold/gems/EXP (clamped, level-ups included), notify
      * the leaderboard/quest stubs, and mark the run ENDED.
      */
-    private async settleRun(run: AdventureRun, endReason: AdventureEndReason): Promise<SettleResult> {
+    private async settleRun(
+        run: AdventureRun, endReason: AdventureEndReason, extraPatch: Record<string, unknown> = {},
+    ): Promise<SettleResult> {
         const untransferred: ItemInstance[] = [];
         let transferredCount = 0;
 
@@ -380,6 +538,7 @@ export class AdventureRunService extends BaseService {
         });
 
         await this.runRepo.saveCheckpoint(run.runId, {
+            ...extraPatch,
             state: AdventureStateType.ENDED,
             endReason,
             endedAt: Date.now(),

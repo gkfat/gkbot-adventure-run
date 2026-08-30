@@ -15,17 +15,19 @@ import {
 
 const {
     getActiveByCharacterIdMock, createRunMock, saveCheckpointMock,
-    getByIdForAccountMock, settleRunRewardsMock,
+    getByIdForAccountMock, settleRunRewardsMock, getByIdOrThrowMock,
     getCharacterWithStatsMock,
     createItemMock, getByIdMock, deleteItemMock,
     addItemMock, removeItemMock,
-    rngNextMock,
+    rngNextMock, combatResolveMock,
+    selectEventMock, eventResolveMock, generateCandidatesMock,
 } = vi.hoisted(() => ({
     getActiveByCharacterIdMock: vi.fn(),
     createRunMock: vi.fn(),
     saveCheckpointMock: vi.fn(),
     getByIdForAccountMock: vi.fn(),
     settleRunRewardsMock: vi.fn(),
+    getByIdOrThrowMock: vi.fn(),
     getCharacterWithStatsMock: vi.fn(),
     createItemMock: vi.fn(),
     getByIdMock: vi.fn(),
@@ -33,6 +35,30 @@ const {
     addItemMock: vi.fn(),
     removeItemMock: vi.fn(),
     rngNextMock: vi.fn(),
+    combatResolveMock: vi.fn(),
+    selectEventMock: vi.fn(),
+    eventResolveMock: vi.fn(),
+    generateCandidatesMock: vi.fn(),
+}));
+
+vi.mock('./combat.service', () => ({
+    CombatService: vi.fn().mockImplementation(function CombatServiceMock() {
+        return { resolve: combatResolveMock };
+    }),
+}));
+
+vi.mock('./event.service', () => ({
+    EventService: vi.fn().mockImplementation(function EventServiceMock() {
+        return {
+            selectEvent: selectEventMock, resolve: eventResolveMock,
+        };
+    }),
+}));
+
+vi.mock('./blessing.service', () => ({
+    BlessingService: vi.fn().mockImplementation(function BlessingServiceMock() {
+        return { generateCandidates: generateCandidatesMock };
+    }),
 }));
 
 vi.mock('../repositories/adventure-run.repository', () => ({
@@ -50,6 +76,7 @@ vi.mock('../repositories/character.repository', () => ({
         return {
             getByIdForAccount: getByIdForAccountMock,
             settleRunRewards: settleRunRewardsMock,
+            getByIdOrThrow: getByIdOrThrowMock,
         };
     }),
 }));
@@ -114,7 +141,10 @@ function baseRun(overrides: Partial<AdventureRun> = {}): AdventureRun {
 beforeEach(() => {
     vi.clearAllMocks();
     getByIdForAccountMock.mockResolvedValue({
-        characterId: 'char-1', accountId: 'account-1', 
+        characterId: 'char-1', accountId: 'account-1',
+    });
+    getByIdOrThrowMock.mockResolvedValue({
+        characterId: 'char-1', attributes: { LUCK: 0 },
     });
     saveCheckpointMock.mockImplementation(async (runId: string, patch: Record<string, unknown>) => ({
         ...baseRun(), ...patch,
@@ -276,8 +306,8 @@ describe('AdventureRunService.useHealingItem', () => {
     });
 });
 
-describe('AdventureRunService.endRun — settlement', () => {
-    it('reports items that could not fit into a full permanent inventory instead of dropping them', async () => {
+describe('AdventureRunService.getCurrentRun — auto-settlement on DISCONNECT', () => {
+    it('completes settlement (state -> ENDED) even when a run-inventory item cannot fit into a full permanent inventory', async () => {
         const droppedItem = {
             itemId: 'drop-1',
             templateId: 'salvaged_wrench',
@@ -289,18 +319,277 @@ describe('AdventureRunService.endRun — settlement', () => {
             createdAt: Date.now(),
         };
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
-            state: AdventureStateType.EXPLORING, runInventory: [droppedItem], score: 42, goldEarned: 10, gemsEarned: 1,
+            state: AdventureStateType.EXPLORING,
+            runInventory: [droppedItem],
+            score: 42,
+            goldEarned: 10,
+            gemsEarned: 1,
+            lastActivityAt: Date.now() - 20 * 60 * 1000, // past the 15-minute reconnect window
         }));
         createItemMock.mockResolvedValue(undefined);
         addItemMock.mockRejectedValue(new BusinessLogicError('Inventory is full'));
         settleRunRewardsMock.mockResolvedValue({ leveledUp: false });
 
         const service = new AdventureRunService();
-        const result = await service.endRun('account-1', 'char-1');
+        const result = await service.getCurrentRun('account-1', 'char-1');
 
-        expect(result.itemsEarned).toBe(0);
-        expect(result.untransferredItemIds).toEqual(['drop-1']);
-        expect(result.finalScore).toBe(42);
-        expect(result.expGained).toBe(42);
+        expect(result).toBeNull();
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            state: AdventureStateType.ENDED,
+            endReason: 'DISCONNECT',
+        }));
+    });
+});
+
+describe('AdventureRunService.resolveCombat', () => {
+    it('rejects when the run is not at a COMBAT node', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({ state: AdventureStateType.EXPLORING }));
+
+        const service = new AdventureRunService();
+        await expect(service.resolveCombat('account-1', 'char-1')).rejects.toThrow(BusinessLogicError);
+    });
+
+    it('rejects when the COMBAT node has no enemyLevel/tier context', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.COMBAT, currentNodeData: {}, 
+        }));
+
+        const service = new AdventureRunService();
+        await expect(service.resolveCombat('account-1', 'char-1')).rejects.toThrow(BusinessLogicError);
+    });
+
+    it('on victory: applies rewards, moves to RESOLUTION, and caps runInventory at 50', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.COMBAT,
+            currentNodeData: {
+                enemyLevel: 5, tier: NodeType.ELITE, 
+            },
+            score: 100,
+            goldEarned: 20,
+            gemsEarned: 3,
+            blessingPoints: 1,
+        }));
+        rngNextMock.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+        combatResolveMock.mockResolvedValue({
+            victory: true,
+            roundCount: 3,
+            playerHpRemaining: 80,
+            scoreGained: 50,
+            goldDropped: 10,
+            gemsDropped: 2,
+            itemsDropped: [],
+            blessingPointsGained: 2,
+            enemies: [
+                {
+                    enemyId: 'e1', name: 'Test Enemy', level: 5, 
+                },
+            ],
+            combatLog: [
+                {
+                    timestamp: 0, actorId: 'player', targetId: 'e1', action: 'ATTACK', damage: 5,
+                },
+            ],
+        });
+
+        const service = new AdventureRunService();
+        const result = await service.resolveCombat('account-1', 'char-1');
+
+        expect(combatResolveMock).toHaveBeenCalledWith(
+            expect.objectContaining({ runId: 'run-1' }),
+            expect.objectContaining({
+                enemyLevel: 5, tier: NodeType.ELITE, 
+            }),
+        );
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            state: AdventureStateType.RESOLUTION,
+            playerHp: 80,
+            score: 150,
+            goldEarned: 30,
+            gemsEarned: 5,
+            blessingPoints: 3,
+        }));
+        expect(result.summary.victory).toBe(true);
+        expect(result.combatLog).toHaveLength(1);
+    });
+
+    it('on defeat: settles the run with endReason=DEAD in a single checkpoint', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.COMBAT,
+            currentNodeData: {
+                enemyLevel: 5, tier: NodeType.COMBAT, 
+            },
+            runInventory: [],
+        }));
+        rngNextMock.mockResolvedValueOnce(0.9).mockResolvedValueOnce(0.9);
+        combatResolveMock.mockResolvedValue({
+            victory: false,
+            roundCount: 2,
+            playerHpRemaining: 0,
+            scoreGained: 0,
+            goldDropped: 0,
+            gemsDropped: 0,
+            itemsDropped: [],
+            blessingPointsGained: 0,
+            enemies: [
+                {
+                    enemyId: 'e1', name: 'Test Enemy', level: 5, 
+                },
+            ],
+            combatLog: [],
+        });
+        settleRunRewardsMock.mockResolvedValue({ leveledUp: false });
+
+        const service = new AdventureRunService();
+        const result = await service.resolveCombat('account-1', 'char-1');
+
+        expect(saveCheckpointMock).toHaveBeenCalledTimes(1);
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            state: AdventureStateType.ENDED,
+            endReason: 'DEAD',
+            playerHp: 0,
+        }));
+        expect(result.summary.victory).toBe(false);
+    });
+});
+
+describe('AdventureRunService.advanceFromExploring — EVENT node selection', () => {
+    it('calls eventService.selectEvent and stores the template info in currentNodeData', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            step: 1, lastRestStep: 0, 
+        }));
+        rngNextMock.mockResolvedValue(0.6); // weighted pick -> EVENT bucket (COMBAT 55/EVENT 25/...)
+        selectEventMock.mockResolvedValue({
+            id: 'medbay_leak', type: 'HEAL', description: 'flavor text', choices: undefined,
+        });
+
+        const service = new AdventureRunService();
+        await service.advance('account-1', 'char-1');
+
+        expect(selectEventMock).toHaveBeenCalledWith('run-1');
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            state: AdventureStateType.EVENT,
+            currentNodeData: expect.objectContaining({ eventTemplateId: 'medbay_leak' }),
+        }));
+        // Firestore rejects `undefined` field values — a choice-less template
+        // must omit the `choices` key entirely rather than set it to undefined.
+        const [, patch] = saveCheckpointMock.mock.calls[0] as [string, { currentNodeData: object }];
+        expect(patch.currentNodeData).not.toHaveProperty('choices');
+    });
+});
+
+describe('AdventureRunService.resolveEvent', () => {
+    it('rejects when the run is not at an EVENT node', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({ state: AdventureStateType.EXPLORING }));
+
+        const service = new AdventureRunService();
+        await expect(service.resolveEvent('account-1', 'char-1')).rejects.toThrow(BusinessLogicError);
+    });
+
+    it('applies the event outcome (heal + gold) and moves to RESOLUTION', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.EVENT,
+            playerHp: 50,
+            playerHpMax: 100,
+            goldEarned: 10,
+            currentNodeData: { eventTemplateId: 'medbay_leak' },
+        }));
+        eventResolveMock.mockResolvedValue({
+            eventId: 'medbay_leak', type: 'HEAL', description: 'flavor', hpHealed: 20, goldGained: 5,
+        });
+
+        const service = new AdventureRunService();
+        const result = await service.resolveEvent('account-1', 'char-1');
+
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            state: AdventureStateType.RESOLUTION,
+            playerHp: 70,
+            goldEarned: 15,
+        }));
+        expect(result.hpHealed).toBe(20);
+    });
+
+    it('forwards choiceIndex to eventService.resolve', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.EVENT,
+            currentNodeData: { eventTemplateId: 'sealed_crate' },
+        }));
+        eventResolveMock.mockResolvedValue({
+            eventId: 'sealed_crate', type: 'CHOICE', description: 'flavor', goldGained: 5,
+        });
+
+        const service = new AdventureRunService();
+        await service.resolveEvent('account-1', 'char-1', 1);
+
+        expect(eventResolveMock).toHaveBeenCalledWith(expect.objectContaining({ runId: 'run-1' }), 1);
+    });
+});
+
+describe('AdventureRunService.advanceFromResolution — BLESSING_SELECT candidate generation', () => {
+    it('generates candidates and stores them when blessingPoints reaches the threshold', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.RESOLUTION, blessingPoints: 3,
+        }));
+        getByIdOrThrowMock.mockResolvedValue({
+            characterId: 'char-1', attributes: { LUCK: 7 }, 
+        });
+        generateCandidatesMock.mockResolvedValue([
+            { modifierId: 'blessing_atk_boost' },
+            { modifierId: 'blessing_def_boost' },
+            { modifierId: 'blessing_hp_boost' },
+        ]);
+
+        const service = new AdventureRunService();
+        await service.advance('account-1', 'char-1');
+
+        expect(generateCandidatesMock).toHaveBeenCalledWith('run-1', 7);
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            state: AdventureStateType.BLESSING_SELECT,
+            currentNodeData: { candidates: expect.any(Array) },
+        }));
+    });
+});
+
+describe('AdventureRunService.selectBlessing', () => {
+    it('rejects a blessingId that is not among the current candidates', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.BLESSING_SELECT,
+            currentNodeData: {
+                candidates: [
+                    {
+                        modifierId: 'blessing_atk_boost', name: 'x', description: 'y', 
+                    },
+                ], 
+            },
+        }));
+
+        const service = new AdventureRunService();
+        await expect(service.selectBlessing('account-1', 'char-1', 'not-a-candidate')).rejects.toThrow(ValidationError);
+    });
+
+    it('adds the chosen blessing, resets blessingPoints, and advances to EXPLORING', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.BLESSING_SELECT,
+            step: 4,
+            blessings: [],
+            blessingPoints: 3,
+            currentNodeData: {
+                candidates: [
+                    {
+                        modifierId: 'blessing_atk_boost', name: '戰鬥意志', description: 'desc', isBlessing: true,
+                    },
+                ],
+            },
+        }));
+
+        const service = new AdventureRunService();
+        const chosen = await service.selectBlessing('account-1', 'char-1', 'blessing_atk_boost');
+
+        expect(chosen.modifierId).toBe('blessing_atk_boost');
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            state: AdventureStateType.EXPLORING,
+            step: 5,
+            blessings: ['blessing_atk_boost'],
+            blessingPoints: 0,
+        }));
     });
 });

@@ -37,6 +37,7 @@ import {
     getCurrentAdventureResponseSchema,
     advanceAdventureRequestSchema,
     advanceAdventureResponseSchema,
+    startCombatRequestSchema,
     startCombatResponseSchema,
     resolveEventRequestSchema,
     resolveEventResponseSchema,
@@ -44,8 +45,6 @@ import {
     selectBlessingResponseSchema,
     restHealRequestSchema,
     restHealResponseSchema,
-    endAdventureRequestSchema,
-    endAdventureResponseSchema,
 } from '../../shared/schemas/api/adventure.schema';
 
 import {
@@ -108,7 +107,6 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         SelectBlessingRequest: selectBlessingRequestSchema,
         SelectBlessingResponse: selectBlessingResponseSchema,
         RestHealResponse: restHealResponseSchema,
-        EndAdventureResponse: endAdventureResponseSchema,
         GetInventoryResponse: getInventoryResponseSchema,
         DeleteItemResponse: deleteItemResponseSchema,
         EquipItemRequest: equipItemRequestSchema,
@@ -490,6 +488,7 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         description: 'Start combat at current node',
         tags: ['Adventure'],
         security: [{ bearerAuth: [] }],
+        request: { body: { content: { 'application/json': { schema: startCombatRequestSchema } } } },
         responses: {
             200: {
                 description: 'Combat completed with log and summary',
@@ -566,29 +565,6 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             },
             400: {
                 description: 'Not at rest node',
-                content: { 'application/json': { schema: errorResponseSchema } },
-            },
-            401: {
-                description: 'Unauthorized',
-                content: { 'application/json': { schema: errorResponseSchema } },
-            },
-        },
-    });
-
-    registry.registerPath({
-        method: 'post',
-        path: '/api/adventure/end',
-        description: 'End current adventure and collect rewards',
-        tags: ['Adventure'],
-        security: [{ bearerAuth: [] }],
-        request: { body: { content: { 'application/json': { schema: endAdventureRequestSchema } } } },
-        responses: {
-            200: {
-                description: 'Adventure ended with rewards',
-                content: { 'application/json': { schema: endAdventureResponseSchema } },
-            },
-            400: {
-                description: 'No active adventure',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
             401: {
