@@ -19,6 +19,7 @@
 
 - 敵人共用同一組基礎 crit/dodge/暴擊倍率（`ENEMY_COMBAT_STATS`），但**不吃 AGI 加成**（敵人無 AGI 屬性）：暴擊率固定 5%、暴擊倍率 ×1.5、閃避率固定 3%。
 - `combatLog` 每筆事件含 `timestamp`（相對戰鬥時間 ms）、`actorId`/`targetId`、`action`（`ATTACK`/`CRIT`/`DODGE`/`DEATH`）；`roundCount` 統計 log 中排除 `DEATH` 事件後的筆數。
+- `combatSummary.enemies` 每筆敵人資料額外提供 `hpMax`（依 tier/enemyLevel 算好的最大生命值）與 `isBoss`（是否為 Boss 本體，用於區分小兵），供冒險畫面在逐批播放戰鬥紀錄時還原每隻敵人當下的即時狀態（見第 9 節）。
 - 戰鬥節點在**產生節點時**就先決定並存入 `currentNodeData` 的，是「第一波」完整敵人陣容（種類/名稱/描述/依 tier+enemyLevel 算好的 HP），供玩家開戰前預覽；第二波（若有）不預先揭露，實際解算時才決定。
 
 ## 2. 敵人 Archetype 基礎數值（`ENEMY_ARCHETYPES`，enemyLevel = 1 時的基礎值）
@@ -30,7 +31,7 @@
 | 失控搬運機 | 原本負責搬運零件的機具，如今橫衝直撞、不辨敵我。 | 12 | 2 | 50 | 2.2 | 1 | 是 |
 | 廢棄零件堆 | 拼湊而成的殘骸堆，靠著殘留電力勉強驅動、行動遲緩。 | 4 | 2 | 30 | 3.5 | 0 | 否 |
 
-> ASSUMPTION（`server/constants/combat.ts` 檔頭註解）：這四個 archetype 的數值、描述、`bossMinionCount`、`canReinforce` 別處都沒有定義（`10_戰鬥模型.md` 不存在，`docs/worldview.md` 明確把怪物命名/數值留給本 change 決定），皆為 `combat-engine` change 自行發明，可自由調整；`bossMinionCount`/`canReinforce` 則是 `chapter-level-structure` change 追加發明，見第 6 節。實際戰鬥數值由 `getStatMultipliers()` 依節點真實的 enemyLevel/tier 再乘一次倍率（見第 3 節），此表只是 enemyLevel=1 的基礎值。
+> ASSUMPTION（`server/constants/combat.ts` 檔頭註解）：這四個 archetype 的數值、描述、`bossMinionCount`、`canReinforce` 別處都沒有定義（`10_戰鬥模型.md` 不存在，`docs/worldview.md` 明確把怪物命名/數值留給本 change 決定），皆為 `combat-engine` change 自行發明，可自由調整；`bossMinionCount`/`canReinforce` 則是 `chapter-level-structure` change 追加發明，見第 6 節。實際戰鬥數值由 `getStatMultipliers()` 依節點真實的 enemyLevel/tier 再乘一次倍率（見第 3 節），此表只是 enemyLevel=1 的基礎值。這些數值目前皆已定案並 sync 進 `combat-engine/spec.md`（`Boss 小兵補位`、`一般戰鬥波次與敵人數上限` 需求），仍維持 ASSUMPTION 標記僅代表數字本身可自由調整，非代表尚未定案。
 
 ## 3. Enemy Tier 與數值倍率（`getStatMultipliers`，`difficulty.ts`）
 
@@ -89,7 +90,7 @@ BOSS_REINFORCE_CONFIG = {
 
 > ASSUMPTION（`server/constants/combat.ts` 註解）：`bossMinionCount`/`canReinforce`/`BOSS_REINFORCE_CONFIG` 三者皆為 `chapter-level-structure` change 自行發明（回合檢查間隔＋固定機率＋補位上限，只為讓模擬長度有界），可自由調整。
 >
-> **文件落差提醒**：`openspec/specs/combat-engine/spec.md` 目前仍寫「Boss 固定 1 wave、1 隻敵人」，尚未反映上述護衛/補位機制。此機制來自尚未 archive 的 `openspec/changes/chapter-level-structure/`（`tasks.md` 第 4 節「Boss 戰鬥：小兵陣容與補位機制」勾選框仍未打勾），但 `server/constants/combat.ts`、`server/services/combat.service.ts` 已經實作並生效——**本節描述的是目前程式碼的實際行為**，正式 spec.md 尚待該 change 完成測試並 archive 後同步。
+> 本節機制已於 2026-09-01 隨 `chapter-level-structure` change sync 進 `openspec/specs/combat-engine/spec.md`（「Boss 小兵補位」「Boss 戰鬥數值與獎勵」需求），程式碼與正式 spec 已一致，不再是文件落差。
 
 ## 7. 戰鬥結算與獎勵
 
@@ -119,12 +120,14 @@ RunModifier（Blessing/Curse）會在傷害/防禦/掉落計算前**額外加總
 
 `openspec/specs/character-archetype-abilities/spec.md` 只定義 5 個職業各一筆 `ArchetypeAbility` 靜態資料（`trigger` 列舉：`blessing_effect_boost`/`non_combat_node_bonus`/`enemy_encounter_record`/`salvage_material_drop`/`risk_reward_choice`），供消費端系統「查表使用」，**該 spec 明確不定義任何機率/倍率/數值，實際效果由消費端各自的 change 實作**。目前 `server/services/combat.service.ts` 沒有任何程式碼讀取或消費 `ArchetypeAbility`（已檢索確認無引用）——換言之，**5 個職業目前對戰鬥計算沒有任何實際數值影響**。唯一敘事上與戰鬥相關的是工匠 Tinkerer 的 `salvage_material_drop`（擊敗機械類敵人有機率獲得可轉化素材），但運算邏輯待確認由哪個未來 change 接入 combat 側。
 
-## 9. 前端呈現：戰鬥紀錄逐筆播放（規劃中，部分完成）
+## 9. 前端呈現：戰鬥紀錄逐批播放
 
-`openspec/changes/combat-log-sequential-playback/` change：前端 `combatResultPanel.vue` 依 `combatLog` 相鄰事件的 `timestamp` 差值排程逐批顯示（同一 `timestamp` 的多筆事件同時顯示），戰鬥摘要延後到最後一批播放完畢才顯示。`tasks.md` 顯示播放邏輯（1.1~1.3）已完成並打勾，但手動瀏覽器驗證（2.1）與 spec 同步/archive（3.2）尚未完成，change 尚未 archive。**純前端呈現層改動，不影響後端戰鬥運算/數值**（伺服器端邏輯與 API 回應格式不變）。
+前端 `combatResultPanel.vue` 依 `combatLog` 相鄰事件的 `timestamp` 差值排程逐批顯示（同一 `timestamp` 的多筆事件同時顯示），戰鬥摘要延後到最後一批播放完畢才顯示；播放期間顯示一份敵人狀態面板（依已播放批次即時反映每隻敵人的階級/名稱/HP，依 `combatSummary.enemies` 的 `hpMax`/`isBoss` 還原初始狀態），並以旋轉動畫視覺化下一批的倒數（單圈時長 = 目前批次到下一批次的等待時間）。此機制已隨 `combat-log-sequential-playback` change 於 2026-09-01 sync 進 `combat-engine/spec.md`（「戰鬥結果包含敵人狀態資料」「冒險畫面顯示戰鬥結果」需求）並 archive。**純前端呈現層改動，不影響後端戰鬥運算/數值**（伺服器端邏輯不變，僅 API 回應新增 `hpMax`/`isBoss` 兩個欄位）。
+
+戰鬥波次之間（換 wave）另有一段橫越戰場的 banner：先「戰鬥結束」、再「敵方增援來襲」、最後「戰鬥開始」＋波次計數（`N/N 波次`），詳見 `app/components/game/combatResultPanel.vue` 的 wave banner 時間軸邏輯；此為純前端演出節奏，不在 spec 範圍內。
 
 ## 落地備註
 
-- 第 6 節「BOSS 護衛與增援機制」是程式碼已生效、但正式 `spec.md` 尚未同步的內容，之後 `chapter-level-structure` change 完成測試並 archive 後，需重新核對本文件與新版 spec.md 是否一致。
+- 第 6 節「BOSS 護衛與增援機制」與第 9 節「戰鬥紀錄逐批播放」皆已完成 spec 同步與 change archive（2026-09-01），程式碼與正式 spec.md 已一致。
 - 第 8 節職業技能與戰鬥的整合目前完全空白，若未來要讓 Tinkerer 的 Salvage 或其他職業特色真的影響戰鬥數值，需要新的 change 定案機率/倍率並接進 `combat.service.ts`。
 - 標示 ASSUMPTION 的所有數值（敵人 archetype 基礎值、BOSS 倍率、BOSS 補位機制參數）皆非最終平衡數字，調整時不需要額外找「原始設計依據」，因為它們本來就是對應 change 自行發明的暫定值。
