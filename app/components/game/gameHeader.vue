@@ -46,18 +46,9 @@ defineEmits<{ 'open-drawer': [] }>();
         justify-content: center;
         width: 34px;
         height: 34px;
-        border-radius: 50%;
-        background: rgba(196, 203, 219, 0.08);
+        background: none;
         border: none;
         cursor: pointer;
-
-        &:hover {
-            background: rgba(196, 203, 219, 0.16);
-        }
-
-        &:active {
-            background: rgba(196, 203, 219, 0.22);
-        }
 
         &:focus-visible {
             outline: 2px solid rgb(var(--v-theme-primary));

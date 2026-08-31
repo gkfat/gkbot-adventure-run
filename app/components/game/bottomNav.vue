@@ -19,7 +19,7 @@
             <button
                 type="button"
                 class="bottom-nav__home pixel-press"
-                aria-label="首頁"
+                aria-label="冒險"
                 :aria-current="isOnMainPage ? 'page' : undefined"
                 @click="handleHomeTap"
             >
@@ -28,7 +28,7 @@
                     size="24"
                 />
             </button>
-            <span class="bottom-nav__label bottom-nav__label--home">首頁</span>
+            <span class="bottom-nav__label bottom-nav__label--home">冒險</span>
         </div>
 
         <button
@@ -104,8 +104,8 @@ const handleHomeTap = () => {
     display: grid;
     grid-template-columns: 1fr 1fr auto 1fr 1fr;
     align-items: end;
-    height: 62px;
-    padding-bottom: 6px;
+    height: 54px;
+    padding-bottom: 4px;
     background: rgb(var(--v-theme-background));
     border-top: 1px solid rgba(196, 203, 219, 0.12);
 
@@ -114,7 +114,7 @@ const handleHomeTap = () => {
         flex-direction: column;
         align-items: center;
         justify-content: flex-end;
-        gap: 2px;
+        gap: 5px;
         height: 100%;
         background: none;
         border: none;
@@ -144,9 +144,9 @@ const handleHomeTap = () => {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 52px;
-        height: 52px;
-        margin-top: -26px;
+        width: 46px;
+        height: 46px;
+        margin-top: -23px;
         border-radius: 8px;
         border: 3px solid rgb(var(--v-theme-background));
         background: rgb(var(--v-theme-green));
