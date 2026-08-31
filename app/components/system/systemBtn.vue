@@ -5,7 +5,8 @@
             ...$attrs,
         }"
         :class="[
-            'text-none text-green bg-dark opacity-100 pixel-btn pa-7',
+            'text-none opacity-100 pixel-btn',
+            props.size === 'default' ? 'pa-7' : '',
             $attrs.class,
         ]"
         @click="handleClick"
@@ -44,7 +45,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
     // 預設樣式
-    variant: 'plain',
+    variant: 'flat',
     size: 'default',
     rounded: 'lg',
     

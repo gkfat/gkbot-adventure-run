@@ -44,6 +44,8 @@ function baseCharacter(overrides: Partial<Character> = {}): Character {
         unspentAttributePoints: 0,
         equipment: {},
         nextChapterIndex: 0,
+        currentLevelIndex: 0,
+        chapterTotalLevels: 5,
         nickname: '玩家A1B2C3',
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -58,10 +60,33 @@ beforeEach(() => {
     }));
 });
 
-describe('CharacterRepository.settleRunRewards', () => {
-    it('advances nextChapterIndex when endReason=COMPLETED', async () => {
+describe('CharacterRepository.settleRunRewards — chapter/level advance (chapter-level-structure)', () => {
+    it('advances currentLevelIndex within the same chapter when the chapter has levels left', async () => {
         txGetMock.mockResolvedValue({
-            exists: true, data: () => baseCharacter({ nextChapterIndex: 2 }),
+            exists: true, data: () => baseCharacter({
+                nextChapterIndex: 2, currentLevelIndex: 1, chapterTotalLevels: 5,
+            }),
+        });
+
+        const repo = new CharacterRepository();
+        const result = await repo.settleRunRewards('char-1', {
+            goldEarned: 10, gemsEarned: 1, expGained: 50, endReason: AdventureEndReason.COMPLETED,
+        });
+
+        expect(result.character.currentLevelIndex).toBe(2);
+        expect(result.character.chapterTotalLevels).toBe(5);
+        expect(result.character.nextChapterIndex).toBe(2);
+        expect(result.chapterAdvanced).toBe(false);
+        expect(txUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'char-1' }), expect.objectContaining({
+            currentLevelIndex: 2, nextChapterIndex: 2,
+        }));
+    });
+
+    it('advances nextChapterIndex and resets currentLevelIndex when the chapter\'s last level completes', async () => {
+        txGetMock.mockResolvedValue({
+            exists: true, data: () => baseCharacter({
+                nextChapterIndex: 2, currentLevelIndex: 4, chapterTotalLevels: 5,
+            }),
         });
 
         const repo = new CharacterRepository();
@@ -70,14 +95,19 @@ describe('CharacterRepository.settleRunRewards', () => {
         });
 
         expect(result.character.nextChapterIndex).toBe(3);
+        expect(result.character.currentLevelIndex).toBe(0);
+        expect(result.character.chapterTotalLevels).toBeGreaterThan(0);
+        expect(result.chapterAdvanced).toBe(true);
         expect(txUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'char-1' }), expect.objectContaining({
-            nextChapterIndex: 3,
+            nextChapterIndex: 3, currentLevelIndex: 0,
         }));
     });
 
-    it('leaves nextChapterIndex unchanged when endReason=DEAD', async () => {
+    it('leaves chapter/level progress unchanged when endReason=DEAD', async () => {
         txGetMock.mockResolvedValue({
-            exists: true, data: () => baseCharacter({ nextChapterIndex: 2 }),
+            exists: true, data: () => baseCharacter({
+                nextChapterIndex: 2, currentLevelIndex: 4, chapterTotalLevels: 5,
+            }),
         });
 
         const repo = new CharacterRepository();
@@ -86,14 +116,19 @@ describe('CharacterRepository.settleRunRewards', () => {
         });
 
         expect(result.character.nextChapterIndex).toBe(2);
+        expect(result.character.currentLevelIndex).toBe(4);
+        expect(result.character.chapterTotalLevels).toBe(5);
+        expect(result.chapterAdvanced).toBe(false);
         expect(txUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'char-1' }), expect.objectContaining({
-            nextChapterIndex: 2,
+            nextChapterIndex: 2, currentLevelIndex: 4, chapterTotalLevels: 5,
         }));
     });
 
-    it('leaves nextChapterIndex unchanged when endReason=DISCONNECT', async () => {
+    it('leaves chapter/level progress unchanged when endReason=DISCONNECT', async () => {
         txGetMock.mockResolvedValue({
-            exists: true, data: () => baseCharacter({ nextChapterIndex: 5 }),
+            exists: true, data: () => baseCharacter({
+                nextChapterIndex: 5, currentLevelIndex: 2, chapterTotalLevels: 8,
+            }),
         });
 
         const repo = new CharacterRepository();
@@ -102,11 +137,16 @@ describe('CharacterRepository.settleRunRewards', () => {
         });
 
         expect(result.character.nextChapterIndex).toBe(5);
+        expect(result.character.currentLevelIndex).toBe(2);
+        expect(result.character.chapterTotalLevels).toBe(8);
+        expect(result.chapterAdvanced).toBe(false);
     });
 
     it('reports leveledUp and unspentAttributePointsGained across a level-up', async () => {
         txGetMock.mockResolvedValue({
-            exists: true, data: () => baseCharacter({ level: 1, exp: 0 }),
+            exists: true, data: () => baseCharacter({
+                level: 1, exp: 0, 
+            }),
         });
 
         const repo = new CharacterRepository();
@@ -121,16 +161,45 @@ describe('CharacterRepository.settleRunRewards', () => {
     });
 
     it('treats a missing nextChapterIndex on a legacy character document as 0', async () => {
-        const legacyDoc = baseCharacter();
+        const legacyDoc = baseCharacter({
+            currentLevelIndex: 0, chapterTotalLevels: 5, 
+        });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         delete (legacyDoc as any).nextChapterIndex;
-        txGetMock.mockResolvedValue({ exists: true, data: () => legacyDoc });
+        txGetMock.mockResolvedValue({
+            exists: true, data: () => legacyDoc, 
+        });
 
         const repo = new CharacterRepository();
         const result = await repo.settleRunRewards('char-1', {
             goldEarned: 0, gemsEarned: 0, expGained: 0, endReason: AdventureEndReason.COMPLETED,
         });
 
-        expect(result.character.nextChapterIndex).toBe(1);
+        // nextChapterIndex defaults to 0, and since currentLevelIndex(0)+1 < chapterTotalLevels(5)
+        // this is a same-chapter level advance, not a chapter advance.
+        expect(result.character.nextChapterIndex).toBe(0);
+        expect(result.character.currentLevelIndex).toBe(1);
+        expect(result.chapterAdvanced).toBe(false);
+    });
+
+    it('treats missing currentLevelIndex/chapterTotalLevels on a legacy character document as freshly-rolled defaults', async () => {
+        const legacyDoc = baseCharacter({ nextChapterIndex: 3 });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (legacyDoc as any).currentLevelIndex;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (legacyDoc as any).chapterTotalLevels;
+        txGetMock.mockResolvedValue({
+            exists: true, data: () => legacyDoc, 
+        });
+
+        const repo = new CharacterRepository();
+        const result = await repo.settleRunRewards('char-1', {
+            goldEarned: 0, gemsEarned: 0, expGained: 0, endReason: AdventureEndReason.DEAD,
+        });
+
+        // DEAD doesn't advance, but the missing fields must still be
+        // defaulted (and persisted) rather than left undefined.
+        expect(result.character.currentLevelIndex).toBe(0);
+        expect(result.character.chapterTotalLevels).toBeGreaterThan(0);
     });
 });

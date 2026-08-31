@@ -28,6 +28,8 @@ export const combatSummarySchema = z.object({
         enemyId: z.string(),
         name: z.string(),
         level: z.number().int().min(1),
+        hpMax: z.number().int().min(1),
+        isBoss: z.boolean(),
     })),
     completedAt: z.number(),
 }).strict();
@@ -48,6 +50,7 @@ export const settleSummarySchema = z.object({
     forfeitedGold: z.number().int().min(0),
     forfeitedGems: z.number().int().min(0),
     forfeitedItems: z.array(itemInstanceSchema),
+    chapterAdvanced: z.boolean(),
 }).strict();
 
 /**

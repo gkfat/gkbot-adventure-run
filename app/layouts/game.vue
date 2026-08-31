@@ -12,7 +12,7 @@
             :style="{ width: '100%', maxWidth: '500px', height: '100%' }"
         >
             <GameHeader @open-drawer="drawerOpen = true" />
-            <GameResourceBar />
+            <GameResourceBar v-if="!isAdventurePage" />
 
             <main class="game-stage flex-grow-1">
                 <slot />

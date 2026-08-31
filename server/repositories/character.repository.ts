@@ -11,7 +11,9 @@
 import { BaseRepository } from './base.repository';
 import type { Character } from '../../shared/types/character';
 import { EXP_TABLE } from '../../shared/types/character';
-import { AdventureEndReason } from '../../shared/types/adventure';
+import {
+    AdventureEndReason, rollChapterTotalLevels,
+} from '../../shared/types/adventure';
 import { characterSchema } from '../../shared/schemas/firestore/character.schema';
 import {
     DatabaseError, NotFoundError,
@@ -22,6 +24,7 @@ import {
 import {
     LEGACY_ARCHETYPE_ID, LEGACY_CLASS_NAME, type CharacterArchetype,
 } from '../constants/characterArchetypes';
+import { random } from '../services/rng.service';
 
 export const CHARACTER_ROSTER_MAX = 3;
 
@@ -36,12 +39,41 @@ function withNextChapterDefault(character: Character): Character {
     };
 }
 
+/**
+ * Deterministic roll for a chapter's total level count, from the character's
+ * own id + the chapter index — no persisted seed needed, and stable across
+ * repeated calls for the same (characterId, chapterIndex) pair (chapter-level-structure).
+ */
+function rollChapterTotalLevelsForCharacter(characterId: string, chapterIndex: number): number {
+    return rollChapterTotalLevels(chapterIndex, random(characterId, chapterIndex));
+}
+
+/**
+ * Backfill `currentLevelIndex`/`chapterTotalLevels` for character documents
+ * written before `chapter-level-structure` shipped — same "不做資料回填"
+ * tolerance pattern as withNextChapterDefault, made stable by deriving
+ * `chapterTotalLevels` deterministically (see rollChapterTotalLevelsForCharacter)
+ * instead of persisting a rolled value.
+ */
+function withLevelDefaults(character: Character): Character {
+    return {
+        ...character,
+        currentLevelIndex: character.currentLevelIndex ?? 0,
+        chapterTotalLevels: character.chapterTotalLevels
+            ?? rollChapterTotalLevelsForCharacter(character.characterId, character.nextChapterIndex),
+    };
+}
+
+function withCharacterDefaults(character: Character): Character {
+    return withLevelDefaults(withNextChapterDefault(character));
+}
+
 export class CharacterRepository extends BaseRepository<Character> {
     protected collectionName = 'characters';
 
     override async getById(id: string): Promise<Character | null> {
         const character = await super.getById(id);
-        return character ? withNextChapterDefault(character) : null;
+        return character ? withCharacterDefaults(character) : null;
     }
 
     /**
@@ -95,6 +127,8 @@ export class CharacterRepository extends BaseRepository<Character> {
             equipment: {},
 
             nextChapterIndex: 0,
+            currentLevelIndex: 0,
+            chapterTotalLevels: rollChapterTotalLevelsForCharacter(characterId, 0),
 
             nickname: this.generateArchetypeNickname(archetype.className, characterId),
 
@@ -207,17 +241,25 @@ export class CharacterRepository extends BaseRepository<Character> {
      * adventure-run-core/design.md). `goldEarned`/`gemsEarned` are 0 when the
      * caller already decided the run failed (single-stage-run-settlement:
      * only a `COMPLETED` run keeps gold/gems — that decision is made by the
-     * caller, not here). `nextChapterIndex` (which facility theme the
-     * character's next run starts at) only advances on `COMPLETED`. Runs
-     * inside a transaction since it's a read-modify-write on the same
-     * document a concurrent equip/attribute allocation could also be touching.
+     * caller, not here).
+     *
+     * Chapter/Level advance (chapter-level-structure): a `COMPLETED` run only
+     * advances `currentLevelIndex` (same chapter, same facility theme) unless
+     * it just cleared the chapter's last level — only then does
+     * `nextChapterIndex` advance, `currentLevelIndex` reset to 0, and a new
+     * `chapterTotalLevels` get rolled for the new chapter. DEAD/DISCONNECT
+     * touch neither. Runs inside a transaction since it's a read-modify-write
+     * on the same document a concurrent equip/attribute allocation could also
+     * be touching.
      */
     async settleRunRewards(characterId: string, rewards: {
         goldEarned: number;
         gemsEarned: number;
         expGained: number;
         endReason: AdventureEndReason;
-    }): Promise<{ character: Character; leveledUp: boolean; unspentAttributePointsGained: number }> {
+    }): Promise<{
+        character: Character; leveledUp: boolean; unspentAttributePointsGained: number; chapterAdvanced: boolean;
+    }> {
         const docRef = this.getDocumentRef(characterId);
 
         try {
@@ -226,7 +268,7 @@ export class CharacterRepository extends BaseRepository<Character> {
                 if (!doc.exists) {
                     throw new NotFoundError('character');
                 }
-                const character = withNextChapterDefault(doc.data() as Character);
+                const character = withCharacterDefaults(doc.data() as Character);
 
                 const gold = clamp(character.gold + rewards.goldEarned, 0, RESOURCE_LIMITS.GOLD_MAX - 1);
                 const gems = clamp(character.gems + rewards.gemsEarned, 0, RESOURCE_LIMITS.GEMS_MAX - 1);
@@ -244,21 +286,35 @@ export class CharacterRepository extends BaseRepository<Character> {
                     exp = 0;
                 }
 
-                const nextChapterIndex = rewards.endReason === AdventureEndReason.COMPLETED
-                    ? character.nextChapterIndex + 1
-                    : character.nextChapterIndex;
+                let {
+                    nextChapterIndex, currentLevelIndex, chapterTotalLevels, 
+                } = character;
+                let chapterAdvanced = false;
+
+                if (rewards.endReason === AdventureEndReason.COMPLETED) {
+                    const nextLevelIndex = character.currentLevelIndex + 1;
+                    if (nextLevelIndex < character.chapterTotalLevels) {
+                        currentLevelIndex = nextLevelIndex;
+                    } else {
+                        nextChapterIndex = character.nextChapterIndex + 1;
+                        currentLevelIndex = 0;
+                        chapterTotalLevels = rollChapterTotalLevelsForCharacter(characterId, nextChapterIndex);
+                        chapterAdvanced = true;
+                    }
+                }
 
                 const updated: Character = {
-                    ...character, gold, gems, level, exp, unspentAttributePoints, nextChapterIndex,
+                    ...character, gold, gems, level, exp, unspentAttributePoints, nextChapterIndex, currentLevelIndex, chapterTotalLevels,
                 };
                 tx.update(docRef, {
-                    gold, gems, level, exp, unspentAttributePoints, nextChapterIndex, updatedAt: Date.now(),
+                    gold, gems, level, exp, unspentAttributePoints, nextChapterIndex, currentLevelIndex, chapterTotalLevels, updatedAt: Date.now(),
                 });
 
                 return {
                     character: updated,
                     leveledUp: level > character.level,
                     unspentAttributePointsGained: level - character.level,
+                    chapterAdvanced,
                 };
             });
         } catch (error: unknown) {

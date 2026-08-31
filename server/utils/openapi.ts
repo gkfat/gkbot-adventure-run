@@ -37,6 +37,8 @@ import {
     getCurrentAdventureResponseSchema,
     advanceAdventureRequestSchema,
     advanceAdventureResponseSchema,
+    abandonAdventureRequestSchema,
+    abandonAdventureResponseSchema,
     startCombatRequestSchema,
     startCombatResponseSchema,
     resolveEventRequestSchema,
@@ -101,6 +103,7 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         StartAdventureResponse: startAdventureResponseSchema,
         GetCurrentAdventureResponse: getCurrentAdventureResponseSchema,
         AdvanceAdventureResponse: advanceAdventureResponseSchema,
+        AbandonAdventureResponse: abandonAdventureResponseSchema,
         StartCombatResponse: startCombatResponseSchema,
         ResolveEventRequest: resolveEventRequestSchema,
         ResolveEventResponse: resolveEventResponseSchema,
@@ -451,6 +454,29 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             200: {
                 description: 'Current adventure state (null if no active adventure)',
                 content: { 'application/json': { schema: getCurrentAdventureResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/adventure/abandon',
+        description: 'Force-settle the active adventure run as DISCONNECT (forfeit), regardless of reconnect window',
+        tags: ['Adventure'],
+        security: [{ bearerAuth: [] }],
+        request: { body: { content: { 'application/json': { schema: abandonAdventureRequestSchema } } } },
+        responses: {
+            200: {
+                description: 'Run abandoned and settled',
+                content: { 'application/json': { schema: abandonAdventureResponseSchema } },
+            },
+            400: {
+                description: 'No active adventure run',
+                content: { 'application/json': { schema: errorResponseSchema } },
             },
             401: {
                 description: 'Unauthorized',

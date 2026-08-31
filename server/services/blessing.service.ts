@@ -7,7 +7,7 @@ import { BaseService } from './base.service';
 import { RngService } from './rng.service';
 import {
     BLESSING_TEMPLATES, majorTierChance, type BlessingTemplate,
-} from '../constants/blessings';
+} from '../../shared/constants/blessings';
 import type { RunModifier } from '../../shared/types/adventure';
 
 const CANDIDATE_COUNT = 3;

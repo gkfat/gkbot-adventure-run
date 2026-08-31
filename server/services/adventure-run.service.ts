@@ -38,6 +38,7 @@ import {
     type AdventureRun, type LeaderboardUpdater, type ProgressTracker,
     type CombatResolver, type CombatContext, type CombatResolution, type CombatSummary, type CombatLogEntry,
     type EventResult, type RunModifier, type SettleSummary, type EnemyPreview,
+    disambiguateEnemyNames,
 } from '../../shared/types/adventure';
 import type { Character } from '../../shared/types/character';
 import type { ItemInstance } from '../../shared/types/item';
@@ -166,10 +167,26 @@ export class AdventureRunService extends BaseService {
 
         if (Date.now() - run.lastActivityAt > NODE_CONFIG.RECONNECT_WINDOW_MS) {
             const { settlement } = await this.settleRun(run, AdventureEndReason.DISCONNECT);
-            return { run: null, settlement };
+            return {
+                run: null, settlement, 
+            };
         }
 
         return { run };
+    }
+
+    /**
+     * Force-settle the character's active run as DISCONNECT right now,
+     * regardless of the reconnect window — used for an explicit "放棄本次
+     * 冒險" action and for a cold reload landing directly on /adventure
+     * (known-issue.md #8: either should immediately count as a failed run,
+     * not a resumable one).
+     */
+    async abandonRun(accountId: string, characterId: string): Promise<{ settlement: SettleSummary }> {
+        await this.requireOwnedCharacter(accountId, characterId);
+        const run = await this.requireActiveRun(characterId);
+        const { settlement } = await this.settleRun(run, AdventureEndReason.DISCONNECT);
+        return { settlement };
     }
 
     /**
@@ -305,8 +322,9 @@ export class AdventureRunService extends BaseService {
         const resolution = await this.combatResolver.resolve(run, context);
         const combatResult: Partial<CombatResolution> = { ...resolution };
         delete combatResult.combatLog;
+        delete combatResult.finalRngIndex;
         const summary: CombatSummary = {
-            ...(combatResult as Omit<CombatResolution, 'combatLog'>), completedAt: Date.now(),
+            ...(combatResult as Omit<CombatResolution, 'combatLog' | 'finalRngIndex'>), completedAt: Date.now(),
         };
 
         const runInventory = [...run.runInventory, ...resolution.itemsDropped]
@@ -324,6 +342,7 @@ export class AdventureRunService extends BaseService {
                 lastCombatSummary: summary,
                 currentNodeData: FieldValue.delete(),
                 lastActivityAt: Date.now(),
+                rngIndex: resolution.finalRngIndex,
             });
             await this.progressTracker.incrementProgress({
                 accountId: run.accountId, characterId: run.characterId, type: 'ENEMY_KILLED', amount: resolution.enemies.length,
@@ -338,6 +357,7 @@ export class AdventureRunService extends BaseService {
         }, AdventureEndReason.DEAD, {
             playerHp: 0,
             lastCombatSummary: summary,
+            rngIndex: resolution.finalRngIndex,
         });
 
         return {
@@ -456,7 +476,9 @@ export class AdventureRunService extends BaseService {
      * fixed elite cadence > weighted random (see spec.md "節點生成優先序").
      */
     private async decideNextNode(run: AdventureRun): Promise<NodeType> {
-        const { stageNodeIndex, stageNodeCount } = resolveStageFields(run);
+        const {
+            stageNodeIndex, stageNodeCount, 
+        } = resolveStageFields(run);
         if (stageNodeIndex === stageNodeCount - 1) {
             return NodeType.BOSS;
         }
@@ -519,9 +541,13 @@ export class AdventureRunService extends BaseService {
      */
     private async buildCombatNodeData(run: AdventureRun, tier: CombatContext['tier']) {
         const enemyLevel = getEnemyLevel(run.step);
-        const isBoss = tier === NodeType.BOSS;
-        const waveCount = isBoss ? 1 : rollWaveCount(run.step, await this.rngService.next(run.runId));
-        const enemyCountPerWave = isBoss ? 1 : rollEnemyCount(run.step, await this.rngService.next(run.runId));
+
+        if (tier === NodeType.BOSS) {
+            return this.buildBossNodeData(run, enemyLevel);
+        }
+
+        const waveCount = rollWaveCount(run.step, await this.rngService.next(run.runId));
+        const enemyCountPerWave = rollEnemyCount(run.step, await this.rngService.next(run.runId));
 
         const multipliers = getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[tier]);
         const firstWaveEnemies: EnemyPreview[] = [];
@@ -535,6 +561,7 @@ export class AdventureRunService extends BaseService {
                 description: archetype.description,
                 level: enemyLevel,
                 hp: Math.round(archetype.baseHp * multipliers.hp),
+                isBoss: false,
             });
         }
 
@@ -544,7 +571,57 @@ export class AdventureRunService extends BaseService {
             tier,
             waveCount,
             enemyCountPerWave,
-            firstWaveEnemies,
+            firstWaveEnemies: disambiguateEnemyNames(firstWaveEnemies),
+        };
+    }
+
+    /**
+     * Boss composition (chapter-level-structure): 1 wave, 1 boss unit (BOSS
+     * tier stats) + the boss archetype's own `bossMinionCount` (0~2) escort
+     * minions (STRONG_ELITE tier stats) — all sharing the same archetype, so
+     * the preview and the actual fight (combat.service reuses this same
+     * archetypeIndex per slot via firstWaveArchetypeIndices) stay in sync.
+     * Whether the boss can reinforce fallen minions mid-fight is decided
+     * entirely inside combat.service from the archetype's `canReinforce`
+     * flag — nothing extra to preview here.
+     */
+    private async buildBossNodeData(run: AdventureRun, enemyLevel: number) {
+        const archetypeRoll = await this.rngService.next(run.runId);
+        const archetypeIndex = Math.floor(archetypeRoll * ENEMY_ARCHETYPES.length);
+        const archetype = ENEMY_ARCHETYPES[archetypeIndex] as typeof ENEMY_ARCHETYPES[number];
+        const enemyCountPerWave = 1 + archetype.bossMinionCount;
+
+        const bossMultipliers = getStatMultipliers(enemyLevel, 'BOSS');
+        const minionMultipliers = getStatMultipliers(enemyLevel, 'STRONG_ELITE');
+
+        const firstWaveEnemies: EnemyPreview[] = [
+            {
+                archetypeIndex,
+                name: archetype.name,
+                description: archetype.description,
+                level: enemyLevel,
+                hp: Math.round(archetype.baseHp * bossMultipliers.hp),
+                isBoss: true,
+            },
+        ];
+        for (let i = 0; i < archetype.bossMinionCount; i++) {
+            firstWaveEnemies.push({
+                archetypeIndex,
+                name: archetype.name,
+                description: archetype.description,
+                level: enemyLevel,
+                hp: Math.round(archetype.baseHp * minionMultipliers.hp),
+                isBoss: false,
+            });
+        }
+
+        return {
+            pending: true,
+            enemyLevel,
+            tier: NodeType.BOSS,
+            waveCount: 1,
+            enemyCountPerWave,
+            firstWaveEnemies: disambiguateEnemyNames(firstWaveEnemies),
         };
     }
 
@@ -623,7 +700,9 @@ export class AdventureRunService extends BaseService {
         const gemsEarned = isSuccess ? run.gemsEarned : 0;
         const expGained = run.expEarned;
 
-        const { character, leveledUp, unspentAttributePointsGained } = await this.characterRepo.settleRunRewards(run.characterId, {
+        const {
+            character, leveledUp, unspentAttributePointsGained, chapterAdvanced,
+        } = await this.characterRepo.settleRunRewards(run.characterId, {
             goldEarned, gemsEarned, expGained, endReason,
         });
 
@@ -650,6 +729,7 @@ export class AdventureRunService extends BaseService {
             forfeitedGold: isSuccess ? 0 : run.goldEarned,
             forfeitedGems: isSuccess ? 0 : run.gemsEarned,
             forfeitedItems: isSuccess ? [] : run.runInventory,
+            chapterAdvanced,
         };
 
         const updatedRun = await this.runRepo.saveCheckpoint(run.runId, {
@@ -661,6 +741,8 @@ export class AdventureRunService extends BaseService {
             settlement,
         });
 
-        return { run: updatedRun, settlement };
+        return {
+            run: updatedRun, settlement, 
+        };
     }
 }

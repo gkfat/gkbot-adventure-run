@@ -61,7 +61,8 @@ export type Enemy = {
  * Combat log entry
  */
 export type CombatLogEntry = {
-  timestamp: number;           // Relative combat time (ms)
+  timestamp: number;           // Relative combat time (ms), reset to 0 at the start of each wave
+  wave: number;                // 0-based wave index this entry belongs to
   actorId: string;            // 'player' or enemyId
   targetId: string;           // 'player' or enemyId
   action: 'ATTACK' | 'CRIT' | 'DODGE' | 'DEATH';
@@ -86,8 +87,12 @@ export type CombatResult = {
 
   // Enemies encountered this combat (included here, not just on CombatSummary,
   // so the caller can build combatSummary/combatLog display without a second
-  // channel back from CombatResolver.resolve()).
-  enemies: Array<{ enemyId: string; name: string; level: number }>;
+  // channel back from CombatResolver.resolve()). `hpMax`/`isBoss` (chapter-level-structure)
+  // let the adventure screen render a live enemy status panel (tier/HP) as
+  // combatLog plays back — see combat-log-sequential-playback.
+  enemies: Array<{
+    enemyId: string; name: string; level: number; hpMax: number; isBoss: boolean;
+  }>;
 };
 
 /**
@@ -106,6 +111,12 @@ export type CombatSummary = CombatResult & {
  */
 export type CombatResolution = CombatResult & {
   combatLog: CombatLogEntry[];
+  // Next unconsumed rngIndex after this combat — the caller must persist it
+  // (as `run.rngIndex`) in the same checkpoint write that follows combat
+  // resolution, and must NOT let it leak into CombatSummary (see combat.service
+  // RNG-batching: all rolls happen in-memory off a cursor started at
+  // run.rngIndex, so this is the only point where the advance gets written back).
+  finalRngIndex: number;
 };
 
 /**
@@ -147,6 +158,7 @@ export type EnemyPreview = {
   description: string;
   level: number;
   hp: number;
+  isBoss: boolean;
 };
 
 /**
@@ -225,6 +237,12 @@ export type SettleSummary = {
   forfeitedGold: number;
   forfeitedGems: number;
   forfeitedItems: ItemInstance[];
+
+  // Chapter/Level advance (chapter-level-structure) — true only when this
+  // settlement cleared the chapter's last level and moved to the next
+  // facility theme; false for a same-chapter level advance, and for
+  // DEAD/DISCONNECT (which never advance either).
+  chapterAdvanced: boolean;
 };
 
 /**
@@ -354,8 +372,9 @@ export const NODE_CONFIG = {
     ELITE_INTERVAL: 5,            // Elite every 5 steps
     STRONG_ELITE_INTERVAL: 9,     // Strong elite every 9 steps
 
-    // Reconnection window
-    RECONNECT_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
+    // Reconnection window — after this much idle time, getCurrentRun()
+    // auto-settles the run as DISCONNECT (known-issue.md #8).
+    RECONNECT_WINDOW_MS: 5 * 60 * 1000, // 5 minutes
 
     // Weighted random node type when neither the rest guarantee nor the
     // elite cadence triggers. ASSUMPTION (undocumented elsewhere): rest is
@@ -424,8 +443,14 @@ export const STAGE_CONFIG = {
     NODE_COUNT_MIN: 10,
     NODE_COUNT_MAX: 20,             // inclusive, decisive RNG uniform roll at stage start
     FACILITY_THEMES: [
-        '廢棄補給站', '廢棄研究所', '廢棄維修廠', '崩壞VR體驗館',
-        '廢棄工廠', '荒廢遊樂場', '廢棄百貨公司', '無主小賣店',
+        '廢棄補給站',
+        '廢棄研究所',
+        '廢棄維修廠',
+        '崩壞VR體驗館',
+        '廢棄工廠',
+        '荒廢遊樂場',
+        '廢棄百貨公司',
+        '無主小賣店',
     ],
 } as const;
 
@@ -437,10 +462,89 @@ export function getFacilityTheme(chapterIndex: number): string {
 }
 
 /**
+ * Chapter/Level hierarchy (chapter-level-structure): a Chapter = one facility
+ * theme (STAGE_CONFIG.FACILITY_THEMES), a Level = one run within that
+ * chapter. Range indexes line up positionally with FACILITY_THEMES.
+ * ASSUMPTION (undocumented elsewhere, see design.md): these ranges are
+ * invented values reflecting docs/worldview.md 第 2 節's scale language
+ * (小賣店 = quick, 研究設施 = long) — freely tunable.
+ */
+export const LEVEL_COUNT_RANGE_BY_FACILITY: readonly { min: number; max: number }[] = [
+    {
+        min: 5, max: 8, 
+    },   // 廢棄補給站
+    {
+        min: 8, max: 12, 
+    },  // 廢棄研究所
+    {
+        min: 6, max: 9, 
+    },   // 廢棄維修廠
+    {
+        min: 6, max: 10, 
+    },  // 崩壞VR體驗館
+    {
+        min: 7, max: 11, 
+    },  // 廢棄工廠
+    {
+        min: 5, max: 8, 
+    },   // 荒廢遊樂場
+    {
+        min: 6, max: 10, 
+    },  // 廢棄百貨公司
+    {
+        min: 3, max: 5, 
+    },   // 無主小賣店
+] as const;
+
+/**
+ * The level-count range for a given chapter — cycles through
+ * LEVEL_COUNT_RANGE_BY_FACILITY the same way getFacilityTheme cycles
+ * FACILITY_THEMES (same chapterIndex, same modulo).
+ */
+export function getLevelCountRange(chapterIndex: number): { min: number; max: number } {
+    return LEVEL_COUNT_RANGE_BY_FACILITY[chapterIndex % LEVEL_COUNT_RANGE_BY_FACILITY.length] as { min: number; max: number };
+}
+
+/**
+ * Roll a chapter's total level count from a single RNG draw in [0, 1) —
+ * pure function, the caller supplies the randomness (see
+ * CharacterRepository for the real seed source, mirroring
+ * AdventureRunRepository's rollInRange pattern for stageNodeCount).
+ */
+export function rollChapterTotalLevels(chapterIndex: number, rngValue: number): number {
+    const range = getLevelCountRange(chapterIndex);
+    return range.min + Math.floor(rngValue * (range.max - range.min + 1));
+}
+
+/**
  * Display name for a stage, e.g. "廢棄研究所" — single-stage-run-settlement:
  * a run is always exactly one Stage now, so there is no chapter-internal
  * stage number worth showing.
  */
 export function getStageDisplayName(chapterIndex: number): string {
     return getFacilityTheme(chapterIndex);
+}
+
+/**
+ * Enemy rosters can contain multiple units sharing the same archetype name
+ * (random multi-enemy waves, or a BOSS node's escort minions sharing the
+ * boss's archetype) — append a 1-based index per duplicate group so the
+ * player can tell them apart, e.g. "廢棄零件堆1", "廢棄零件堆2". Units with a
+ * unique name are left untouched.
+ */
+export function disambiguateEnemyNames<T extends { name: string }>(units: T[]): T[] {
+    const countByName = new Map<string, number>();
+    for (const unit of units) {
+        countByName.set(unit.name, (countByName.get(unit.name) ?? 0) + 1);
+    }
+
+    const seenByName = new Map<string, number>();
+    return units.map((unit) => {
+        if ((countByName.get(unit.name) ?? 0) <= 1) return unit;
+        const nextIndex = (seenByName.get(unit.name) ?? 0) + 1;
+        seenByName.set(unit.name, nextIndex);
+        return {
+            ...unit, name: `${unit.name}${nextIndex}`,
+        };
+    });
 }

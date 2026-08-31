@@ -36,6 +36,19 @@ export function random(seed: string, index: number): number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
+/**
+ * An in-memory, synchronous cursor over the same `random(seed, index)`
+ * sequence `RngService.next()` uses — for a caller (CombatService) that rolls
+ * many times per request and would otherwise pay one Firestore round-trip per
+ * roll. The caller is responsible for persisting `index` as the run's new
+ * `rngIndex` once, after it is done rolling (RngService itself does no I/O
+ * here — see createCursor()).
+ */
+export type RngCursor = {
+  next(): number;
+  readonly index: number;
+};
+
 export class RngService {
     private runRepo: AdventureRunRepository;
 
@@ -50,5 +63,25 @@ export class RngService {
      */
     async next(runId: string): Promise<number> {
         return this.runRepo.consumeRng(runId);
+    }
+
+    /**
+     * Start a cursor at `startIndex` (the caller's already-loaded `run.rngIndex`)
+     * that computes further values purely in-memory. No two callers may share
+     * a run's rngIndex range concurrently — same "one request at a time"
+     * precondition as `next()`/`consumeRng` (see AdventureRunRepository.consumeRng).
+     */
+    createCursor(seed: string, startIndex: number): RngCursor {
+        let index = startIndex;
+        return {
+            next: (): number => {
+                const value = random(seed, index);
+                index += 1;
+                return value;
+            },
+            get index() {
+                return index;
+            },
+        };
     }
 }

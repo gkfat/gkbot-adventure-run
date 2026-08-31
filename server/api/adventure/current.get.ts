@@ -27,7 +27,9 @@ export default defineEventHandler(async (event) => {
         }
 
         const adventureRunService = new AdventureRunService();
-        const { run, settlement } = await adventureRunService.getCurrentRun(authUser.uid, parseResult.data.characterId);
+        const {
+            run, settlement, 
+        } = await adventureRunService.getCurrentRun(authUser.uid, parseResult.data.characterId);
 
         logRequest({
             severity: 'INFO',

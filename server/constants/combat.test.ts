@@ -83,4 +83,15 @@ describe('ENEMY_ARCHETYPES', () => {
             expect(archetype.description.length).toBeGreaterThan(0);
         }
     });
+
+    it('gives every archetype a boss minion count within 0~2 (chapter-level-structure)', () => {
+        for (const archetype of ENEMY_ARCHETYPES) {
+            expect(archetype.bossMinionCount).toBeGreaterThanOrEqual(0);
+            expect(archetype.bossMinionCount).toBeLessThanOrEqual(2);
+        }
+        // At least one archetype can reinforce and at least one can't — worldview.md
+        // 第 6 節's "有些 boss 才會補位" contrast should actually exist.
+        expect(ENEMY_ARCHETYPES.some(archetype => archetype.canReinforce)).toBe(true);
+        expect(ENEMY_ARCHETYPES.some(archetype => !archetype.canReinforce)).toBe(true);
+    });
 });

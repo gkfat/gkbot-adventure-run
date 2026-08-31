@@ -53,10 +53,10 @@ describe('combinedDropRateMultiplier', () => {
 });
 
 const {
-    getCharacterWithStatsMock, rngNextMock, 
+    getCharacterWithStatsMock, createCursorMock,
 } = vi.hoisted(() => ({
     getCharacterWithStatsMock: vi.fn(),
-    rngNextMock: vi.fn(),
+    createCursorMock: vi.fn(),
 }));
 
 vi.mock('./character.service', () => ({
@@ -67,7 +67,7 @@ vi.mock('./character.service', () => ({
 
 vi.mock('./rng.service', () => ({
     RngService: vi.fn().mockImplementation(function RngServiceMock() {
-        return { next: rngNextMock };
+        return { createCursor: createCursorMock };
     }),
 }));
 
@@ -106,7 +106,18 @@ let rollQueue: number[];
 beforeEach(() => {
     vi.clearAllMocks();
     rollQueue = [];
-    rngNextMock.mockImplementation(async () => (rollQueue.length > 0 ? rollQueue.shift() as number : 0.99));
+    createCursorMock.mockImplementation((_seed: string, startIndex: number) => {
+        let index = startIndex;
+        return {
+            next: () => {
+                index += 1;
+                return rollQueue.length > 0 ? rollQueue.shift() as number : 0.99;
+            },
+            get index() {
+                return index;
+            },
+        };
+    });
     getCharacterWithStatsMock.mockResolvedValue({
         nickname: 'Tester',
         attributes: { LUCK: 0 },
@@ -148,6 +159,28 @@ describe('CombatService.resolve', () => {
 
         expect(result.enemies).toHaveLength(4);
         expect(result.combatLog.filter(entry => entry.action === 'DEATH')).toHaveLength(4);
+    });
+
+    it('stamps each log entry with its wave index and resets every unit\'s action gauge (including the player) at the start of each wave', async () => {
+        const service = new CombatService();
+        const run = baseRun();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 2, enemyCountPerWave: 1, firstWaveArchetypeIndices: [],
+        };
+
+        const result = await service.resolve(run, context);
+
+        const wave0Entries = result.combatLog.filter(entry => entry.wave === 0);
+        const wave1Entries = result.combatLog.filter(entry => entry.wave === 1);
+        expect(wave0Entries.length).toBeGreaterThan(0);
+        expect(wave1Entries.length).toBeGreaterThan(0);
+        expect(result.combatLog).toHaveLength(wave0Entries.length + wave1Entries.length);
+        // Player one-shots every enemy (ATK=1000 vs low-level DEF), so the
+        // player's very first action in each wave happens at timestamp 0 —
+        // if nextAttackAt carried over from wave 0, wave 1's first player
+        // action would start at a non-zero offset instead.
+        expect(wave0Entries[0]?.timestamp).toBe(0);
+        expect(wave1Entries[0]?.timestamp).toBe(0);
     });
 
     it('loses when the player is defeated and grants no rewards', async () => {
@@ -218,6 +251,122 @@ describe('CombatService.resolve', () => {
         expect(result.victory).toBe(true);
     });
 
+    it('BOSS tier with escort minions only counts victory once the boss AND every minion are dead', async () => {
+        // Player overpowered enough to one-shot each unit; archetype 0 has
+        // bossMinionCount=2 (chapter-level-structure), so enemyCountPerWave=3
+        // mirrors what adventure-run.service.buildBossNodeData would compute.
+        const service = new CombatService();
+        const run = baseRun();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 3, firstWaveArchetypeIndices: [
+                0,
+                0,
+                0,
+            ],
+        };
+
+        const result = await service.resolve(run, context);
+
+        expect(result.victory).toBe(true);
+        expect(result.enemies).toHaveLength(3);
+        expect(result.combatLog.filter(entry => entry.action === 'DEATH')).toHaveLength(3);
+    });
+
+    it('BOSS tier guarantees a drop for the boss unit but not for its escort minions', async () => {
+        // LUCK=0 -> luck-gated chance ~0.15; rollQueue defaults every
+        // unqueued roll to 0.99, so only the boss's forced dropChance=1
+        // should produce an item — the minions' kills must not.
+        const service = new CombatService();
+        const run = baseRun();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 3, firstWaveArchetypeIndices: [
+                0,
+                0,
+                0,
+            ],
+        };
+
+        const result = await service.resolve(run, context);
+
+        expect(result.victory).toBe(true);
+        expect(result.itemsDropped.length).toBe(1);
+    });
+
+    it('reinforces a fallen minion slot when the boss archetype allows it and the reinforcement roll hits', async () => {
+        getCharacterWithStatsMock.mockResolvedValue({
+            nickname: 'Tester',
+            attributes: { LUCK: 0 },
+            stats: {
+                ATK: 100, DEF: 0, HP_MAX: 100000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+            },
+        });
+        // Every roll = 0: no dodge/crit, and the reinforcement check (roll < 0.5) always hits.
+        createCursorMock.mockImplementation((_seed: string, startIndex: number) => {
+            let index = startIndex;
+            return {
+                next: () => {
+                    index += 1;
+                    return 0;
+                },
+                get index() {
+                    return index;
+                },
+            };
+        });
+
+        const service = new CombatService();
+        const run = baseRun({
+            playerHp: 100000, playerHpMax: 100000, 
+        });
+        // archetype 0 ("維修型 GkBot") canReinforce=true; enemyCountPerWave=1
+        // (boss only, no starting minions) isolates the reinforcement as the
+        // only source of a second enemy.
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+        };
+
+        const result = await service.resolve(run, context);
+
+        expect(result.victory).toBe(true);
+        expect(result.enemies.length).toBeGreaterThan(1);
+    });
+
+    it('does not reinforce when the boss archetype cannot reinforce', async () => {
+        getCharacterWithStatsMock.mockResolvedValue({
+            nickname: 'Tester',
+            attributes: { LUCK: 0 },
+            stats: {
+                ATK: 100, DEF: 0, HP_MAX: 100000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+            },
+        });
+        createCursorMock.mockImplementation((_seed: string, startIndex: number) => {
+            let index = startIndex;
+            return {
+                next: () => {
+                    index += 1;
+                    return 0;
+                },
+                get index() {
+                    return index;
+                },
+            };
+        });
+
+        const service = new CombatService();
+        const run = baseRun({
+            playerHp: 100000, playerHpMax: 100000, 
+        });
+        // archetype 1 ("保全機具") canReinforce=false.
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [1],
+        };
+
+        const result = await service.resolve(run, context);
+
+        expect(result.victory).toBe(true);
+        expect(result.enemies).toHaveLength(1);
+    });
+
     it('uses the pre-decided archetype for wave 0 when firstWaveArchetypeIndices is provided, without rolling for it', async () => {
         // rollQueue is empty -> any unexpected archetype roll would consume it
         // and desync the dodge/crit rolls below; a spy confirms none happened
@@ -229,8 +378,6 @@ describe('CombatService.resolve', () => {
 
         const result = await service.resolve(baseRun(), context);
 
-        expect(result.enemies.map(enemy => enemy.name)).toEqual([
-            ENEMY_ARCHETYPES[2]?.name, ENEMY_ARCHETYPES[3]?.name,
-        ]);
+        expect(result.enemies.map(enemy => enemy.name)).toEqual([ENEMY_ARCHETYPES[2]?.name, ENEMY_ARCHETYPES[3]?.name]);
     });
 });

@@ -4,7 +4,7 @@ import {
 import { requireAuth } from '../../utils/auth';
 import { AdventureRunService } from '../../services/adventure-run.service';
 import {
-    advanceAdventureRequestSchema, advanceAdventureResponseSchema,
+    abandonAdventureRequestSchema, abandonAdventureResponseSchema,
 } from '../../../shared/schemas/api/adventure.schema';
 import { toH3Error } from '../../utils/errorHandler';
 import {
@@ -20,19 +20,17 @@ export default defineEventHandler(async (event) => {
         const authUser = await requireAuth(event);
 
         const body = await readBody(event);
-        const parseResult = advanceAdventureRequestSchema.safeParse(body);
+        const parseResult = abandonAdventureRequestSchema.safeParse(body);
         if (!parseResult.success) {
             throw new ValidationError('Invalid request', parseResult.error.flatten());
         }
 
         const adventureRunService = new AdventureRunService();
-        const {
-            run, settlement, 
-        } = await adventureRunService.advance(authUser.uid, parseResult.data.characterId);
+        const { settlement } = await adventureRunService.abandonRun(authUser.uid, parseResult.data.characterId);
 
         logRequest({
             severity: 'INFO',
-            message: 'Adventure run advanced',
+            message: 'Adventure run abandoned',
             method: event.method,
             path: event.path,
             status: 200,
@@ -43,19 +41,14 @@ export default defineEventHandler(async (event) => {
 
         const response = {
             success: true,
-            data: {
-                state: run.state,
-                step: run.step,
-                nodeType: run.currentNodeType,
-                settlement,
-            },
+            data: { settlement },
         };
 
-        return advanceAdventureResponseSchema.parse(response);
+        return abandonAdventureResponseSchema.parse(response);
     } catch (error: unknown) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to advance adventure run',
+            message: 'Failed to abandon adventure run',
             method: event.method,
             path: event.path,
             status: error instanceof AppError ? error.statusCode : 500,

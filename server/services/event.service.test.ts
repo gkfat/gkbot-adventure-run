@@ -6,7 +6,7 @@ import {
     AdventureStateType, type AdventureRun,
 } from '../../shared/types/adventure';
 import { BusinessLogicError } from '../../shared/types/errors';
-import { CURSE_TEMPLATES } from '../constants/blessings';
+import { CURSE_TEMPLATES } from '../../shared/constants/blessings';
 
 const {
     rngNextMock, getCharacterWithStatsMock, generateCandidatesMock,

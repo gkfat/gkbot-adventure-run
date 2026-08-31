@@ -181,7 +181,9 @@ describe('AdventureRunService.startRun', () => {
 
     it('creates a run sized to the character\'s current HP_MAX and current nextChapterIndex when none is active', async () => {
         getActiveByCharacterIdMock.mockResolvedValue(null);
-        getCharacterWithStatsMock.mockResolvedValue({ stats: { HP_MAX: 150 }, nextChapterIndex: 2 });
+        getCharacterWithStatsMock.mockResolvedValue({
+            stats: { HP_MAX: 150 }, nextChapterIndex: 2, 
+        });
         createRunMock.mockResolvedValue(baseRun({ playerHpMax: 150 }));
 
         const service = new AdventureRunService();
@@ -241,7 +243,11 @@ describe('AdventureRunService.advance — node generation priority', () => {
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
             state: AdventureStateType.COMBAT,
             currentNodeType: NodeType.BOSS,
-            currentNodeData: expect.objectContaining({ tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1 }),
+            // rngNextMock defaults to 0 -> archetypeIndex 0 ("維修型 GkBot",
+            // bossMinionCount=2) -> 1 boss + 2 minions.
+            currentNodeData: expect.objectContaining({
+                tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 3, 
+            }),
         }));
         expect(result.run.currentNodeType).toBe(NodeType.BOSS);
     });
@@ -255,9 +261,7 @@ describe('AdventureRunService.advance — node generation priority', () => {
         const service = new AdventureRunService();
         await service.advance('account-1', 'char-1');
 
-        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
-            currentNodeType: NodeType.BOSS,
-        }));
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({ currentNodeType: NodeType.BOSS }));
     });
 
     it('treats missing chapter/stage fields as chapter 1/stage 1 (migration fallback) and does not trigger Boss', async () => {
@@ -495,9 +499,10 @@ describe('AdventureRunService.resolveCombat', () => {
             ],
             combatLog: [
                 {
-                    timestamp: 0, actorId: 'player', targetId: 'e1', action: 'ATTACK', damage: 5,
+                    timestamp: 0, wave: 0, actorId: 'player', targetId: 'e1', action: 'ATTACK', damage: 5,
                 },
             ],
+            finalRngIndex: 42,
         });
 
         const service = new AdventureRunService();
@@ -516,8 +521,10 @@ describe('AdventureRunService.resolveCombat', () => {
             goldEarned: 30,
             gemsEarned: 5,
             blessingPoints: 3,
+            rngIndex: 42,
         }));
         expect(result.summary.victory).toBe(true);
+        expect(result.summary).not.toHaveProperty('finalRngIndex');
         expect(result.combatLog).toHaveLength(1);
         expect(result.settlement).toBeUndefined();
     });
@@ -538,8 +545,13 @@ describe('AdventureRunService.resolveCombat', () => {
             gemsDropped: 0,
             itemsDropped: [],
             blessingPointsGained: 5,
-            enemies: [{ enemyId: 'boss-1', name: 'Boss', level: 8 }],
+            enemies: [
+                {
+                    enemyId: 'boss-1', name: 'Boss', level: 8,
+                },
+            ],
             combatLog: [],
+            finalRngIndex: 5,
         });
 
         const service = new AdventureRunService();
@@ -583,6 +595,7 @@ describe('AdventureRunService.resolveCombat', () => {
                 },
             ],
             combatLog: [],
+            finalRngIndex: 7,
         });
 
         const service = new AdventureRunService();
@@ -593,6 +606,7 @@ describe('AdventureRunService.resolveCombat', () => {
             state: AdventureStateType.ENDED,
             endReason: 'DEAD',
             playerHp: 0,
+            rngIndex: 7,
         }));
         expect(createItemMock).not.toHaveBeenCalled();
         expect(settleRunRewardsMock).toHaveBeenCalledWith('char-1', expect.objectContaining({

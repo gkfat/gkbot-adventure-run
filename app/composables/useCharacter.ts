@@ -31,6 +31,9 @@ interface CharacterData {
     spriteUrl: string;
     stats: CharacterStats;
     equipmentBonus: Partial<Pick<CharacterStats, 'ATK' | 'DEF' | 'HP_MAX' | 'actionIntervalSec'>>;
+    nextChapterIndex: number;
+    currentLevelIndex: number;
+    chapterTotalLevels: number;
 }
 
 interface CharacterSummary {

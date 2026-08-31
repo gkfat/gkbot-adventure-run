@@ -2,7 +2,7 @@ import {
     describe, it, expect, vi, beforeEach,
 } from 'vitest';
 import { BlessingService } from './blessing.service';
-import { BLESSING_TEMPLATES } from '../constants/blessings';
+import { BLESSING_TEMPLATES } from '../../shared/constants/blessings';
 
 const { rngNextMock } = vi.hoisted(() => ({ rngNextMock: vi.fn() }));
 

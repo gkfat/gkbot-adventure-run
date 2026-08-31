@@ -54,6 +54,10 @@ export const characterSchema = z.object({
     // Facility theme for the character's next adventure run
     nextChapterIndex: z.number().int().min(0),
 
+    // Chapter/Level hierarchy (chapter-level-structure)
+    currentLevelIndex: z.number().int().min(0),
+    chapterTotalLevels: z.number().int().min(1),
+
     // Leaderboard display
     nickname: z.string().min(1).max(20),
 

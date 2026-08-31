@@ -61,7 +61,12 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
         try {
             const docRef = this.collection.doc();
             const timestamp = Date.now();
-            const seed = crypto.randomUUID();
+            // Deterministic per character+chapter (not per run attempt): a
+            // failed/abandoned run followed by a retry of the same chapter
+            // must reproduce the exact same node/enemy sequence, otherwise
+            // players could reroll a hard chapter into an easier one by
+            // repeatedly quitting and restarting (known-issue.md #8).
+            const seed = `${params.characterId}:${params.chapterIndex}`;
 
             // Roll the Stage's node count deterministically from the fresh
             // seed — no existing doc yet, so this can't go through

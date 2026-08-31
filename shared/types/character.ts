@@ -32,6 +32,15 @@ export type Character = {
   // only advances when a run COMPLETEs, so DEAD/DISCONNECT retries the same theme.
   nextChapterIndex: number;
 
+  // Chapter/Level hierarchy (chapter-level-structure): a Chapter (=
+  // nextChapterIndex's facility) is cleared over `chapterTotalLevels` Levels,
+  // each Level being one run. `currentLevelIndex` (0-based) only advances on
+  // a COMPLETED run; DEAD/DISCONNECT retries the same level.
+  // `chapterTotalLevels` is rolled once when entering the chapter (see
+  // rollChapterTotalLevels) and stays fixed until the chapter is cleared.
+  currentLevelIndex: number;
+  chapterTotalLevels: number;
+
   // Leaderboard display
   nickname: string;           // Display name; auto-generated on creation, player can override
   

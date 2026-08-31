@@ -2,7 +2,9 @@
  * Combat Service — implements the `CombatResolver` interface adventure-run-core
  * defined. Simulates one full combat (all waves) in a single call using a
  * discrete-event schedule (each unit's own `nextAttackAt`), consuming all
- * randomness through RngService for determinism/auditability (RULE-014).
+ * randomness off one in-memory RngService cursor (started at run.rngIndex)
+ * for determinism/auditability (RULE-014) without a per-roll Firestore
+ * round-trip — see the `cursor`/`finalRngIndex` wiring in resolve().
  *
  * See combat-engine/design.md for the enemy stat table and reward formulas —
  * none of this is defined anywhere else (documented ASSUMPTIONs).
@@ -10,14 +12,17 @@
 
 import { BaseService } from './base.service';
 import { CharacterService } from './character.service';
-import { RngService } from './rng.service';
+import {
+    RngService, type RngCursor,
+} from './rng.service';
 import {
     getStatMultipliers, type EnemyTier,
 } from '../constants/difficulty';
 import {
-    ENEMY_ARCHETYPES, ENEMY_COMBAT_STATS,
+    ENEMY_ARCHETYPES, ENEMY_COMBAT_STATS, BOSS_REINFORCE_CONFIG,
     expForKill, goldForKill, applyLuckToGold, itemDropChance,
     blessingPointsForVictory, maxDropRarity, gemsDropTier, DROP_ITEM_CONTEXT,
+    type EnemyArchetype,
 } from '../constants/combat';
 import { generateItemInstance } from './item.service';
 import {
@@ -25,7 +30,9 @@ import {
 } from '../constants/templates';
 import { ItemType } from '../../shared/types/item';
 import type { ItemInstance } from '../../shared/types/item';
-import { NodeType } from '../../shared/types/adventure';
+import {
+    NodeType, disambiguateEnemyNames,
+} from '../../shared/types/adventure';
 import type {
     AdventureRun, CombatContext, CombatResolver, CombatResolution, CombatLogEntry, RunModifier,
 } from '../../shared/types/adventure';
@@ -109,6 +116,12 @@ type CombatUnit = {
     dodgeChance: number;
     nextAttackAt: number;
     level?: number;
+    // Boss composition (chapter-level-structure): only set for a BOSS-tier
+    // node's boss slot (index 0) — used to pick the guaranteed-drop unit
+    // (computeRewards) and whether reinforcement can trigger (resolve()).
+    archetypeIndex: number;
+    isBoss: boolean;
+    canReinforce: boolean;
 };
 
 export class CombatService extends BaseService implements CombatResolver {
@@ -131,6 +144,12 @@ export class CombatService extends BaseService implements CombatResolver {
         const activeModifiers: RunModifier[] = [];
         const modifiedStats = applyModifiers(character.stats, activeModifiers);
 
+        // All rolls for this combat come off one in-memory cursor started at
+        // run.rngIndex — see RngService.createCursor(). The caller must
+        // persist cursor.index (returned as finalRngIndex below) as the run's
+        // new rngIndex once combat is fully resolved.
+        const cursor = this.rngService.createCursor(run.seed, run.rngIndex);
+
         const player: CombatUnit = {
             id: 'player',
             name: character.nickname,
@@ -143,6 +162,9 @@ export class CombatService extends BaseService implements CombatResolver {
             critMultiplier: modifiedStats.critMultiplier,
             dodgeChance: modifiedStats.dodgeChance,
             nextAttackAt: 0,
+            archetypeIndex: -1,
+            isBoss: false,
+            canReinforce: false,
         };
 
         const combatLog: CombatLogEntry[] = [];
@@ -150,9 +172,24 @@ export class CombatService extends BaseService implements CombatResolver {
         const encountered: CombatUnit[] = [];
 
         for (let wave = 0; wave < context.waveCount && player.hp > 0; wave++) {
-            const enemies = await this.spawnWave(run.runId, context, wave === 0 ? context.firstWaveArchetypeIndices : undefined);
+            // Each wave is its own discrete-event window: every unit — including
+            // the player, who otherwise persists across waves — starts this
+            // wave's action gauge from 0, matching freshly spawned enemies
+            // (buildEnemyUnit always sets nextAttackAt: 0). Without this reset,
+            // the player's nextAttackAt would keep accumulating from the
+            // previous wave while new enemies restart at 0, making combatLog
+            // timestamps jump backwards at the wave boundary (see
+            // combat-log-sequential-playback design.md — the frontend relies on
+            // per-wave timestamps to build its playback schedule).
+            player.nextAttackAt = 0;
+
+            const enemies = this.spawnWave(cursor, context, wave === 0 ? context.firstWaveArchetypeIndices : undefined);
             encountered.push(...enemies);
             const alive = [...enemies];
+            // Boss small-composition reinforcement (chapter-level-structure)
+            // only applies within a BOSS-tier node's single wave.
+            const bossUnit = context.tier === NodeType.BOSS ? enemies[0] : undefined;
+            let reinforceCount = 0;
 
             let rounds = 0;
             while (player.hp > 0 && alive.length > 0 && rounds < MAX_ROUNDS) {
@@ -162,12 +199,13 @@ export class CombatService extends BaseService implements CombatResolver {
                     (min, unit) => (unit.nextAttackAt < min.nextAttackAt ? unit : min),
                 );
                 const target = actor === player ? alive[0] as CombatUnit : player;
-                 
-                await this.performAttack(run.runId, actor, target, combatLog);
+                const eventTimestamp = actor.nextAttackAt;
+
+                this.performAttack(cursor, actor, target, combatLog, wave);
 
                 if (target.hp <= 0) {
                     combatLog.push({
-                        timestamp: actor.nextAttackAt, actorId: actor.id, targetId: target.id, action: 'DEATH',
+                        timestamp: eventTimestamp, wave, actorId: actor.id, targetId: target.id, action: 'DEATH',
                     });
                     if (target !== player) {
                         alive.splice(alive.indexOf(target), 1);
@@ -176,12 +214,30 @@ export class CombatService extends BaseService implements CombatResolver {
                 }
 
                 actor.nextAttackAt += actor.actionIntervalSec * 1000;
+
+                if (bossUnit && bossUnit.canReinforce && bossUnit.hp > 0
+                    && rounds % BOSS_REINFORCE_CONFIG.CHECK_INTERVAL_ROUNDS === 0
+                    && reinforceCount < BOSS_REINFORCE_CONFIG.MAX_REINFORCEMENTS) {
+                    const minionsAlive = alive.filter(unit => unit !== bossUnit).length;
+                    if (minionsAlive < 2) {
+                        const reinforceRoll = cursor.next();
+                        if (reinforceRoll < BOSS_REINFORCE_CONFIG.CHANCE) {
+                            const bossArchetype = ENEMY_ARCHETYPES[bossUnit.archetypeIndex] as EnemyArchetype;
+                            const minionMultipliers = getStatMultipliers(context.enemyLevel, 'STRONG_ELITE');
+                            const minion = this.buildEnemyUnit(bossArchetype, bossUnit.archetypeIndex, minionMultipliers, context.enemyLevel, false);
+                            minion.nextAttackAt = eventTimestamp;
+                            alive.push(minion);
+                            encountered.push(minion);
+                            reinforceCount += 1;
+                        }
+                    }
+                }
             }
         }
 
         const victory = player.hp > 0;
         const rewards = victory
-            ? await this.computeRewards(run, context, defeated, character.attributes.LUCK, activeModifiers)
+            ? this.computeRewards(run, cursor, context, defeated, character.attributes.LUCK, activeModifiers)
             : {
                 expGained: 0, goldDropped: 0, gemsDropped: 0, itemsDropped: [], blessingPointsGained: 0,
             };
@@ -191,10 +247,11 @@ export class CombatService extends BaseService implements CombatResolver {
             roundCount: combatLog.filter(entry => entry.action !== 'DEATH').length,
             playerHpRemaining: Math.max(0, player.hp),
             ...rewards,
-            enemies: encountered.map(enemy => ({
-                enemyId: enemy.id, name: enemy.name, level: enemy.level as number,
+            enemies: disambiguateEnemyNames(encountered).map(enemy => ({
+                enemyId: enemy.id, name: enemy.name, level: enemy.level as number, hpMax: enemy.hpMax, isBoss: enemy.isBoss,
             })),
             combatLog,
+            finalRngIndex: cursor.index,
         };
     }
 
@@ -202,56 +259,86 @@ export class CombatService extends BaseService implements CombatResolver {
      * `archetypeIndices`, when provided (wave 0 only — see design.md), pins
      * each enemy slot to the archetype already decided and shown to the
      * player at node-generation time, instead of rolling a fresh one here.
+     *
+     * BOSS tier (chapter-level-structure): slot 0 is the boss (BOSS-tier
+     * stats), every other slot is an escort minion (STRONG_ELITE-tier
+     * stats) — `adventure-run.service.buildBossNodeData` already sized
+     * `enemyCountPerWave`/`archetypeIndices` to match (same archetype for
+     * every slot), so this only needs to pick the right multiplier per slot.
      */
-    private async spawnWave(runId: string, context: CombatContext, archetypeIndices?: number[]): Promise<CombatUnit[]> {
+    private spawnWave(cursor: RngCursor, context: CombatContext, archetypeIndices?: number[]): CombatUnit[] {
         const enemyLevel = context.enemyLevel;
-        const multipliers = getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier]);
+        const isBossTier = context.tier === NodeType.BOSS;
+        const uniformMultipliers = isBossTier ? undefined : getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier]);
+        const bossMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'BOSS') : undefined;
+        const minionMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'STRONG_ELITE') : undefined;
 
         const enemies: CombatUnit[] = [];
         for (let i = 0; i < context.enemyCountPerWave; i++) {
             let archetypeIndex = archetypeIndices?.[i];
             if (archetypeIndex === undefined) {
-                const roll = await this.rngService.next(runId);
+                const roll = cursor.next();
                 archetypeIndex = Math.floor(roll * ENEMY_ARCHETYPES.length);
             }
-            const archetype = ENEMY_ARCHETYPES[archetypeIndex] as typeof ENEMY_ARCHETYPES[number];
+            const archetype = ENEMY_ARCHETYPES[archetypeIndex] as EnemyArchetype;
+            const isBossUnit = isBossTier && i === 0;
+            const multipliers = isBossTier ? (isBossUnit ? bossMultipliers! : minionMultipliers!) : uniformMultipliers!;
 
-            enemies.push({
-                id: crypto.randomUUID(),
-                name: archetype.name,
-                atk: Math.round(archetype.baseAtk * multipliers.atk),
-                def: Math.round(archetype.baseDef * multipliers.def),
-                hpMax: Math.round(archetype.baseHp * multipliers.hp),
-                hp: Math.round(archetype.baseHp * multipliers.hp),
-                actionIntervalSec: archetype.actionIntervalSec,
-                critChance: ENEMY_COMBAT_STATS.critChance,
-                critMultiplier: ENEMY_COMBAT_STATS.critMultiplier,
-                dodgeChance: ENEMY_COMBAT_STATS.dodgeChance,
-                nextAttackAt: 0,
-                level: enemyLevel,
-            });
+            enemies.push(this.buildEnemyUnit(archetype, archetypeIndex, multipliers, enemyLevel, isBossUnit));
         }
         return enemies;
     }
 
-    private async performAttack(
-        runId: string, actor: CombatUnit, target: CombatUnit, combatLog: CombatLogEntry[],
-    ): Promise<void> {
-        const dodgeRoll = await this.rngService.next(runId);
+    /**
+     * Build a single enemy `CombatUnit` from an archetype + a pre-resolved
+     * stat multiplier — shared by spawnWave's initial roster and the boss
+     * reinforcement spawn (both need the exact same construction).
+     */
+    private buildEnemyUnit(
+        archetype: EnemyArchetype,
+        archetypeIndex: number,
+        multipliers: { hp: number; atk: number; def: number },
+        enemyLevel: number,
+        isBoss: boolean,
+    ): CombatUnit {
+        return {
+            id: crypto.randomUUID(),
+            name: archetype.name,
+            atk: Math.round(archetype.baseAtk * multipliers.atk),
+            def: Math.round(archetype.baseDef * multipliers.def),
+            hpMax: Math.round(archetype.baseHp * multipliers.hp),
+            hp: Math.round(archetype.baseHp * multipliers.hp),
+            actionIntervalSec: archetype.actionIntervalSec,
+            critChance: ENEMY_COMBAT_STATS.critChance,
+            critMultiplier: ENEMY_COMBAT_STATS.critMultiplier,
+            dodgeChance: ENEMY_COMBAT_STATS.dodgeChance,
+            nextAttackAt: 0,
+            level: enemyLevel,
+            archetypeIndex,
+            isBoss,
+            canReinforce: isBoss ? archetype.canReinforce : false,
+        };
+    }
+
+    private performAttack(
+        cursor: RngCursor, actor: CombatUnit, target: CombatUnit, combatLog: CombatLogEntry[], wave: number,
+    ): void {
+        const dodgeRoll = cursor.next();
         if (dodgeRoll < target.dodgeChance) {
             combatLog.push({
-                timestamp: actor.nextAttackAt, actorId: actor.id, targetId: target.id, action: 'DODGE',
+                timestamp: actor.nextAttackAt, wave, actorId: actor.id, targetId: target.id, action: 'DODGE',
             });
             return;
         }
 
-        const critRoll = await this.rngService.next(runId);
+        const critRoll = cursor.next();
         const isCrit = critRoll < actor.critChance;
         const damage = computeDamage(actor.atk, target.def, isCrit, actor.critMultiplier);
 
         target.hp = Math.max(0, target.hp - damage);
         combatLog.push({
             timestamp: actor.nextAttackAt,
+            wave,
             actorId: actor.id,
             targetId: target.id,
             action: isCrit ? 'CRIT' : 'ATTACK',
@@ -260,28 +347,30 @@ export class CombatService extends BaseService implements CombatResolver {
         });
     }
 
-    private async computeRewards(
-        run: AdventureRun, context: CombatContext, defeated: CombatUnit[], luck: number, activeModifiers: RunModifier[],
+    private computeRewards(
+        run: AdventureRun, cursor: RngCursor, context: CombatContext, defeated: CombatUnit[], luck: number, activeModifiers: RunModifier[],
     ) {
         let expGained = 0;
         let goldBase = 0;
         let gemsDropped = 0;
         const itemsDropped: ItemInstance[] = [];
-        // Boss is the Stage's narrative climax — guarantee at least one drop
-        // per kill, bypassing the LUCK-gated chance (design.md "Boss 保底掉落").
-        const dropChance = context.tier === NodeType.BOSS
-            ? 1
-            : itemDropChance(luck) * combinedDropRateMultiplier(activeModifiers);
+        // Boss is the Stage's narrative climax — the boss unit itself
+        // guarantees at least one drop, bypassing the LUCK-gated chance
+        // (design.md "Boss 保底掉落"); its escort minions (chapter-level-structure)
+        // still roll the normal LUCK-gated chance, so a Boss fight doesn't
+        // guarantee one drop per kill.
+        const luckDropChance = itemDropChance(luck) * combinedDropRateMultiplier(activeModifiers);
         const gemsTier = gemsDropTier(context.enemyLevel);
 
         for (let i = 0; i < defeated.length; i++) {
+            const unit = defeated[i] as CombatUnit;
             expGained += expForKill(context.enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier]);
             goldBase += goldForKill(context.enemyLevel);
-             
-            const dropRoll = await this.rngService.next(run.runId);
+
+            const dropChance = (context.tier === NodeType.BOSS && unit.isBoss) ? 1 : luckDropChance;
+            const dropRoll = cursor.next();
             if (dropRoll < dropChance) {
-                 
-                const pickRoll = await this.rngService.next(run.runId);
+                const pickRoll = cursor.next();
                 const templateId = EQUIPMENT_TEMPLATE_IDS[
                     Math.floor(pickRoll * EQUIPMENT_TEMPLATE_IDS.length)
                 ] as string;
@@ -294,11 +383,10 @@ export class CombatService extends BaseService implements CombatResolver {
                     });
                 }
             }
-             
-            const gemsRoll = await this.rngService.next(run.runId);
+
+            const gemsRoll = cursor.next();
             if (gemsRoll < gemsTier.chance) {
-                 
-                const amountRoll = await this.rngService.next(run.runId);
+                const amountRoll = cursor.next();
                 gemsDropped += gemsTier.min + Math.round((gemsTier.max - gemsTier.min) * amountRoll);
             }
         }

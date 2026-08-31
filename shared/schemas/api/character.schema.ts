@@ -82,6 +82,8 @@ export const getCharacterResponseSchema = z.object({
         stats: statsSchema,
         equipmentBonus: equipmentBonusSchema,
         nextChapterIndex: z.number(),
+        currentLevelIndex: z.number(),
+        chapterTotalLevels: z.number(),
     }),
 });
 

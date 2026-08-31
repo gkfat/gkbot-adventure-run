@@ -80,6 +80,16 @@ export const useInventory = () => {
     };
 
     /**
+     * 標記本地快取為過期（保留現有 items 供畫面繼續顯示，不清空），下次
+     * `onMounted` 檢查 `loaded` 時就會重新 fetch。用於背包內容可能已在背景
+     * 被更動之後（例如冒險結算把掉落道具寫入永久背包），確保下次進入背包頁
+     * 會拿到最新資料，而不是沿用進冒險前的舊快照。
+     */
+    const invalidate = () => {
+        loaded.value = false;
+    };
+
+    /**
      * 重置本地快取（登出時使用）
      */
     const reset = () => {
@@ -100,6 +110,7 @@ export const useInventory = () => {
         error: computed(() => error.value),
         fetchInventory,
         itemById,
+        invalidate,
         reset,
     };
 };

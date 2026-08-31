@@ -13,7 +13,7 @@
  * about before combat-engine's `applyModifiers()` had actually shipped.
  */
 
-import type { RunModifier } from '../../shared/types/adventure';
+import type { RunModifier } from '../types/adventure';
 
 export type BlessingTier = 'MINOR' | 'MAJOR';
 

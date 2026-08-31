@@ -59,6 +59,22 @@ export const getCurrentAdventureResponseSchema = z.object({
 });
 
 /**
+ * POST /api/adventure/abandon — request body
+ */
+export const abandonAdventureRequestSchema = z.object({ characterId: z.string() }).strict();
+
+/**
+ * POST /api/adventure/abandon — force-settles the caller's active run as
+ * DISCONNECT immediately, regardless of the reconnect window. Used both by
+ * the explicit "放棄本次冒險" button and by the client auto-abandon on a
+ * cold reload into /adventure — see known-issue.md #8.
+ */
+export const abandonAdventureResponseSchema = z.object({
+    success: z.boolean(),
+    data: z.object({ settlement: settleSummarySchema }),
+});
+
+/**
  * POST /api/adventure/advance — request body
  */
 export const advanceAdventureRequestSchema = z.object({ characterId: z.string() }).strict();
@@ -91,6 +107,7 @@ export const startCombatResponseSchema = z.object({
     data: z.object({
         combatLog: z.array(z.object({
             timestamp: z.number(),
+            wave: z.number(),
             actorId: z.string(),
             targetId: z.string(),
             action: z.enum([
@@ -172,6 +189,8 @@ export type StartAdventureRequest = z.infer<typeof startAdventureRequestSchema>;
 export type StartAdventureResponse = z.infer<typeof startAdventureResponseSchema>;
 export type GetCurrentAdventureQuery = z.infer<typeof getCurrentAdventureQuerySchema>;
 export type GetCurrentAdventureResponse = z.infer<typeof getCurrentAdventureResponseSchema>;
+export type AbandonAdventureRequest = z.infer<typeof abandonAdventureRequestSchema>;
+export type AbandonAdventureResponse = z.infer<typeof abandonAdventureResponseSchema>;
 export type AdvanceAdventureRequest = z.infer<typeof advanceAdventureRequestSchema>;
 export type AdvanceAdventureResponse = z.infer<typeof advanceAdventureResponseSchema>;
 export type StartCombatRequest = z.infer<typeof startCombatRequestSchema>;
