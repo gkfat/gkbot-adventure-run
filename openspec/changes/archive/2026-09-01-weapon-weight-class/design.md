@@ -9,13 +9,14 @@ Stats 加總集中在兩處：`item.service.ts` 的 `sumEquipmentStats`（純函
 ## Goals / Non-Goals
 
 **Goals:**
-- 為 HAND 類道具（目前 `salvaged_wrench` RIGHT_HAND、`riot_shield_scrap` LEFT_HAND）新增 `weaponWeightClass`（LIGHT/MEDIUM/HEAVY）分類與對應數值曲線。
+- 為全部 6 個 `type: EQUIPMENT` template（`salvaged_wrench`/`riot_shield_scrap`/`gkbot_faceplate`/`supply_crate_vest`/`servo_greaves`/`research_chip_ring`，涵蓋 HAND/HEAD/BODY/SHOES/RING 全部槽位）新增 `weaponWeightClass`（LIGHT/MEDIUM/HEAVY）分類與對應數值曲線。
+- 角色 `STR`+`CON` 越高，`HEAVY` 分類裝備的 `actionSpeedMod`/`dodgeChanceMod` 懲罰折扣越大（負重能力），讓屬性點分配與裝備選擇產生連動。
 - 打通裝備 `dodgeChanceMod` → `Stats.dodgeChance` 的加總路徑，讓 HEAVY 類道具能拖累閃避率。
 - 在 `equipment` spec 中正式定義左右手互換規則，沿用既有 `HAND_SLOTS` 邏輯，決定 `requestedSlot` 不合法時的明確行為。
 - 訂定稀有度加成通則：只有 N 稀有度允許某副屬性為 0；R 以上每級皆需有可量測的正向加成（HEAVY 的懲罰視為代價軸例外）。
 
 **Non-Goals:**
-- 不新增新的 EquipmentSlot（不動 `HEAD`/`BODY`/`SHOES`/`RING`）。
+- 不新增新的 `EquipmentSlot`（不新增槽位類型本身）；但既有 `HEAD`/`BODY`/`SHOES`/`RING` 四個槽位的 template 皆納入 `weaponWeightClass` 範圍，非排除對象。
 - 不重構「1 template 橫跨 5 稀有度」的既有限制（`docs/game-design/content/items.md` 第 5 節缺口）——本次 `weaponWeightClass` 是掛在 template 層級的靜態屬性，不隨稀有度變化，不需要拆分多 template。
 - 不落地 `equipment-ideas.md` 的稀有度分文案（獨立議題，見 `items.md`）。
 - 不新增 crit 相關的裝備加成（本次僅處理 dodge）。
@@ -23,8 +24,8 @@ Stats 加總集中在兩處：`item.service.ts` 的 `sumEquipmentStats`（純函
 ## Decisions
 
 ### 1. `weaponWeightClass` 掛在 `ItemTemplate` 層，不隨稀有度變動
-每個 HAND 類 template 天生是 LIGHT/MEDIUM/HEAVY 之一（例如 `salvaged_wrench` 定為 MEDIUM，未來新武器 template 各自定調），而非同一 template 在不同稀有度切換類別。
-**理由**：符合現況「1 template = 1 把武器的身份」設計；weight class 是武器的「種類」而非「強度」，強度仍交給既有 `baseStatsRange` 按稀有度決定。
+每個 `EQUIPMENT` template（不限手部槽位）天生是 LIGHT/MEDIUM/HEAVY 之一（例如 `salvaged_wrench` 定為 MEDIUM，未來新增裝備 template 各自定調），而非同一 template 在不同稀有度切換類別。
+**理由**：符合現況「1 template = 1 件裝備的身份」設計；weight class 是裝備的「種類」而非「強度」，強度仍交給既有 `baseStatsRange` 按稀有度決定。
 **替代方案（不採用）**：weight class 隨稀有度切換——複雜度高，且與「越稀有威脅感越重」的敘事設計（`equipment-ideas.md` 文案方向備註）衝突。
 
 ### 2. 新增 `ItemStats.dodgeChanceMod`，比照 `actionSpeedMod` 走同一條累加路徑
@@ -41,16 +42,31 @@ Stats 加總集中在兩處：`item.service.ts` 的 `sumEquipmentStats`（純函
 只調整 `baseStatsRange` 的數值設計原則，不動 `rarityWeights`（掉落機率）與稀有度判定流程。
 **理由**：限縮改動範圍在數值曲線設計，不牽動 `item-generation` 既有「依模板與稀有度生成物品實體」的生成演算法本體。
 
+### 5. 負重能力（`STR`+`CON`）以百分比折扣抑制 `HEAVY` 懲罰，套用在 `actionSpeedMod`/`dodgeChanceMod` 兩處
+新增 `COMBAT_CONFIG` 常數（比照現有 `CRIT_PER_AGI`/`DODGE_PER_AGI` 風格）：`HEAVY_PENALTY_MITIGATION_PER_POINT`（每點 `STR`+`CON` 折扣比例）與 `MAX_HEAVY_PENALTY_MITIGATION`（折扣上限，具體數字待定，不會達到 100% 抵銷）。實際套用公式：`最終懲罰 = 基礎懲罰 × (1 - min(MAX_HEAVY_PENALTY_MITIGATION, (STR + CON) × HEAVY_PENALTY_MITIGATION_PER_POINT))`（`actionSpeedMod` 懲罰為正值、`dodgeChanceMod` 懲罰為負值，折扣同樣讓兩者的絕對值變小）。
+- `dodgeChanceMod` 的折扣套用點：`combat-engine` capability 既有的閃避公式（`base + AGI × 係數 + 裝備 dodgeChanceMod 加總`），加總前對每件 `HEAVY` 裝備的 `dodgeChanceMod` 先套折扣。
+- `actionSpeedMod` 的折扣套用點：`character-progression` capability 計算 `actionIntervalSec` 的環節（`shared/types/adventure.ts` 內對應公式，或 `sumEquipmentStats`/`withStats` 銜接處），需要在該處對 `HEAVY` 裝備的 `actionSpeedMod` 套用同一折扣公式。
+**理由**：只作用在 `HEAVY` 分類（唯一有懲罰的分類），與現有 `AGI × 係數` 線性公式風格一致，折扣上限避免高數值角色完全免疫負重代價、失去 `HEAVY` 的取捨意義。
+**替代方案（不採用）**：門檻制（達到閾值完全免疫）——與「HEAVY 懲罰隨稀有度加重」的既有通則（本 change Requirement: 稀有度加成通則）在高階裝備上容易被完全抵銷，削弱三分法的取捨設計。
+
+`actionSpeedMod` 折扣已收斂進 `specs/character-progression/spec.md`（MODIFIED Requirements）。
+
+### 6. 新增可見的 `Stats.carryCapacity`（負重），與 HP 同面板顯示；重裝懲罰沿用既有 `equipmentBonus`
+`carryCapacity = STR + CON`，屬性衍生、不受裝備影響，作為正向狀態值顯示（數字越大代表能扛越重的裝備），而非顯示成「已折抵 X% 懲罰」的負面/技術性百分比。不同職業因初始 `attributes.STR`/`attributes.CON` 本來就不同（例如戰士 STR3+CON3=6、投機者 STR1+CON1=2），天然滿足「各職業初始負重不同」，不需要為 `carryCapacity` 另立職業專屬欄位或新公式。
+`HEAVY` 裝備造成的實際懲罰不再另立獨立欄位顯示，沿用既有 `equipmentBonus.actionIntervalSec`/`equipmentBonus.dodgeChance`（已是套用負重折扣後的淨值）；前端 `characterStage.vue` 原本「閃避」欄位完全沒有顯示裝備加成的既有缺口（`critChance`/`dodgeChance` 只顯示裸數值，不像 ATK/DEF/HP/攻速有加成提示），一併補上。
+**理由**：與使用者確認（見對話紀錄）——負重要「顯示正向狀態，例如可承受 N 的重量」，且重裝懲罰的呈現「沿用現有 equipmentBonus」，不新增獨立欄位。
+**替代方案（不採用）**：顯示成折扣百分比（如「已抵銷 24% 重裝懲罰」）——使用者明確選擇了正向容量數字，不採用負面百分比框架。
+
 ## Risks / Trade-offs
 
 - **[Risk]** `equipItem` 的行為變更（不合法 `requestedSlot` 從靜默 fallback 改為 400）可能影響現有前端呼叫方式，若前端目前未帶 `requestedSlot` 或帶了非 HAND 類的值。→ **Mitigation**：實作前先盤點所有呼叫 `equip` API 的前端程式碼（`app/composables/useCharacter.ts` 等），確認目前是否已有依賴靜默 fallback 的呼叫路徑；tasks.md 中列為前置查核項目。
 - **[Risk]** HEAVY 武器讓角色閃避率可能被拖到很低甚至負值（若計算未 clamp）。→ **Mitigation**：`dodgeChanceMod` 累加後仍需套用既有 `DODGE_CAP`/下限 clamp（`COMBAT_CONFIG`），沿用 combat-engine 既有 clamp 邏輯，不需新增獨立上下限機制。
-- **[Risk]** 只有 `salvaged_wrench`/`riot_shield_scrap` 兩個 HAND 類 template，weight class 的三分法（LIGHT/MEDIUM/HEAVY）目前只能各自代表 1 個實例，設計上的「取捨感」要等未來新增更多武器 template 才會真正顯現。→ **Mitigation**：本次先定機制與規則，具體新增武器內容留待後續 change（呼應 `docs/game-design/content/items.md` 第 5 節既有缺口）。
+- **[Risk]** 現有 6 個 `EQUIPMENT` template 分屬 5 個槽位，同一槽位內大多只有 1 個 template（例如 `HEAD` 僅 `gkbot_faceplate`），weight class 的三分法（LIGHT/MEDIUM/HEAVY）在單一槽位內暫時只能各自代表 1 個實例，跨槽位比較（如 HAND vs. HEAD）才看得出取捨差異，同槽位內的「取捨感」要等未來新增更多同槽位 template 才會真正顯現。→ **Mitigation**：本次先定機制與規則，具體新增裝備內容留待後續 change（呼應 `docs/game-design/content/items.md` 第 5 節既有缺口）。
 
 ## Migration Plan
 
 1. 新增型別欄位（`ItemStats.dodgeChanceMod`、`ItemTemplate.weaponWeightClass`）——向下相容（optional 欄位）。
-2. 更新 `server/constants/templates.ts` 既有 2 個 HAND 類 template，補上 `weaponWeightClass`（不影響既有 `baseStatsRange` 數值，先分類不改強度）。
+2. 更新 `server/constants/templates.ts` 全部 6 個 `EQUIPMENT` template，補上 `weaponWeightClass`（不影響既有 `baseStatsRange` 數值，先分類不改強度）。
 3. 打通 `sumEquipmentStats` 的 `dodgeChanceMod` 累加。
 4. 調整 `equipItem` 的 `requestedSlot` 驗證邏輯（明確拒絕不合法值）。
 5. 前端補上左右手選擇 UI（若目前尚未支援指定 `requestedSlot`）。
@@ -59,4 +75,6 @@ Stats 加總集中在兩處：`item.service.ts` 的 `sumEquipmentStats`（純函
 ## Open Questions
 
 - HEAVY 類的懲罰數值曲線（`actionSpeedMod`/`dodgeChanceMod` 隨稀有度惡化的具體區間）由誰定案？本 change 只訂通則，具體數字建議在 tasks 實作階段搭配 `docs/game-design/item-drop-and-stats.md` 一併補上。
+- `HEAVY_PENALTY_MITIGATION_PER_POINT`/`MAX_HEAVY_PENALTY_MITIGATION` 的具體數值由誰定案？本 design 只訂公式與套用點，具體係數建議與上述 HEAVY 懲罰曲線一併於 tasks 實作階段拍板。
+- 各槽位「主屬性」與「副屬性」的具體對應由誰定案？HAND 類武器以 `ATK` 為主屬性、HAND 類防具/`HEAD`/`BODY` 以 `DEF`/`HP` 為主屬性沿用既有設計；但 `SHOES`（`servo_greaves`）/`RING`（`research_chip_ring`）現行已以 `actionSpeedMod` 作為隨稀有度成長的主要屬性，與本次 weight class 定義的「副屬性＝`actionSpeedMod`」在概念上重疊，需要在 tasks 數值曲線設計階段（6.1）逐槽位確認：是否改以 `DEF` 作為 `SHOES`/`RING` 主屬性、`actionSpeedMod` 挪為副屬性，或另訂規則。
 - `LEFT_HAND`/`RIGHT_HAND` 互換是否也要開放給非武器的 `HEAD`/`BODY`/`SHOES`/`RING`？目前範圍限定在既有 `HAND_SLOTS`，若之後有其他部位也要互換需求，屬於另一個 change。

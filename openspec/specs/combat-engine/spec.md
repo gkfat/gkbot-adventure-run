@@ -48,7 +48,7 @@
 - **THEN** 敵人從 `GKBOT_BOSS_ARCHETYPES` 抽取
 
 ### Requirement: 傷害與命中判定公式
-系統 SHALL 以 `damage = max(1, ATK-DEF) * (crit ? critMultiplier : 1)` 計算傷害；crit 與 dodge 機率各自以 `base + AGI * 係數` 計算並 clamp 至各自上限（crit 上限 35%、dodge 上限 25%）。
+系統 SHALL 以 `damage = max(1, ATK-DEF) * (crit ? critMultiplier : 1)` 計算傷害；crit 機率以 `base + AGI * 係數` 計算並 clamp 至上限 35%；dodge 機率以 `base + AGI * 係數 + 裝備 dodgeChanceMod 加總` 計算並 clamp 至區間 [0%, 25%]，其中每件 `HEAVY` 分類裝備的 `dodgeChanceMod` 在加總前先依角色 `STR`+`CON` 套用負重折扣（見 `weapon-weight-class` capability「負重能力抑制 HEAVY 懲罰」）。
 
 #### Scenario: 一般攻擊傷害下限
 - **WHEN** 攻擊方 ATK 小於等於防禦方 DEF
@@ -61,6 +61,18 @@
 #### Scenario: 閃避使攻擊落空
 - **WHEN** 防禦方判定閃避成功
 - **THEN** 該次攻擊造成 0 傷害，combatLog 記錄為 DODGE 事件
+
+#### Scenario: 裝備 dodgeChanceMod 影響閃避機率
+- **WHEN** 角色裝備一件 `dodgeChanceMod` 為負值（HEAVY 分類懲罰）的道具
+- **THEN** 該角色的 `dodgeChance` 相較未裝備時降低，但仍 clamp 在 [0%, 25%] 範圍內，不會因加總結果為負值而低於 0%
+
+#### Scenario: STR+CON 負重折扣降低 dodgeChanceMod 懲罰
+- **WHEN** 角色裝備一件 `HEAVY` 分類道具（`dodgeChanceMod` 為負值），且該角色 `STR`+`CON` 大於 0
+- **THEN** 實際套用到 `dodgeChance` 加總的 `dodgeChanceMod` 幅度（絕對值）小於該道具未經負重折扣的原始 `dodgeChanceMod`
+
+#### Scenario: 未裝備 HAND 類道具時行為不變
+- **WHEN** 角色未裝備任何帶 `dodgeChanceMod` 的道具
+- **THEN** `dodgeChance` 計算結果與現行「僅由 AGI 決定」的行為完全一致
 
 ### Requirement: 敵人爆擊/閃避依個別範本的 LUK 覆寫值決定
 系統 SHALL 於判定敵人爆擊率/閃避率時，優先使用該敵人範本（`EnemyArchetype`）的 `critChanceOverride`/`dodgeChanceOverride`（若有填寫），否則回退使用全域 `ENEMY_COMBAT_STATS` 的預設值。

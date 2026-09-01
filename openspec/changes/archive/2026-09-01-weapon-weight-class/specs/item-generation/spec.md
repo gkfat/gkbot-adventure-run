@@ -1,14 +1,18 @@
 ## ADDED Requirements
 
 ### Requirement: 物品實體攜帶重量分類
-系統 SHALL 在生成 HAND 類道具的物品實體時，將該 template 的 `weaponWeightClass` 一併帶入 `ItemInstance`，供裝備欄位、戰鬥計算與前端顯示直接讀取，不需額外查詢 template。
+系統 SHALL 在生成 `type: EQUIPMENT` 道具的物品實體時（不限 `equipSlot`），將該 template 的 `weaponWeightClass` 一併帶入 `ItemInstance`，供裝備欄位、戰鬥計算與前端顯示直接讀取，不需額外查詢 template。
 
 #### Scenario: 生成 HAND 類物品實體帶出重量分類
 - **WHEN** 呼叫 `generateItemInstance('salvaged_wrench', { source: 'DROP' })`，該 template 定義 `weaponWeightClass = MEDIUM`
 - **THEN** 回傳的 `ItemInstance.weaponWeightClass = 'MEDIUM'`
 
-#### Scenario: 非 HAND 類物品實體不含重量分類
-- **WHEN** 呼叫 `generateItemInstance('gkbot_faceplate', { source: 'DROP' })`（`equipSlot = HEAD`）
+#### Scenario: 生成非 HAND 槽位 EQUIPMENT 物品實體也帶出重量分類
+- **WHEN** 呼叫 `generateItemInstance('gkbot_faceplate', { source: 'DROP' })`（`equipSlot = HEAD`），該 template 定義 `weaponWeightClass = MEDIUM`
+- **THEN** 回傳的 `ItemInstance.weaponWeightClass = 'MEDIUM'`
+
+#### Scenario: 非 EQUIPMENT 類物品實體不含重量分類
+- **WHEN** 呼叫 `generateItemInstance('engine_oil_basic', { source: 'DROP' })`（`type = POTION`）
 - **THEN** 回傳的 `ItemInstance` 不含 `weaponWeightClass` 欄位
 
 ### Requirement: rolledStats 依重量分類納入 dodgeChanceMod

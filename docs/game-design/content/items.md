@@ -18,17 +18,19 @@
 
 目前 `ITEM_TEMPLATES` 共 7 筆，來源：`server/constants/templates.ts`。
 
-| templateId | 名稱 | 類型 | 裝備欄位 | 一句話描述 |
-|---|---|---|---|---|
-| `salvaged_wrench` | 維修殘骸扳手 | EQUIPMENT | RIGHT_HAND | 從維修設施殘骸堆挖出的重型扳手，握把留著前使用者的手汗痕跡 |
-| `riot_shield_scrap` | 拾荒防爆盾 | EQUIPMENT | LEFT_HAND | 補給設施保全機具的防爆盾殘件，扛起來莫名順手 |
-| `gkbot_faceplate` | GkBot 頭部殘片 | EQUIPMENT | HEAD | 拆自失控 GkBot 的頭部外殼，戴上有種說不出的熟悉感 |
-| `supply_crate_vest` | 補給箱改造護甲 | EQUIPMENT | BODY | 拆解自倉儲區自動販賣機外殼焊接而成，內襯印著褪色 GK 公司標語 |
-| `servo_greaves` | 伺服關節護脛 | EQUIPMENT | SHOES | 維修型 GkBot 淘汰下來的腿部伺服機構，接上後走路輕快得不太自然 |
-| `research_chip_ring` | 殘留運算晶片戒 | EQUIPMENT | RING | 研究設施實驗品拆下的運算晶片，戴著它思考反應快得連自己都嚇一跳 |
-| `engine_oil_basic` | 機油 | POTION | — | 「為什麼喝機油會補血...？但真好喝，咕嚕咕嚕咕嚕。」 |
+| templateId | 名稱 | 類型 | 裝備欄位 | weaponWeightClass | 一句話描述 |
+|---|---|---|---|---|---|
+| `salvaged_wrench` | 維修殘骸扳手 | EQUIPMENT | RIGHT_HAND | MEDIUM | 從維修設施殘骸堆挖出的重型扳手，握把留著前使用者的手汗痕跡 |
+| `riot_shield_scrap` | 拾荒防爆盾 | EQUIPMENT | LEFT_HAND | HEAVY | 補給設施保全機具的防爆盾殘件，扛起來莫名順手 |
+| `gkbot_faceplate` | GkBot 頭部殘片 | EQUIPMENT | HEAD | MEDIUM | 拆自失控 GkBot 的頭部外殼，戴上有種說不出的熟悉感 |
+| `supply_crate_vest` | 補給箱改造護甲 | EQUIPMENT | BODY | HEAVY | 拆解自倉儲區自動販賣機外殼焊接而成，內襯印著褪色 GK 公司標語 |
+| `servo_greaves` | 伺服關節護脛 | EQUIPMENT | SHOES | LIGHT | 維修型 GkBot 淘汰下來的腿部伺服機構，接上後走路輕快得不太自然 |
+| `research_chip_ring` | 殘留運算晶片戒 | EQUIPMENT | RING | LIGHT | 研究設施實驗品拆下的運算晶片，戴著它思考反應快得連自己都嚇一跳 |
+| `engine_oil_basic` | 機油 | POTION | — | — | 「為什麼喝機油會補血...？但真好喝，咕嚕咕嚕咕嚕。」 |
 
-各 template 的完整數值曲線（分稀有度的 ATK/DEF/HP/actionSpeedMod/healPercent 區間、售價區間）見 `item-drop-and-stats.md` 對應章節：頭部 / 身體 / 左手 / 右手 / 戒指 / 鞋子 / 藥水。
+`weaponWeightClass`（LIGHT/MEDIUM/HEAVY）是速度/主屬性/閃避的取捨分類，掛在 template 層、不隨稀有度變化；機制與各分類走向規則見 `item-drop-and-stats.md`「裝備重量分類」章節。
+
+各 template 的完整數值曲線（分稀有度的 ATK/DEF/HP/actionSpeedMod/dodgeChanceMod/healPercent 區間、售價區間）見 `item-drop-and-stats.md` 對應章節：頭部 / 身體 / 左手 / 右手 / 戒指 / 鞋子 / 藥水。
 
 裝備 6 個欄位（HEAD/BODY/SHOES/LEFT_HAND/RIGHT_HAND/RING）目前每欄各 1 個 template，加上藥水 1 個，剛好對齊 7 筆。
 
