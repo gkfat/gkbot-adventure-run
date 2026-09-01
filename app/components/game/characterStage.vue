@@ -64,13 +64,38 @@
                             <v-row dense>
                                 <v-col
                                     v-for="attr in attributeEntries"
-                                    :key="attr.label"
+                                    :key="attr.key"
                                     cols="6"
                                     class="character-stage__stat"
                                 >
                                     <span class="text-caption text-medium-emphasis character-stage__stat-label">{{ attr.label }}</span>
-                                    <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
-                                        {{ attr.value }}
+                                    <span class="d-flex align-center ga-1">
+                                        <button
+                                            v-if="allocating"
+                                            type="button"
+                                            class="attr-step-btn pixel-press"
+                                            :disabled="attr.pending <= 0"
+                                            aria-label="減少"
+                                            @click="decrementAttribute(attr.key)"
+                                        >
+                                            −
+                                        </button>
+                                        <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
+                                            {{ attr.value }}<span
+                                                v-if="attr.pending > 0"
+                                                style="color: rgb(var(--v-theme-warning));"
+                                            >+{{ attr.pending }}</span>
+                                        </span>
+                                        <button
+                                            v-if="allocating"
+                                            type="button"
+                                            class="attr-step-btn pixel-press"
+                                            :disabled="remainingPoints <= 0"
+                                            aria-label="增加"
+                                            @click="incrementAttribute(attr.key)"
+                                        >
+                                            +
+                                        </button>
                                     </span>
                                 </v-col>
                             </v-row>
@@ -80,10 +105,45 @@
                             <span class="text-caption text-medium-emphasis">可分配</span>
                             <span
                                 class="font-pixel text-caption"
-                                :style="{ color: character.unspentAttributePoints > 0 ? 'rgb(var(--v-theme-warning))' : 'rgb(var(--v-theme-primary))' }"
+                                :style="{ color: remainingPoints > 0 ? 'rgb(var(--v-theme-warning))' : 'rgb(var(--v-theme-primary))' }"
                             >
-                                +{{ character.unspentAttributePoints }}
+                                +{{ remainingPoints }}
                             </span>
+                            <SystemBtn
+                                v-if="!allocating && character.unspentAttributePoints > 0"
+                                size="x-small"
+                                variant="outlined"
+                                color="primary"
+                                class="text-none mt-1"
+                                @click="startAllocating"
+                            >
+                                分配
+                            </SystemBtn>
+                            <div
+                                v-else-if="allocating"
+                                class="d-flex flex-column ga-1 mt-1"
+                            >
+                                <SystemBtn
+                                    size="x-small"
+                                    variant="flat"
+                                    color="primary"
+                                    class="text-none"
+                                    :loading="savingAllocation"
+                                    :disabled="totalPending === 0"
+                                    @click="saveAllocation"
+                                >
+                                    儲存
+                                </SystemBtn>
+                                <SystemBtn
+                                    size="x-small"
+                                    variant="outlined"
+                                    color="error"
+                                    class="text-none"
+                                    @click="cancelAllocating"
+                                >
+                                    取消
+                                </SystemBtn>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -111,6 +171,13 @@
                                     style="color: rgb(var(--v-theme-green));"
                                 >
                                     {{ stat.delta }}
+                                </span>
+                                <span
+                                    v-if="stat.pendingDelta"
+                                    class="character-stage__stat-delta"
+                                    style="color: rgb(var(--v-theme-warning));"
+                                >
+                                    {{ stat.pendingDelta }}
                                 </span>
                             </span>
                         </v-col>
@@ -150,13 +217,22 @@
                         </button>
                     </div>
 
-                    <img
-                        :src="breatheFrameUrl(character.spriteUrl, breathStep)"
-                        alt="角色"
-                        width="140"
-                        height="140"
-                        class="character-stage__sprite"
-                    >
+                    <div class="character-stage__sprite-wrap">
+                        <img
+                            :src="breatheFrameUrl(character.spriteUrl, breathStep)"
+                            alt="角色"
+                            width="140"
+                            height="140"
+                            class="character-stage__sprite"
+                        >
+                        <img
+                            src="/images/effects/campfire.gif"
+                            alt=""
+                            width="80"
+                            height="80"
+                            class="character-stage__campfire"
+                        >
+                    </div>
 
                     <div class="character-stage__equip-col">
                         <button
@@ -242,6 +318,7 @@
 <script setup lang="ts">
 import { getStageDisplayName } from '../../../shared/types/adventure';
 import type { EquipmentSlot } from '../../../shared/types/common';
+import { calculateBaseStats, applyEquipmentStats } from '../../../shared/utils/calculateStats';
 import {
     EQUIP_SLOTS_LEFT, EQUIP_SLOTS_RIGHT, SLOT_PIXEL_ICON, SLOT_LABEL, RARITY_COLOR, resolvePixelIcon,
     equippedStatValue, equippedStatColor,
@@ -249,7 +326,7 @@ import {
 import { breatheFrameUrl } from '../../utils/spriteDisplay';
 
 const {
-    character, loading, error, fetchCharacter,
+    character, loading, error, fetchCharacter, allocateAttributes,
 } = useCharacter();
 const {
     itemById, fetchInventory, loaded: inventoryLoaded,
@@ -345,15 +422,90 @@ const openSlotDetail = (slot: EquipmentSlot) => {
     }
 };
 
+type AttributeKey = 'STR' | 'AGI' | 'CON' | 'LUCK';
+
+const ATTRIBUTE_META: { key: AttributeKey; label: string }[] = [
+    { key: 'STR', label: '力量' },
+    { key: 'AGI', label: '敏捷' },
+    { key: 'CON', label: '體質' },
+    { key: 'LUCK', label: '幸運' },
+];
+
+const emptyAllocation = (): Record<AttributeKey, number> => ({
+    STR: 0, AGI: 0, CON: 0, LUCK: 0,
+});
+
+// 屬性點分配：進入分配模式後，玩家可用左側 +/- 調整每項屬性的暫定加點
+// （pendingAllocation），下限為 0（不可倒扣現有屬性），上限受剩餘可分配點數
+// 限制。儲存時才呼叫 API 落地；取消則直接捨棄暫定值。
+const allocating = ref(false);
+const savingAllocation = ref(false);
+const pendingAllocation = ref(emptyAllocation());
+
+const totalPending = computed(() => (
+    Object.values(pendingAllocation.value).reduce((sum, value) => sum + value, 0)
+));
+
+const remainingPoints = computed(() => (
+    (character.value?.unspentAttributePoints ?? 0) - totalPending.value
+));
+
+const startAllocating = () => {
+    pendingAllocation.value = emptyAllocation();
+    allocating.value = true;
+};
+
+const cancelAllocating = () => {
+    pendingAllocation.value = emptyAllocation();
+    allocating.value = false;
+};
+
+const incrementAttribute = (key: AttributeKey) => {
+    if (remainingPoints.value <= 0) return;
+    pendingAllocation.value[key] += 1;
+};
+
+const decrementAttribute = (key: AttributeKey) => {
+    if (pendingAllocation.value[key] <= 0) return;
+    pendingAllocation.value[key] -= 1;
+};
+
+const saveAllocation = async () => {
+    if (totalPending.value === 0) return;
+    savingAllocation.value = true;
+    const ok = await allocateAttributes({ ...pendingAllocation.value });
+    savingAllocation.value = false;
+    if (ok) {
+        allocating.value = false;
+        pendingAllocation.value = emptyAllocation();
+    }
+};
+
 const attributeEntries = computed(() => {
     if (!character.value) return [];
     const { attributes } = character.value;
-    return [
-        { label: '力量', value: attributes.STR },
-        { label: '敏捷', value: attributes.AGI },
-        { label: '體質', value: attributes.CON },
-        { label: '幸運', value: attributes.LUCK },
-    ];
+    return ATTRIBUTE_META.map(({ key, label }) => ({
+        key,
+        label,
+        value: attributes[key],
+        pending: pendingAllocation.value[key],
+    }));
+});
+
+// 分配過程中的即時狀態值預覽：以暫定屬性（現有值 + 待分配點數）套用純前端的
+// calculateBaseStats/applyEquipmentStats（與後端同一份公式，見 shared/utils/calculateStats），
+// 疊上目前裝備加成後與伺服端目前的 stats 比較差值，顯示在下方戰鬥數值旁。
+const previewStats = computed(() => {
+    if (!character.value || totalPending.value === 0) return null;
+    const { attributes, equipmentBonus } = character.value;
+    const previewAttributes = {
+        STR: attributes.STR + pendingAllocation.value.STR,
+        AGI: attributes.AGI + pendingAllocation.value.AGI,
+        CON: attributes.CON + pendingAllocation.value.CON,
+        LUCK: attributes.LUCK + pendingAllocation.value.LUCK,
+    };
+    const base = calculateBaseStats(previewAttributes);
+    return applyEquipmentStats(base, equipmentBonus);
 });
 
 type StatFormat = 'int' | 'seconds';
@@ -378,23 +530,59 @@ const withEquipmentBonus = (finalValue: number, bonus: number | undefined, forma
     };
 };
 
+// 分配預覽的差值文字，例如 "+12"，數值不變時回傳空字串（不顯示）。
+const pendingDeltaText = (current: number, preview: number | undefined, format: StatFormat) => {
+    if (preview === undefined || preview === current) return '';
+    const sign = preview > current ? '+' : '';
+    return `${sign}${formatStat(preview - current, format)}`;
+};
+
+const pendingPercentDeltaText = (current: number, preview: number | undefined) => {
+    if (preview === undefined || preview === current) return '';
+    const diff = Math.round((preview - current) * 100);
+    if (diff === 0) return '';
+    return `${diff > 0 ? '+' : ''}${diff}%`;
+};
+
 const statEntries = computed(() => {
     if (!character.value) return [];
     const { stats, equipmentBonus } = character.value;
+    const preview = previewStats.value;
 
     return [
-        { label: 'HP', ...withEquipmentBonus(stats.HP_MAX, equipmentBonus.HP_MAX, 'int') },
-        { label: '攻擊力', ...withEquipmentBonus(stats.ATK, equipmentBonus.ATK, 'int') },
-        { label: '防禦力', ...withEquipmentBonus(stats.DEF, equipmentBonus.DEF, 'int') },
+        {
+            label: 'HP',
+            ...withEquipmentBonus(stats.HP_MAX, equipmentBonus.HP_MAX, 'int'),
+            pendingDelta: pendingDeltaText(stats.HP_MAX, preview?.HP_MAX, 'int'),
+        },
+        {
+            label: '攻擊力',
+            ...withEquipmentBonus(stats.ATK, equipmentBonus.ATK, 'int'),
+            pendingDelta: pendingDeltaText(stats.ATK, preview?.ATK, 'int'),
+        },
+        {
+            label: '防禦力',
+            ...withEquipmentBonus(stats.DEF, equipmentBonus.DEF, 'int'),
+            pendingDelta: pendingDeltaText(stats.DEF, preview?.DEF, 'int'),
+        },
         {
             label: '攻速',
             ...withEquipmentBonus(stats.actionIntervalSec, equipmentBonus.actionIntervalSec, 'seconds'),
+            pendingDelta: pendingDeltaText(stats.actionIntervalSec, preview?.actionIntervalSec, 'seconds'),
         },
         {
-            label: '爆擊', value: `${Math.round(stats.critChance * 100)}%`, delta: '', buffed: false,
+            label: '爆擊',
+            value: `${Math.round(stats.critChance * 100)}%`,
+            delta: '',
+            buffed: false,
+            pendingDelta: pendingPercentDeltaText(stats.critChance, preview?.critChance),
         },
         {
-            label: '閃避', value: `${Math.round(stats.dodgeChance * 100)}%`, delta: '', buffed: false,
+            label: '閃避',
+            value: `${Math.round(stats.dodgeChance * 100)}%`,
+            delta: '',
+            buffed: false,
+            pendingDelta: pendingPercentDeltaText(stats.dodgeChance, preview?.dodgeChance),
         },
     ];
 });
@@ -435,9 +623,26 @@ watch(character, (value) => {
         padding-top: 8px;
     }
 
+    &__sprite-wrap {
+        position: relative;
+        width: 140px;
+        height: 140px;
+    }
+
     &__sprite {
+        position: relative;
+        z-index: 1;
         image-rendering: pixelated;
         filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+    }
+
+    &__campfire {
+        position: absolute;
+        z-index: 2;
+        bottom: -60px;
+        left: 0;
+        image-rendering: pixelated;
+        pointer-events: none;
     }
 
     &__equip-row {
@@ -537,6 +742,27 @@ watch(character, (value) => {
         font-size: 9px;
         white-space: nowrap;
         opacity: 0.85;
+    }
+}
+
+.attr-step-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    line-height: 1;
+    font-size: 11px;
+    border: 1px solid rgba(196, 203, 219, 0.3);
+    border-radius: 3px;
+    background: rgba(196, 203, 219, 0.06);
+    color: rgb(var(--v-theme-primary));
+    cursor: pointer;
+
+    &:disabled {
+        opacity: 0.3;
+        cursor: default;
     }
 }
 

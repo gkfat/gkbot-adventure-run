@@ -233,6 +233,28 @@ export const useCharacter = () => {
     };
 
     /**
+     * 分配目前選定角色的可分配屬性點，成功後重新整理角色資料（含 server 重新計算的 stats）。
+     */
+    const allocateAttributes = async (patch: Partial<CharacterData['attributes']>): Promise<boolean> => {
+        if (!selectedCharacterId.value) return false;
+
+        loading.value = true;
+        error.value = null;
+
+        try {
+            await api.post(`/api/character/${selectedCharacterId.value}/attributes`, patch);
+            await fetchCharacter();
+            return true;
+        } catch (err: any) {
+            console.error('[useCharacter] Failed to allocate attributes:', err);
+            error.value = err.message || '分配屬性點失敗';
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    /**
      * 清空選定角色，回到角色列表畫面
      */
     const clearSelection = () => {
@@ -275,6 +297,7 @@ export const useCharacter = () => {
         createCharacter,
         equipItem,
         unequipItem,
+        allocateAttributes,
         clearSelection,
 
         reset,

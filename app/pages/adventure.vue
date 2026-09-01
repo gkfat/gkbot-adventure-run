@@ -142,7 +142,7 @@
                 class="text-none"
                 @click="handleReturnHome"
             >
-                返回首頁
+                回到營地
             </SystemBtn>
         </div>
 
@@ -162,6 +162,41 @@
             >
                 回到首頁
             </SystemBtn>
+        </div>
+
+        <!-- 開頭畫面：run 剛建立、尚未正式進入關卡，先給玩家一段主觀印象與去留選擇 -->
+        <div
+            v-else-if="currentRun.state === AdventureStateType.INIT"
+            class="d-flex flex-column align-center justify-center fill-height px-6 text-center adventure-page__intro"
+        >
+            <div class="font-pixel text-subtitle-1 mb-3" style="color: rgb(var(--v-theme-green));">
+                {{ stageDisplayName }}
+            </div>
+            <div class="text-body-2 text-medium-emphasis mb-6">
+                {{ introNarrative }}
+            </div>
+            <div class="d-flex flex-column ga-2 adventure-page__intro-actions">
+                <SystemBtn
+                    block
+                    variant="flat"
+                    color="primary"
+                    class="text-none"
+                    :loading="runLoading"
+                    @click="handleAdvance"
+                >
+                    進入關卡
+                </SystemBtn>
+                <SystemBtn
+                    block
+                    variant="outlined"
+                    color="error"
+                    class="text-none"
+                    :loading="runLoading"
+                    @click="handleRetreat"
+                >
+                    撤退
+                </SystemBtn>
+            </div>
         </div>
 
         <!-- 冒險進行中 -->
@@ -419,6 +454,17 @@
                     </div>
                 </div>
 
+                <!-- RESOLUTION 但沒有戰鬥/事件結果要顯示（例如剛結束休息、或選完祝福後）：
+                     單純的過場，補一段敘述文字讓「繼續前進」前有點內容可看 -->
+                <div
+                    v-if="currentRun.state === AdventureStateType.RESOLUTION && !lastCombatResult && !lastEventResult"
+                    class="adventure-page__box mb-3"
+                >
+                    <div class="text-body-2 text-medium-emphasis">
+                        {{ transitionNarrative }}
+                    </div>
+                </div>
+
                 <div
                     v-if="runError"
                     class="text-body-2 mb-3"
@@ -469,6 +515,7 @@ import { BLESSING_TEMPLATES, CURSE_TEMPLATES } from '../../shared/constants/bles
 import type { Stats } from '../../shared/types/common';
 import { describeItem, resolvePixelIcon, RARITY_COLOR, type ItemLike } from '../utils/equipmentDisplay';
 import type { EventNodeData, BlessingNodeData, CombatNodeData } from '../composables/useAdventureRun';
+import { pickIntroNarrative, pickTransitionNarrative } from '../constants/adventureNarrative';
 
 definePageMeta({
     middleware: ['auth'],
@@ -526,6 +573,20 @@ const {
 const stageDisplayName = computed(() => {
     if (!currentRun.value) return '';
     return getStageDisplayName(currentRun.value.chapterIndex);
+});
+
+// 開頭畫面的敘述：純前端風味文字，依章節主題挑選，同一關卡（chapterIndex +
+// currentLevelIndex 不變）內維持穩定，不會每次重新渲染就換一句。
+const introNarrative = computed(() => {
+    if (!currentRun.value || !character.value) return '';
+    const seed = currentRun.value.chapterIndex * 31 + character.value.currentLevelIndex;
+    return pickIntroNarrative(stageDisplayName.value, seed);
+});
+
+// 過場敘述：以目前節點在本次 run 內的位置為種子，讓每次推進看到的文字都不同。
+const transitionNarrative = computed(() => {
+    if (!currentRun.value) return '';
+    return pickTransitionNarrative(stageDisplayName.value, currentRun.value.stageNodeIndex);
 });
 
 // 頂部 panel 顯示 "{章節} - {關卡} {currentStage/totalStage}"，例如
@@ -629,6 +690,7 @@ const settlementExpTargetPercent = computed(() => {
 watch(lastSettlement, async (settlement) => {
     if (!settlement) return;
     expDisplayPercent.value = 0;
+    if (settlement.expGained <= 0) return;
     await fetchCharacter();
     await nextTick();
     setTimeout(() => {
@@ -689,6 +751,14 @@ const restPotions = computed<(ItemLike & { itemId: string })[]>(() => {
 const handleAdvance = async () => {
     if (!character.value) return;
     await advance(character.value.characterId);
+};
+
+// 開頭畫面的「撤退」：這趟遠征還沒真正開始就放棄，比照既有放棄機制結算
+// （DISCONNECT）。結算完 currentRun 會變成 null、lastSettlement 會被設定，
+// 畫面自然切到既有的結算頁，由玩家自己按「回到營地」。
+const handleRetreat = async () => {
+    if (!character.value) return;
+    await abandon(character.value.characterId);
 };
 
 const handleStartCombat = async () => {
@@ -809,6 +879,11 @@ onMounted(() => {
         width: 100%;
         max-width: 400px;
         margin: 0 auto;
+    }
+
+    &__intro-actions {
+        width: 100%;
+        max-width: 280px;
     }
 
     &__levelup {

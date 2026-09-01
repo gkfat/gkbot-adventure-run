@@ -16,3 +16,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 實作背包功能，道具裝備與卸下，buff 數值計算
 - 實作冒險核心 core
 - 實作戰鬥引擎
+- 角色能力值計算抽出共用
+- 新增角色場景動畫與冒險敘事文案

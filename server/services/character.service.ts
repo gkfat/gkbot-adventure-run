@@ -122,7 +122,7 @@ export class CharacterService extends BaseService {
     }
 
     private async withStats(character: Character): Promise<CharacterWithStats> {
-        const baseStats = await calculateBaseStats(character.attributes, character.level);
+        const baseStats = calculateBaseStats(character.attributes);
         const equipmentBonus = await this.getEquipmentBonus(character);
         const stats = applyEquipmentStats(baseStats, equipmentBonus);
 
