@@ -2,8 +2,9 @@
  * Adventure run and combat related types
  */
 
-import type {
-    Timestamp, Stats, 
+import {
+    clamp,
+    type Timestamp, type Stats,
 } from './common';
 import type { ItemInstance } from './item';
 
@@ -46,6 +47,18 @@ export enum NodeType {
 };
 
 /**
+ * Facility risk severity for a run (enemy-factions-and-severity) — rolled
+ * once at `createRun`, fixed for the whole run. See SEVERITY_CONFIG.
+ */
+export type FacilitySeverity = 'DEEP_WRECK' | 'PARTIAL_ACTIVE' | 'HIGHLY_ACTIVE';
+
+/**
+ * Which enemy roster a run draws from (enemy-factions-and-severity) —
+ * rolled once at `createRun`, fixed for the whole run.
+ */
+export type EnemyFaction = 'GKBOT' | 'HUMAN';
+
+/**
  * Enemy definition
  */
 export type Enemy = {
@@ -55,6 +68,7 @@ export type Enemy = {
   stats: Stats;
   isElite: boolean;
   isStrongElite: boolean;
+  faction: EnemyFaction;
 };
 
 /**
@@ -285,6 +299,13 @@ export type AdventureRun = {
   stageNodeIndex: number;        // 0-based, resets to 0 on stage change
   stageNodeCount: number;        // node count for this stage, rolled once at stage start
 
+  // Facility risk severity + enemy faction (enemy-factions-and-severity) —
+  // both rolled once at createRun from the not-yet-written seed, fixed for
+  // the whole run. Missing on pre-migration run docs — see
+  // AdventureRunRepository.withStageDefaults.
+  severityTier: FacilitySeverity;
+  factionType: EnemyFaction;
+
   startedAt: Timestamp;
   endedAt?: Timestamp;
   endReason?: AdventureEndReason;
@@ -432,6 +453,96 @@ export const DIFFICULTY_CONFIG = {
     ENEMY_3_PER_STEP: 0.006,
     ENEMY_3_CAP: 0.45,
 } as const;
+
+/**
+ * Facility severity / enemy faction configuration (enemy-factions-and-severity).
+ * ASSUMPTION (see design.md 決策 2): all values are invented, freely tunable —
+ * only the shape (chapterIndex-scaled chance with a cap, plus flat stat/wave
+ * multipliers per tier) is load-bearing.
+ */
+export const SEVERITY_CONFIG = {
+    // Depends on chapterIndex, clamp() keeps randomness even late-game.
+    HIGHLY_ACTIVE_BASE_CHANCE: 0.05,
+    HIGHLY_ACTIVE_PER_CHAPTER: 0.02,
+    HIGHLY_ACTIVE_CAP: 0.50,
+
+    PARTIAL_ACTIVE_BASE_CHANCE: 0.25,
+    PARTIAL_ACTIVE_PER_CHAPTER: 0.015,
+    PARTIAL_ACTIVE_CAP: 0.40,
+    // DEEP_WRECK = 1 - HIGHLY_ACTIVE - PARTIAL_ACTIVE (remaining probability)
+
+    // Multiplies on top of getStatMultipliers()'s result. DEF is kept
+    // conservative — the subtractive damage model max(1, ATK-DEF) is very
+    // sensitive to DEF, an aggressive multiplier would floor damage to 1.
+    SEVERITY_STAT_MULTIPLIER: {
+        DEEP_WRECK: {
+            hp: 0.85, atk: 0.85, def: 0.90,
+        },
+        PARTIAL_ACTIVE: {
+            hp: 1.0, atk: 1.0, def: 1.0,
+        }, // current baseline, unchanged
+        HIGHLY_ACTIVE: {
+            hp: 1.25, atk: 1.15, def: 1.08,
+        },
+    },
+
+    // Multiplies on top of getWave2Chance/getEnemy2Chance/getEnemy3Chance's
+    // result (still clamped within the existing WAVE_2_CAP/ENEMY_2_CAP/ENEMY_3_CAP).
+    SEVERITY_WAVE_ENEMY_MULTIPLIER: {
+        DEEP_WRECK: 0.8,
+        PARTIAL_ACTIVE: 1.0,
+        HIGHLY_ACTIVE: 1.3,
+    },
+
+    // factionType = HUMAN chance, keyed by severityTier.
+    HUMAN_FACTION_CHANCE: {
+        DEEP_WRECK: 0.25,     // stray hostile humans/synthetics
+        PARTIAL_ACTIVE: 0.15,
+        HIGHLY_ACTIVE: 0.40,  // most common tier for an organized human occupation
+    },
+} as const;
+
+/**
+ * `severityTier` chance for a given `chapterIndex` — HIGHLY_ACTIVE and
+ * PARTIAL_ACTIVE both scale with chapterIndex (capped), DEEP_WRECK is
+ * whatever probability remains.
+ */
+export function getSeverityChances(chapterIndex: number): Record<FacilitySeverity, number> {
+    const highlyActive = clamp(
+        SEVERITY_CONFIG.HIGHLY_ACTIVE_BASE_CHANCE + SEVERITY_CONFIG.HIGHLY_ACTIVE_PER_CHAPTER * chapterIndex,
+        0,
+        SEVERITY_CONFIG.HIGHLY_ACTIVE_CAP,
+    );
+    const partialActive = clamp(
+        SEVERITY_CONFIG.PARTIAL_ACTIVE_BASE_CHANCE + SEVERITY_CONFIG.PARTIAL_ACTIVE_PER_CHAPTER * chapterIndex,
+        0,
+        SEVERITY_CONFIG.PARTIAL_ACTIVE_CAP,
+    );
+    return {
+        HIGHLY_ACTIVE: highlyActive,
+        PARTIAL_ACTIVE: partialActive,
+        DEEP_WRECK: Math.max(0, 1 - highlyActive - partialActive),
+    };
+}
+
+/**
+ * Roll `severityTier` from a single RNG draw in [0, 1) — thresholds stack:
+ * [0, highlyActive) -> HIGHLY_ACTIVE, [highlyActive, highlyActive+partialActive) -> PARTIAL_ACTIVE, else DEEP_WRECK.
+ */
+export function rollSeverityTier(chapterIndex: number, rngValue: number): FacilitySeverity {
+    const chances = getSeverityChances(chapterIndex);
+    if (rngValue < chances.HIGHLY_ACTIVE) return 'HIGHLY_ACTIVE';
+    if (rngValue < chances.HIGHLY_ACTIVE + chances.PARTIAL_ACTIVE) return 'PARTIAL_ACTIVE';
+    return 'DEEP_WRECK';
+}
+
+/**
+ * Roll `factionType` from a single RNG draw in [0, 1), weighted by the given
+ * `severityTier`'s HUMAN_FACTION_CHANCE.
+ */
+export function rollFactionType(severityTier: FacilitySeverity, rngValue: number): EnemyFaction {
+    return rngValue < SEVERITY_CONFIG.HUMAN_FACTION_CHANCE[severityTier] ? 'HUMAN' : 'GKBOT';
+}
 
 /**
  * Stage structure configuration (adventure-stage-progression).

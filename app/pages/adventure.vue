@@ -172,8 +172,15 @@
             <div class="font-pixel text-subtitle-1 mb-3" style="color: rgb(var(--v-theme-green));">
                 {{ stageDisplayName }}
             </div>
-            <div class="text-body-2 text-medium-emphasis mb-6">
+            <div class="text-body-2 text-medium-emphasis mb-3">
                 {{ introNarrative }}
+            </div>
+            <div
+                v-if="severityFactionHint"
+                class="text-caption mb-6"
+                :style="{ color: severityFactionHint.color }"
+            >
+                {{ severityFactionHint.text }}
             </div>
             <div class="d-flex flex-column ga-2 adventure-page__intro-actions">
                 <SystemBtn
@@ -513,7 +520,10 @@
 </template>
 
 <script setup lang="ts">
-import { AdventureStateType, NodeType, getStageDisplayName } from '../../shared/types/adventure';
+import {
+    AdventureStateType, NodeType, getStageDisplayName,
+    type FacilitySeverity, type EnemyFaction,
+} from '../../shared/types/adventure';
 import { EXP_TABLE } from '../../shared/types/character';
 import { BLESSING_TEMPLATES, CURSE_TEMPLATES } from '../../shared/constants/blessings';
 import type { Stats } from '../../shared/types/common';
@@ -585,6 +595,33 @@ const introNarrative = computed(() => {
     if (!currentRun.value || !character.value) return '';
     const seed = currentRun.value.chapterIndex * 31 + character.value.currentLevelIndex;
     return pickIntroNarrative(stageDisplayName.value, seed);
+});
+
+// 設施風險分級/敵對陣營提示文案（enemy-factions-and-severity design.md 決策
+// 8）：純顯示，讓玩家在進入關卡前對本趟遠征的危險程度/敵人類型有心理預期。
+// ASSUMPTION：文案內容未在其他地方定案，可事後調整。
+const SEVERITY_HINT_TEXT: Record<FacilitySeverity, string> = {
+    DEEP_WRECK: '設施幾乎完全荒廢，機能停擺已久',
+    PARTIAL_ACTIVE: '設施部分機能仍在運作，需保持警戒',
+    HIGHLY_ACTIVE: '⚠️ 警戒森嚴：設施機能高度運作中',
+};
+const FACTION_HINT_TEXT: Record<EnemyFaction, string> = {
+    GKBOT: '，偵測到殘存 GkBot 活動跡象',
+    HUMAN: '，偵測到武裝人類／合成人勢力',
+};
+const SEVERITY_HINT_COLOR: Record<FacilitySeverity, string> = {
+    DEEP_WRECK: 'rgb(var(--v-theme-primary))',
+    PARTIAL_ACTIVE: 'rgb(var(--v-theme-primary))',
+    HIGHLY_ACTIVE: 'rgb(var(--v-theme-warning))',
+};
+const severityFactionHint = computed(() => {
+    if (!currentRun.value) return null;
+    const { severityTier, factionType } = currentRun.value;
+    if (!severityTier || !factionType) return null;
+    return {
+        text: `${SEVERITY_HINT_TEXT[severityTier]}${FACTION_HINT_TEXT[factionType]}`,
+        color: SEVERITY_HINT_COLOR[severityTier],
+    };
 });
 
 // 過場敘述：以目前節點在本次 run 內的位置為種子，讓每次推進看到的文字都不同。

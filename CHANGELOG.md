@@ -18,3 +18,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 實作戰鬥引擎
 - 角色能力值計算抽出共用
 - 新增角色場景動畫與冒險敘事文案
+- 新增敵對陣營與設施風險分級，修正敵人名稱截斷

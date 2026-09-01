@@ -8,7 +8,9 @@
  * everything it needs to scale its own base stats.
  */
 
-import { DIFFICULTY_CONFIG } from '../../shared/types/adventure';
+import {
+    DIFFICULTY_CONFIG, SEVERITY_CONFIG, type FacilitySeverity,
+} from '../../shared/types/adventure';
 import { clamp } from '../../shared/types/common';
 
 export type EnemyTier = 'NORMAL' | 'ELITE' | 'STRONG_ELITE' | 'BOSS';
@@ -25,7 +27,9 @@ export function getEnemyLevel(step: number): number {
  * growth curve, scaled further by the tier's flat multiplier (ELITE/STRONG_ELITE
  * stack on top of the base curve, not on top of a level-1 enemy).
  */
-export function getStatMultipliers(enemyLevel: number, tier: EnemyTier): { hp: number; atk: number; def: number } {
+export function getStatMultipliers(
+    enemyLevel: number, tier: EnemyTier, severityTier: FacilitySeverity = 'PARTIAL_ACTIVE',
+): { hp: number; atk: number; def: number } {
     const levelSteps = Math.max(0, enemyLevel - 1);
     const baseHp = 1 + levelSteps * DIFFICULTY_CONFIG.HP_MULT_PER_LEVEL;
     const baseAtk = 1 + levelSteps * DIFFICULTY_CONFIG.ATK_MULT_PER_LEVEL;
@@ -52,10 +56,15 @@ export function getStatMultipliers(enemyLevel: number, tier: EnemyTier): { hp: n
         },
     }[tier];
 
+    // Facility severity (enemy-factions-and-severity design.md 決策 2)
+    // stacks on top of the tier curve — PARTIAL_ACTIVE's multiplier is 1.0,
+    // so this is a no-op for the pre-change baseline.
+    const severityMult = SEVERITY_CONFIG.SEVERITY_STAT_MULTIPLIER[severityTier];
+
     return {
-        hp: baseHp * tierMult.hp,
-        atk: baseAtk * tierMult.atk,
-        def: baseDef * tierMult.def,
+        hp: baseHp * tierMult.hp * severityMult.hp,
+        atk: baseAtk * tierMult.atk * severityMult.atk,
+        def: baseDef * tierMult.def * severityMult.def,
     };
 }
 
@@ -67,39 +76,51 @@ function scaledChance(step: number, base: number, perStep: number, cap: number):
     return clamp(base + perStep * step, 0, cap);
 }
 
-export function getWave2Chance(step: number): number {
-    return scaledChance(
+/**
+ * Facility severity (enemy-factions-and-severity design.md 決策 2) multiplies
+ * on top of a step-scaled chance, re-clamped to the same cap so severity
+ * never pushes the probability past the existing ceiling.
+ */
+function applySeverityMultiplier(chance: number, cap: number, severityTier: FacilitySeverity): number {
+    return clamp(chance * SEVERITY_CONFIG.SEVERITY_WAVE_ENEMY_MULTIPLIER[severityTier], 0, cap);
+}
+
+export function getWave2Chance(step: number, severityTier: FacilitySeverity = 'PARTIAL_ACTIVE'): number {
+    const chance = scaledChance(
         step,
         DIFFICULTY_CONFIG.WAVE_2_BASE_CHANCE,
         DIFFICULTY_CONFIG.WAVE_2_PER_STEP,
         DIFFICULTY_CONFIG.WAVE_2_CAP,
     );
+    return applySeverityMultiplier(chance, DIFFICULTY_CONFIG.WAVE_2_CAP, severityTier);
 }
 
-export function getEnemy2Chance(step: number): number {
-    return scaledChance(
+export function getEnemy2Chance(step: number, severityTier: FacilitySeverity = 'PARTIAL_ACTIVE'): number {
+    const chance = scaledChance(
         step,
         DIFFICULTY_CONFIG.ENEMY_2_BASE_CHANCE,
         DIFFICULTY_CONFIG.ENEMY_2_PER_STEP,
         DIFFICULTY_CONFIG.ENEMY_2_CAP,
     );
+    return applySeverityMultiplier(chance, DIFFICULTY_CONFIG.ENEMY_2_CAP, severityTier);
 }
 
-export function getEnemy3Chance(step: number): number {
-    return scaledChance(
+export function getEnemy3Chance(step: number, severityTier: FacilitySeverity = 'PARTIAL_ACTIVE'): number {
+    const chance = scaledChance(
         step,
         DIFFICULTY_CONFIG.ENEMY_3_BASE_CHANCE,
         DIFFICULTY_CONFIG.ENEMY_3_PER_STEP,
         DIFFICULTY_CONFIG.ENEMY_3_CAP,
     );
+    return applySeverityMultiplier(chance, DIFFICULTY_CONFIG.ENEMY_3_CAP, severityTier);
 }
 
 /**
  * Roll the wave count (1 or capped at DIFFICULTY_CONFIG.WAVE_COUNT_MAX) for
  * a combat node, given a single RNG draw in [0, 1) from RngService.
  */
-export function rollWaveCount(step: number, rngValue: number): number {
-    return rngValue < getWave2Chance(step) ? Math.min(2, DIFFICULTY_CONFIG.WAVE_COUNT_MAX) : 1;
+export function rollWaveCount(step: number, rngValue: number, severityTier: FacilitySeverity = 'PARTIAL_ACTIVE'): number {
+    return rngValue < getWave2Chance(step, severityTier) ? Math.min(2, DIFFICULTY_CONFIG.WAVE_COUNT_MAX) : 1;
 }
 
 /**
@@ -107,9 +128,9 @@ export function rollWaveCount(step: number, rngValue: number): number {
  * DIFFICULTY_CONFIG.ENEMY_COUNT_MAX), given a single RNG draw in [0, 1).
  * Thresholds stack: [0, enemy3Chance) -> 3, [enemy3Chance, enemy3Chance+enemy2Chance) -> 2, else 1.
  */
-export function rollEnemyCount(step: number, rngValue: number): number {
-    const enemy3Chance = getEnemy3Chance(step);
-    const enemy2Chance = getEnemy2Chance(step);
+export function rollEnemyCount(step: number, rngValue: number, severityTier: FacilitySeverity = 'PARTIAL_ACTIVE'): number {
+    const enemy3Chance = getEnemy3Chance(step, severityTier);
+    const enemy2Chance = getEnemy2Chance(step, severityTier);
 
     if (rngValue < enemy3Chance) {
         return Math.min(3, DIFFICULTY_CONFIG.ENEMY_COUNT_MAX);

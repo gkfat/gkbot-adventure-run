@@ -22,7 +22,7 @@ import { ItemRepository } from '../repositories/item.repository';
 import { InventoryRepository } from '../repositories/inventory.repository';
 import { RngService } from './rng.service';
 import {
-    CombatService, NODE_TYPE_TO_ENEMY_TIER,
+    CombatService, NODE_TYPE_TO_ENEMY_TIER, mobArchetypesFor, bossArchetypesFor,
 } from './combat.service';
 import { EventService } from './event.service';
 import { BlessingService } from './blessing.service';
@@ -33,7 +33,6 @@ import {
 import {
     getEnemyLevel, getStatMultipliers, rollWaveCount, rollEnemyCount,
 } from '../constants/difficulty';
-import { ENEMY_ARCHETYPES } from '../constants/combat';
 import {
     AdventureStateType, AdventureEndReason, NodeType, NODE_CONFIG, STAGE_CONFIG,
     type AdventureRun, type LeaderboardUpdater, type ProgressTracker,
@@ -584,15 +583,20 @@ export class AdventureRunService extends BaseService {
             return this.buildBossNodeData(run, enemyLevel);
         }
 
-        const waveCount = rollWaveCount(run.step, await this.rngService.next(run.runId));
-        const enemyCountPerWave = rollEnemyCount(run.step, await this.rngService.next(run.runId));
+        // enemy-factions-and-severity Migration Plan: fall back to the
+        // pre-change defaults when missing (pre-migration run docs).
+        const severityTier = run.severityTier ?? 'PARTIAL_ACTIVE';
+        const mobArchetypes = mobArchetypesFor(run.factionType ?? 'GKBOT');
 
-        const multipliers = getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[tier]);
+        const waveCount = rollWaveCount(run.step, await this.rngService.next(run.runId), severityTier);
+        const enemyCountPerWave = rollEnemyCount(run.step, await this.rngService.next(run.runId), severityTier);
+
+        const multipliers = getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[tier], severityTier);
         const firstWaveEnemies: EnemyPreview[] = [];
         for (let i = 0; i < enemyCountPerWave; i++) {
             const roll = await this.rngService.next(run.runId);
-            const archetypeIndex = Math.floor(roll * ENEMY_ARCHETYPES.length);
-            const archetype = ENEMY_ARCHETYPES[archetypeIndex] as typeof ENEMY_ARCHETYPES[number];
+            const archetypeIndex = Math.floor(roll * mobArchetypes.length);
+            const archetype = mobArchetypes[archetypeIndex] as typeof mobArchetypes[number];
             firstWaveEnemies.push({
                 archetypeIndex,
                 name: archetype.name,
@@ -624,13 +628,21 @@ export class AdventureRunService extends BaseService {
      * flag — nothing extra to preview here.
      */
     private async buildBossNodeData(run: AdventureRun, enemyLevel: number) {
-        const archetypeRoll = await this.rngService.next(run.runId);
-        const archetypeIndex = Math.floor(archetypeRoll * ENEMY_ARCHETYPES.length);
-        const archetype = ENEMY_ARCHETYPES[archetypeIndex] as typeof ENEMY_ARCHETYPES[number];
-        const enemyCountPerWave = 1 + archetype.bossMinionCount;
+        // enemy-factions-and-severity Migration Plan: fall back to the
+        // pre-change defaults when missing (pre-migration run docs).
+        const severityTier = run.severityTier ?? 'PARTIAL_ACTIVE';
+        const bossArchetypes = bossArchetypesFor(run.factionType ?? 'GKBOT');
 
-        const bossMultipliers = getStatMultipliers(enemyLevel, 'BOSS');
-        const minionMultipliers = getStatMultipliers(enemyLevel, 'STRONG_ELITE');
+        const archetypeRoll = await this.rngService.next(run.runId);
+        const archetypeIndex = Math.floor(archetypeRoll * bossArchetypes.length);
+        const archetype = bossArchetypes[archetypeIndex] as typeof bossArchetypes[number];
+        const enemyCountPerWave = 1 + (archetype.bossMinionCount ?? 0);
+
+        // NORMAL tier for the boss's own stats (design.md 決策 4 — its
+        // baseAtk/baseDef/baseHp is already a boss-scale value, not stacked
+        // with the BOSS tier multiplier); escort minions stay STRONG_ELITE.
+        const bossMultipliers = getStatMultipliers(enemyLevel, 'NORMAL', severityTier);
+        const minionMultipliers = getStatMultipliers(enemyLevel, 'STRONG_ELITE', severityTier);
 
         const firstWaveEnemies: EnemyPreview[] = [
             {
@@ -642,7 +654,7 @@ export class AdventureRunService extends BaseService {
                 isBoss: true,
             },
         ];
-        for (let i = 0; i < archetype.bossMinionCount; i++) {
+        for (let i = 0; i < (archetype.bossMinionCount ?? 0); i++) {
             firstWaveEnemies.push({
                 archetypeIndex,
                 name: archetype.name,

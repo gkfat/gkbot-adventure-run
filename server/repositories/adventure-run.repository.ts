@@ -11,7 +11,7 @@
 
 import { BaseRepository } from './base.repository';
 import {
-    AdventureStateType, STAGE_CONFIG, type AdventureRun,
+    AdventureStateType, STAGE_CONFIG, rollSeverityTier, rollFactionType, type AdventureRun,
 } from '../../shared/types/adventure';
 import { adventureRunSchema } from '../../shared/schemas/firestore/adventure.schema';
 import {
@@ -42,6 +42,11 @@ function withStageDefaults(run: AdventureRun): AdventureRun {
         stageNodeIndex: run.stageNodeIndex ?? 0,
         stageNodeCount: run.stageNodeCount ?? STAGE_CONFIG.NODE_COUNT_MIN,
         expEarned: run.expEarned ?? 0,
+        // enemy-factions-and-severity Migration Plan: missing on pre-migration
+        // run docs — tolerate as PARTIAL_ACTIVE/GKBOT (equivalent to the
+        // unadjusted pre-change behavior), no data backfill.
+        severityTier: run.severityTier ?? 'PARTIAL_ACTIVE',
+        factionType: run.factionType ?? 'GKBOT',
     };
 }
 
@@ -73,13 +78,24 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
             // RngService.next()/consumeRng().
             const stageNodeCount = rollInRange(random(seed, 0), STAGE_CONFIG.NODE_COUNT_MIN, STAGE_CONFIG.NODE_COUNT_MAX);
 
+            // Facility severity / enemy faction (enemy-factions-and-severity
+            // design.md 決策 1): rolled once here, same deterministic-seed
+            // style as stageNodeCount — indices 1/2 so they never collide
+            // with stageNodeCount's index 0.
+            const severityTier = rollSeverityTier(params.chapterIndex, random(seed, 1));
+            const factionType = rollFactionType(severityTier, random(seed, 2));
+
             const run: AdventureRun = adventureRunSchema.parse({
                 runId: docRef.id,
                 characterId: params.characterId,
                 accountId: params.accountId,
 
                 seed,
-                rngIndex: 1,
+                // Indices 0~2 are already consumed above (stageNodeCount,
+                // severityTier, factionType) — start the run's own
+                // RngService/consumeRng sequence past them so it never
+                // replays an already-used draw.
+                rngIndex: 3,
 
                 state: AdventureStateType.INIT,
                 step: 0,
@@ -88,6 +104,9 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
                 chapterIndex: params.chapterIndex,
                 stageNodeIndex: 0,
                 stageNodeCount,
+
+                severityTier,
+                factionType,
 
                 startedAt: timestamp,
 

@@ -4,7 +4,10 @@ import {
 import {
     CombatService, computeDamage, applyModifiers, combinedDropRateMultiplier,
 } from './combat.service';
-import { ENEMY_ARCHETYPES } from '../constants/combat';
+import { getStatMultipliers } from '../constants/difficulty';
+import {
+    ENEMY_ARCHETYPES, HUMAN_ARCHETYPES, GKBOT_BOSS_ARCHETYPES, HUMAN_BOSS_ARCHETYPES,
+} from '../constants/combat';
 import {
     AdventureStateType, NodeType, type AdventureRun, type CombatContext, type RunModifier,
 } from '../../shared/types/adventure';
@@ -379,5 +382,90 @@ describe('CombatService.resolve', () => {
         const result = await service.resolve(baseRun(), context);
 
         expect(result.enemies.map(enemy => enemy.name)).toEqual([ENEMY_ARCHETYPES[2]?.name, ENEMY_ARCHETYPES[3]?.name]);
+    });
+
+    // enemy-factions-and-severity: archetype list selection by run.factionType
+    describe('faction-based archetype selection', () => {
+        it('factionType=GKBOT (default) draws normal combat from ENEMY_ARCHETYPES and Boss from GKBOT_BOSS_ARCHETYPES', async () => {
+            const service = new CombatService();
+            const run = baseRun({ factionType: 'GKBOT' });
+
+            const combatResult = await service.resolve(run, {
+                enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [3],
+            });
+            expect(combatResult.enemies[0]?.name).toBe(ENEMY_ARCHETYPES[3]?.name);
+
+            const bossResult = await service.resolve(run, {
+                enemyLevel: 1, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [1],
+            });
+            expect(bossResult.enemies[0]?.name).toBe(GKBOT_BOSS_ARCHETYPES[1]?.name);
+        });
+
+        it('factionType=HUMAN draws normal combat from HUMAN_ARCHETYPES and Boss from HUMAN_BOSS_ARCHETYPES, never a GkBot archetype', async () => {
+            const service = new CombatService();
+            const run = baseRun({ factionType: 'HUMAN' });
+
+            const combatResult = await service.resolve(run, {
+                enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [3],
+            });
+            expect(combatResult.enemies[0]?.name).toBe(HUMAN_ARCHETYPES[3]?.name);
+            expect(ENEMY_ARCHETYPES.map(archetype => archetype.name)).not.toContain(combatResult.enemies[0]?.name);
+
+            const bossResult = await service.resolve(run, {
+                enemyLevel: 1, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [1],
+            });
+            expect(bossResult.enemies[0]?.name).toBe(HUMAN_BOSS_ARCHETYPES[1]?.name);
+        });
+    });
+
+    // enemy-factions-and-severity design.md 決策 4: Boss stats no longer stack
+    // the BOSS tier multiplier on top of the boss archetype's own base values.
+    describe('Boss stats use NORMAL tier, not BOSS tier', () => {
+        it('a boss unit\'s hpMax equals baseHp scaled by NORMAL tier, not BOSS tier', async () => {
+            const service = new CombatService();
+            const run = baseRun({ factionType: 'GKBOT' });
+            const enemyLevel = 6;
+            const bossArchetype = GKBOT_BOSS_ARCHETYPES[0]!;
+
+            const result = await service.resolve(run, {
+                enemyLevel, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+            });
+
+            const expectedHp = Math.round(bossArchetype.baseHp * getStatMultipliers(enemyLevel, 'NORMAL').hp);
+            const bossTierHp = Math.round(bossArchetype.baseHp * getStatMultipliers(enemyLevel, 'BOSS').hp);
+            expect(result.enemies[0]?.hpMax).toBe(expectedHp);
+            expect(result.enemies[0]?.hpMax).not.toBe(bossTierHp);
+        });
+    });
+
+    // enemy-factions-and-severity design.md 決策 3: LUK (crit/dodge) overrides
+    describe('LUK overrides', () => {
+        it('uses the archetype\'s dodgeChanceOverride instead of the global default when set', async () => {
+            // "幻影投影體" (ENEMY_ARCHETYPES[6]) has dodgeChanceOverride=0.23; a
+            // dodge roll of 0.10 clears the global default (0.03) but not the override.
+            rollQueue = [0.10];
+            const service = new CombatService();
+            const context: CombatContext = {
+                enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [6],
+            };
+
+            const result = await service.resolve(baseRun(), context);
+
+            expect(result.combatLog[0]?.action).toBe('DODGE');
+        });
+
+        it('falls back to the global ENEMY_COMBAT_STATS default when no override is set', async () => {
+            // ENEMY_ARCHETYPES[0] ("維修型 GkBot") has no dodgeChanceOverride;
+            // the same 0.10 roll should NOT clear the global 0.03 default.
+            rollQueue = [0.10];
+            const service = new CombatService();
+            const context: CombatContext = {
+                enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+            };
+
+            const result = await service.resolve(baseRun(), context);
+
+            expect(result.combatLog[0]?.action).not.toBe('DODGE');
+        });
     });
 });

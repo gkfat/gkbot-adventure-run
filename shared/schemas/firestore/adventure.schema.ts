@@ -4,9 +4,20 @@
 
 import { z } from 'zod';
 import {
-    AdventureStateType, AdventureEndReason, NodeType, RESOURCE_LIMITS, 
+    AdventureStateType, AdventureEndReason, NodeType, RESOURCE_LIMITS,
 } from '../../types';
 import { itemInstanceSchema } from './item.schema';
+
+/**
+ * Facility severity / enemy faction (enemy-factions-and-severity) — see
+ * shared/types/adventure.ts FacilitySeverity/EnemyFaction.
+ */
+export const facilitySeveritySchema = z.enum([
+    'DEEP_WRECK',
+    'PARTIAL_ACTIVE',
+    'HIGHLY_ACTIVE',
+]);
+export const enemyFactionSchema = z.enum(['GKBOT', 'HUMAN']);
 
 /**
  * Combat summary schema (stored in run)
@@ -75,6 +86,10 @@ export const adventureRunSchema = z.object({
     chapterIndex: z.number().int().min(0),
     stageNodeIndex: z.number().int().min(0),
     stageNodeCount: z.number().int().min(0),
+
+    // Facility severity / enemy faction (enemy-factions-and-severity)
+    severityTier: facilitySeveritySchema,
+    factionType: enemyFactionSchema,
 
     startedAt: z.number(),
     endedAt: z.number().optional(),

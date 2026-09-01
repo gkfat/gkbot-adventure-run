@@ -1,5 +1,6 @@
 import type {
     AdventureStateType, AdventureEndReason, NodeType, CombatSummary, CombatLogEntry, EnemyPreview,
+    FacilitySeverity, EnemyFaction,
 } from '../../shared/types/adventure';
 import type { Rarity } from '../../shared/types/common';
 import type { ItemInstance } from '../../shared/types/item';
@@ -37,6 +38,8 @@ export type AdventureRunView = {
     chapterIndex: number;
     stageNodeIndex: number;
     stageNodeCount: number;
+    severityTier: FacilitySeverity;
+    factionType: EnemyFaction;
     currentNodeType?: NodeType;
     currentNodeData?: unknown;
     playerHp: number;

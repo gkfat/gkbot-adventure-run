@@ -3,6 +3,7 @@ import {
 } from 'vitest';
 import {
     getEnemyLevel, getStatMultipliers, rollWaveCount, rollEnemyCount,
+    getWave2Chance, getEnemy2Chance, getEnemy3Chance,
 } from './difficulty';
 
 describe('getEnemyLevel', () => {
@@ -38,6 +39,19 @@ describe('getStatMultipliers', () => {
         expect(boss.atk).toBeGreaterThan(strongElite.atk);
         expect(boss.def).toBeGreaterThan(strongElite.def);
     });
+
+    it('PARTIAL_ACTIVE severity (default) matches the pre-change curve exactly', () => {
+        expect(getStatMultipliers(6, 'NORMAL', 'PARTIAL_ACTIVE')).toEqual(getStatMultipliers(6, 'NORMAL'));
+    });
+
+    it('HIGHLY_ACTIVE severity is not lower than DEEP_WRECK across hp/atk/def, same step/tier', () => {
+        const deepWreck = getStatMultipliers(6, 'NORMAL', 'DEEP_WRECK');
+        const highlyActive = getStatMultipliers(6, 'NORMAL', 'HIGHLY_ACTIVE');
+
+        expect(highlyActive.hp).toBeGreaterThanOrEqual(deepWreck.hp);
+        expect(highlyActive.atk).toBeGreaterThanOrEqual(deepWreck.atk);
+        expect(highlyActive.def).toBeGreaterThanOrEqual(deepWreck.def);
+    });
 });
 
 describe('rollWaveCount / rollEnemyCount', () => {
@@ -61,5 +75,23 @@ describe('rollWaveCount / rollEnemyCount', () => {
     it('rolls the lowest tier as rngValue approaches 1', () => {
         expect(rollWaveCount(0, 0.999)).toBe(1);
         expect(rollEnemyCount(0, 0.999)).toBe(1);
+    });
+
+    it('PARTIAL_ACTIVE severity (default) matches the pre-change chance exactly', () => {
+        expect(getWave2Chance(50, 'PARTIAL_ACTIVE')).toBe(getWave2Chance(50));
+        expect(getEnemy2Chance(50, 'PARTIAL_ACTIVE')).toBe(getEnemy2Chance(50));
+        expect(getEnemy3Chance(50, 'PARTIAL_ACTIVE')).toBe(getEnemy3Chance(50));
+    });
+
+    it('HIGHLY_ACTIVE severity raises multi-wave/multi-enemy chance above DEEP_WRECK, same step', () => {
+        expect(getWave2Chance(50, 'HIGHLY_ACTIVE')).toBeGreaterThan(getWave2Chance(50, 'DEEP_WRECK'));
+        expect(getEnemy2Chance(50, 'HIGHLY_ACTIVE')).toBeGreaterThan(getEnemy2Chance(50, 'DEEP_WRECK'));
+        expect(getEnemy3Chance(50, 'HIGHLY_ACTIVE')).toBeGreaterThan(getEnemy3Chance(50, 'DEEP_WRECK'));
+    });
+
+    it('HIGHLY_ACTIVE severity still clamps within the existing caps near max step', () => {
+        expect(getWave2Chance(1000, 'HIGHLY_ACTIVE')).toBeLessThanOrEqual(0.60);
+        expect(getEnemy2Chance(1000, 'HIGHLY_ACTIVE')).toBeLessThanOrEqual(0.70);
+        expect(getEnemy3Chance(1000, 'HIGHLY_ACTIVE')).toBeLessThanOrEqual(0.45);
     });
 });

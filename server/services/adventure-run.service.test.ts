@@ -41,14 +41,18 @@ const {
     generateCandidatesMock: vi.fn(),
 }));
 
-vi.mock('./combat.service', () => ({
-    CombatService: vi.fn().mockImplementation(function CombatServiceMock() {
-        return { resolve: combatResolveMock };
-    }),
-    NODE_TYPE_TO_ENEMY_TIER: {
-        COMBAT: 'NORMAL', ELITE: 'ELITE', STRONG_ELITE: 'STRONG_ELITE', BOSS: 'BOSS',
-    },
-}));
+vi.mock('./combat.service', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('./combat.service')>();
+    return {
+        ...actual,
+        CombatService: vi.fn().mockImplementation(function CombatServiceMock() {
+            return { resolve: combatResolveMock };
+        }),
+        NODE_TYPE_TO_ENEMY_TIER: {
+            COMBAT: 'NORMAL', ELITE: 'ELITE', STRONG_ELITE: 'STRONG_ELITE', BOSS: 'BOSS',
+        },
+    };
+});
 
 vi.mock('./event.service', () => ({
     EventService: vi.fn().mockImplementation(function EventServiceMock() {

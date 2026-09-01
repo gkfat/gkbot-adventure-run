@@ -19,7 +19,8 @@ import {
     getStatMultipliers, type EnemyTier,
 } from '../constants/difficulty';
 import {
-    ENEMY_ARCHETYPES, ENEMY_COMBAT_STATS, BOSS_REINFORCE_CONFIG,
+    ENEMY_ARCHETYPES, HUMAN_ARCHETYPES, GKBOT_BOSS_ARCHETYPES, HUMAN_BOSS_ARCHETYPES,
+    ENEMY_COMBAT_STATS, BOSS_REINFORCE_CONFIG,
     expForKill, goldForKill, applyLuckToGold, itemDropChance,
     blessingPointsForVictory, maxDropRarity, gemsDropTier, DROP_ITEM_CONTEXT,
     type EnemyArchetype,
@@ -36,6 +37,7 @@ import {
 } from '../../shared/types/adventure';
 import type {
     AdventureRun, CombatContext, CombatResolver, CombatResolution, CombatLogEntry, RunModifier,
+    EnemyFaction, FacilitySeverity,
 } from '../../shared/types/adventure';
 import type { Stats } from '../../shared/types/common';
 
@@ -52,6 +54,22 @@ export const NODE_TYPE_TO_ENEMY_TIER: Record<CombatContext['tier'], EnemyTier> =
     [NodeType.STRONG_ELITE]: 'STRONG_ELITE',
     [NodeType.BOSS]: 'BOSS',
 };
+
+/**
+ * Mob (non-BOSS-tier) archetype list for a run's `factionType`
+ * (enemy-factions-and-severity design.md 決策 5).
+ */
+export function mobArchetypesFor(factionType: EnemyFaction): EnemyArchetype[] {
+    return factionType === 'HUMAN' ? HUMAN_ARCHETYPES : ENEMY_ARCHETYPES;
+}
+
+/**
+ * Boss archetype list for a run's `factionType`
+ * (enemy-factions-and-severity design.md 決策 5).
+ */
+export function bossArchetypesFor(factionType: EnemyFaction): EnemyArchetype[] {
+    return factionType === 'HUMAN' ? HUMAN_BOSS_ARCHETYPES : GKBOT_BOSS_ARCHETYPES;
+}
 
 /**
  * `damage = max(1, ATK-DEF) * (crit ? critMultiplier : 1)` — combat-engine
@@ -146,6 +164,14 @@ export class CombatService extends BaseService implements CombatResolver {
     }
 
     async resolve(run: AdventureRun, context: CombatContext): Promise<CombatResolution> {
+        // enemy-factions-and-severity Migration Plan: fall back to the
+        // pre-change defaults when either field is missing (pre-migration
+        // run docs, or a test fixture that doesn't set them).
+        const factionType: EnemyFaction = run.factionType ?? 'GKBOT';
+        const severityTier = run.severityTier ?? 'PARTIAL_ACTIVE';
+        const mobArchetypes = mobArchetypesFor(factionType);
+        const bossArchetypes = bossArchetypesFor(factionType);
+
         const character = await this.characterService.getCharacterWithStats(run.accountId, run.characterId);
 
         const activeModifiers = resolveActiveModifiers(run);
@@ -190,7 +216,10 @@ export class CombatService extends BaseService implements CombatResolver {
             // per-wave timestamps to build its playback schedule).
             player.nextAttackAt = 0;
 
-            const enemies = this.spawnWave(cursor, context, wave === 0 ? context.firstWaveArchetypeIndices : undefined);
+            const enemies = this.spawnWave(
+                cursor, context, mobArchetypes, bossArchetypes, severityTier,
+                wave === 0 ? context.firstWaveArchetypeIndices : undefined,
+            );
             encountered.push(...enemies);
             const alive = [...enemies];
             // Boss small-composition reinforcement (chapter-level-structure)
@@ -229,8 +258,8 @@ export class CombatService extends BaseService implements CombatResolver {
                     if (minionsAlive < 2) {
                         const reinforceRoll = cursor.next();
                         if (reinforceRoll < BOSS_REINFORCE_CONFIG.CHANCE) {
-                            const bossArchetype = ENEMY_ARCHETYPES[bossUnit.archetypeIndex] as EnemyArchetype;
-                            const minionMultipliers = getStatMultipliers(context.enemyLevel, 'STRONG_ELITE');
+                            const bossArchetype = bossArchetypes[bossUnit.archetypeIndex] as EnemyArchetype;
+                            const minionMultipliers = getStatMultipliers(context.enemyLevel, 'STRONG_ELITE', severityTier);
                             const minion = this.buildEnemyUnit(bossArchetype, bossUnit.archetypeIndex, minionMultipliers, context.enemyLevel, false);
                             minion.nextAttackAt = eventTimestamp;
                             alive.push(minion);
@@ -267,27 +296,38 @@ export class CombatService extends BaseService implements CombatResolver {
      * each enemy slot to the archetype already decided and shown to the
      * player at node-generation time, instead of rolling a fresh one here.
      *
-     * BOSS tier (chapter-level-structure): slot 0 is the boss (BOSS-tier
-     * stats), every other slot is an escort minion (STRONG_ELITE-tier
-     * stats) — `adventure-run.service.buildBossNodeData` already sized
+     * BOSS tier (chapter-level-structure): slot 0 is the boss, every other
+     * slot is an escort minion (STRONG_ELITE-tier stats) —
+     * `adventure-run.service.buildBossNodeData` already sized
      * `enemyCountPerWave`/`archetypeIndices` to match (same archetype for
      * every slot), so this only needs to pick the right multiplier per slot.
+     * The boss slot itself uses NORMAL tier (enemy-factions-and-severity
+     * design.md 決策 4 — its own baseAtk/baseDef/baseHp is already a boss-scale
+     * value, no longer stacked with the BOSS tier multiplier).
      */
-    private spawnWave(cursor: RngCursor, context: CombatContext, archetypeIndices?: number[]): CombatUnit[] {
+    private spawnWave(
+        cursor: RngCursor,
+        context: CombatContext,
+        mobArchetypes: EnemyArchetype[],
+        bossArchetypes: EnemyArchetype[],
+        severityTier: FacilitySeverity,
+        archetypeIndices?: number[],
+    ): CombatUnit[] {
         const enemyLevel = context.enemyLevel;
         const isBossTier = context.tier === NodeType.BOSS;
-        const uniformMultipliers = isBossTier ? undefined : getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier]);
-        const bossMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'BOSS') : undefined;
-        const minionMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'STRONG_ELITE') : undefined;
+        const archetypes = isBossTier ? bossArchetypes : mobArchetypes;
+        const uniformMultipliers = isBossTier ? undefined : getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier], severityTier);
+        const bossMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'NORMAL', severityTier) : undefined;
+        const minionMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'STRONG_ELITE', severityTier) : undefined;
 
         const enemies: CombatUnit[] = [];
         for (let i = 0; i < context.enemyCountPerWave; i++) {
             let archetypeIndex = archetypeIndices?.[i];
             if (archetypeIndex === undefined) {
                 const roll = cursor.next();
-                archetypeIndex = Math.floor(roll * ENEMY_ARCHETYPES.length);
+                archetypeIndex = Math.floor(roll * archetypes.length);
             }
-            const archetype = ENEMY_ARCHETYPES[archetypeIndex] as EnemyArchetype;
+            const archetype = archetypes[archetypeIndex] as EnemyArchetype;
             const isBossUnit = isBossTier && i === 0;
             const multipliers = isBossTier ? (isBossUnit ? bossMultipliers! : minionMultipliers!) : uniformMultipliers!;
 
@@ -316,14 +356,17 @@ export class CombatService extends BaseService implements CombatResolver {
             hpMax: Math.round(archetype.baseHp * multipliers.hp),
             hp: Math.round(archetype.baseHp * multipliers.hp),
             actionIntervalSec: archetype.actionIntervalSec,
-            critChance: ENEMY_COMBAT_STATS.critChance,
+            // LUK overrides (enemy-factions-and-severity design.md 決策 3):
+            // an archetype's own critChanceOverride/dodgeChanceOverride wins
+            // when set, otherwise fall back to the global default.
+            critChance: archetype.critChanceOverride ?? ENEMY_COMBAT_STATS.critChance,
             critMultiplier: ENEMY_COMBAT_STATS.critMultiplier,
-            dodgeChance: ENEMY_COMBAT_STATS.dodgeChance,
+            dodgeChance: archetype.dodgeChanceOverride ?? ENEMY_COMBAT_STATS.dodgeChance,
             nextAttackAt: 0,
             level: enemyLevel,
             archetypeIndex,
             isBoss,
-            canReinforce: isBoss ? archetype.canReinforce : false,
+            canReinforce: isBoss ? (archetype.canReinforce ?? false) : false,
         };
     }
 
