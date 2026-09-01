@@ -259,7 +259,7 @@ export class CombatService extends BaseService implements CombatResolver {
                         const reinforceRoll = cursor.next();
                         if (reinforceRoll < BOSS_REINFORCE_CONFIG.CHANCE) {
                             const bossArchetype = bossArchetypes[bossUnit.archetypeIndex] as EnemyArchetype;
-                            const minionMultipliers = getStatMultipliers(context.enemyLevel, 'STRONG_ELITE', severityTier);
+                            const minionMultipliers = getStatMultipliers(context.enemyLevel, 'BOSS_MINION', severityTier);
                             const minion = this.buildEnemyUnit(bossArchetype, bossUnit.archetypeIndex, minionMultipliers, context.enemyLevel, false);
                             minion.nextAttackAt = eventTimestamp;
                             alive.push(minion);
@@ -297,7 +297,9 @@ export class CombatService extends BaseService implements CombatResolver {
      * player at node-generation time, instead of rolling a fresh one here.
      *
      * BOSS tier (chapter-level-structure): slot 0 is the boss, every other
-     * slot is an escort minion (STRONG_ELITE-tier stats) —
+     * slot is an escort minion (BOSS_MINION-tier stats, kept below the
+     * boss's own NORMAL-tier multiplier since both share the same
+     * boss-scale archetype baseHp/baseAtk/baseDef) —
      * `adventure-run.service.buildBossNodeData` already sized
      * `enemyCountPerWave`/`archetypeIndices` to match (same archetype for
      * every slot), so this only needs to pick the right multiplier per slot.
@@ -318,7 +320,7 @@ export class CombatService extends BaseService implements CombatResolver {
         const archetypes = isBossTier ? bossArchetypes : mobArchetypes;
         const uniformMultipliers = isBossTier ? undefined : getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier], severityTier);
         const bossMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'NORMAL', severityTier) : undefined;
-        const minionMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'STRONG_ELITE', severityTier) : undefined;
+        const minionMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'BOSS_MINION', severityTier) : undefined;
 
         const enemies: CombatUnit[] = [];
         for (let i = 0; i < context.enemyCountPerWave; i++) {

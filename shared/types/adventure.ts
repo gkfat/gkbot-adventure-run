@@ -440,7 +440,15 @@ export const DIFFICULTY_CONFIG = {
     STRONG_ELITE_HP_MULT: 2.6,
     STRONG_ELITE_ATK_MULT: 2.1,
     STRONG_ELITE_DEF_MULT: 1.6,
-  
+
+    // Boss escort minion multipliers — escorts share the boss's own
+    // (already boss-scale) archetype baseHp/baseAtk/baseDef, so unlike
+    // STRONG_ELITE (designed to scale up a mob-tier base) these stay below
+    // 1.0 to keep escorts weaker than the boss unit itself.
+    BOSS_MINION_HP_MULT: 0.6,
+    BOSS_MINION_ATK_MULT: 0.7,
+    BOSS_MINION_DEF_MULT: 0.8,
+
     // Multi-enemy/wave configuration
     WAVE_COUNT_MAX: 2,
     ENEMY_COUNT_MAX: 3,

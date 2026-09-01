@@ -618,9 +618,10 @@ export class AdventureRunService extends BaseService {
     }
 
     /**
-     * Boss composition (chapter-level-structure): 1 wave, 1 boss unit (BOSS
+     * Boss composition (chapter-level-structure): 1 wave, 1 boss unit (NORMAL
      * tier stats) + the boss archetype's own `bossMinionCount` (0~2) escort
-     * minions (STRONG_ELITE tier stats) — all sharing the same archetype, so
+     * minions (BOSS_MINION tier stats, kept below 1.0 since escorts share
+     * the boss's own boss-scale archetype) — all sharing the same archetype, so
      * the preview and the actual fight (combat.service reuses this same
      * archetypeIndex per slot via firstWaveArchetypeIndices) stay in sync.
      * Whether the boss can reinforce fallen minions mid-fight is decided
@@ -640,9 +641,11 @@ export class AdventureRunService extends BaseService {
 
         // NORMAL tier for the boss's own stats (design.md 決策 4 — its
         // baseAtk/baseDef/baseHp is already a boss-scale value, not stacked
-        // with the BOSS tier multiplier); escort minions stay STRONG_ELITE.
+        // with the BOSS tier multiplier); escort minions use BOSS_MINION
+        // (kept below 1.0, since STRONG_ELITE would double-scale the
+        // already boss-scale baseHp/baseAtk/baseDef they share with the boss).
         const bossMultipliers = getStatMultipliers(enemyLevel, 'NORMAL', severityTier);
-        const minionMultipliers = getStatMultipliers(enemyLevel, 'STRONG_ELITE', severityTier);
+        const minionMultipliers = getStatMultipliers(enemyLevel, 'BOSS_MINION', severityTier);
 
         const firstWaveEnemies: EnemyPreview[] = [
             {

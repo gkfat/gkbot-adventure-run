@@ -28,7 +28,7 @@ export function getEnemyLevel(step: number): number {
  * stack on top of the base curve, not on top of a level-1 enemy).
  */
 export function getStatMultipliers(
-    enemyLevel: number, tier: EnemyTier, severityTier: FacilitySeverity = 'PARTIAL_ACTIVE',
+    enemyLevel: number, tier: EnemyTier | 'BOSS_MINION', severityTier: FacilitySeverity = 'PARTIAL_ACTIVE',
 ): { hp: number; atk: number; def: number } {
     const levelSteps = Math.max(0, enemyLevel - 1);
     const baseHp = 1 + levelSteps * DIFFICULTY_CONFIG.HP_MULT_PER_LEVEL;
@@ -53,6 +53,14 @@ export function getStatMultipliers(
         // Elite progression, higher than STRONG_ELITE across all three stats.
         BOSS: {
             hp: 4.0, atk: 2.8, def: 2.0,
+        },
+        // Boss escort minions share the boss's own archetype (already
+        // boss-scale baseHp/baseAtk/baseDef) — kept below 1.0 so escorts
+        // stay weaker than the boss unit itself (see combat.service.ts).
+        BOSS_MINION: {
+            hp: DIFFICULTY_CONFIG.BOSS_MINION_HP_MULT,
+            atk: DIFFICULTY_CONFIG.BOSS_MINION_ATK_MULT,
+            def: DIFFICULTY_CONFIG.BOSS_MINION_DEF_MULT,
         },
     }[tier];
 
