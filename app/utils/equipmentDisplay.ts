@@ -70,21 +70,6 @@ export const RARITY_ORDER_DESC: Rarity[] = [
     Rarity.N,
 ];
 
-// Display names for known item templates (kept in sync with `name` in
-// server/constants/templates.ts — the API doesn't send template name/description,
-// only the rolled instance, so the frontend keeps its own display copy).
-// Falls back to the raw templateId for any template introduced later that
-// hasn't been named here yet.
-const TEMPLATE_NAMES: Record<string, string> = {
-    salvaged_wrench: '維修殘骸扳手',
-    riot_shield_scrap: '拾荒防爆盾',
-    gkbot_faceplate: 'GkBot 頭部殘片',
-    supply_crate_vest: '補給箱改造護甲',
-    servo_greaves: '伺服關節護脛',
-    research_chip_ring: '殘留運算晶片戒',
-    engine_oil_basic: '機油',
-};
-
 // Detailed item art per template — takes priority over the slot-based fallback.
 const TEMPLATE_ICON: Record<string, PixelIconName> = {
     salvaged_wrench: 'wrench',
@@ -96,23 +81,13 @@ const TEMPLATE_ICON: Record<string, PixelIconName> = {
     engine_oil_basic: 'engineOil',
 };
 
-// Flavor/lore text per template (kept in sync with `description` in
-// server/constants/templates.ts) — no numbers, just what the item is.
-const TEMPLATE_FLAVOR: Record<string, string> = {
-    salvaged_wrench: '從維修設施的殘骸堆裡挖出來的重型扳手，握把上還留著上一位使用者的手汗痕跡——那個人後來怎麼了，沒人知道。',
-    riot_shield_scrap: '補給設施保全機具的防爆盾牌殘件，邊緣還留著清晰的撞擊凹痕，扛起來卻莫名地順手。',
-    gkbot_faceplate: '拆卸自失控 GkBot 的頭部外殼，戴上的瞬間有種說不出的熟悉感——熟悉到讓人有點不安。',
-    supply_crate_vest: '拆解自倉儲區自動販賣機外殼焊接而成，內襯還印著一行褪色的 GK 公司標語。',
-    servo_greaves: '維修型 GkBot 淘汰下來的腿部伺服機構，接上之後走起路來輕快得不太自然。',
-    research_chip_ring: '研究設施實驗品上拆下的殘留運算晶片，塞進戒指後仍在微弱運轉，戴著它思考時反應快得連自己都嚇一跳。',
-    engine_oil_basic: '為什麼喝機油會補血...？但真好喝，咕嚕咕嚕咕嚕。',
-};
-
 export type ItemLike = {
     templateId: string;
     type: string;
     equipSlot?: EquipmentSlot;
     rarity: Rarity;
+    name?: string;
+    description?: string;
     stats: {
         ATK?: number;
         DEF?: number;
@@ -200,16 +175,16 @@ export function primaryStatMagnitude(item: ItemLike): number {
  * and flavor text are shown in separate places in the dialog by design.
  */
 export function describeItem(item: ItemLike): { name: string; effectText: string; flavor: string } {
-    const name = TEMPLATE_NAMES[item.templateId] ?? item.templateId;
+    const name = item.name ?? item.templateId;
 
     const effects = STAT_DISPLAY_ORDER
         .filter(({ key }) => item.stats[key])
         .map(({
-            key, effectLabel, 
+            key, effectLabel,
         }) => effectLabel(item.stats[key] as number));
 
     const effectText = effects.length > 0 ? effects.join('、') : '沒有額外效果';
-    const flavor = TEMPLATE_FLAVOR[item.templateId]
+    const flavor = item.description
         ?? (item.type === 'POTION' ? '一瓶用途不明的藥水。' : '一件來歷不明的裝備。');
 
     return {

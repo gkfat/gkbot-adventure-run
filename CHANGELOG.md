@@ -20,3 +20,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 新增角色場景動畫與冒險敘事文案
 - 新增敵對陣營與設施風險分級，修正敵人名稱截斷
 - 新增負重系統，角色力量與體質決定能承受多少裝備重量帶來的影響
+- 裝備系統新增稀有度設計

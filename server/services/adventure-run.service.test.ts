@@ -314,6 +314,8 @@ describe('AdventureRunService.useHealingItem', () => {
         type: ItemType.POTION,
         rarity: Rarity.N,
         stats: { healPercent: 20 },
+        name: '機油',
+        description: '為什麼喝機油會補血...？但真好喝，咕嚕咕嚕咕嚕。',
         source: ItemSource.DROP,
         characterId: 'char-1',
         createdAt: Date.now(),
@@ -378,6 +380,8 @@ describe('AdventureRunService.getCurrentRun — auto-settlement on DISCONNECT', 
             type: ItemType.EQUIPMENT,
             rarity: Rarity.N,
             stats: {},
+            name: '維修殘骸扳手',
+            description: '從維修設施殘骸堆挖出的重型扳手。',
             source: ItemSource.DROP,
             characterId: 'char-1',
             createdAt: Date.now(),
@@ -422,6 +426,8 @@ describe('AdventureRunService.getCurrentRun — auto-settlement on DISCONNECT', 
             type: ItemType.EQUIPMENT,
             rarity: Rarity.N,
             stats: {},
+            name: '維修殘骸扳手',
+            description: '從維修設施殘骸堆挖出的重型扳手。',
             source: ItemSource.DROP,
             characterId: 'char-1',
             createdAt: Date.now(),
@@ -572,7 +578,7 @@ describe('AdventureRunService.resolveCombat', () => {
 
     it('on defeat: settles the run with endReason=DEAD, forfeiting gold/gems/items but keeping EXP', async () => {
         const droppedItem = {
-            itemId: 'drop-1', templateId: 'salvaged_wrench', type: ItemType.EQUIPMENT, rarity: Rarity.N, stats: {}, source: ItemSource.DROP, characterId: 'char-1', createdAt: Date.now(),
+            itemId: 'drop-1', templateId: 'salvaged_wrench', type: ItemType.EQUIPMENT, rarity: Rarity.N, stats: {}, name: '維修殘骸扳手', description: '從維修設施殘骸堆挖出的重型扳手。', source: ItemSource.DROP, characterId: 'char-1', createdAt: Date.now(),
         };
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
             state: AdventureStateType.COMBAT,

@@ -102,8 +102,20 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
     // Weapon — RIGHT_HAND
     'salvaged_wrench': {
         templateId: 'salvaged_wrench',
-        name: '維修殘骸扳手',
-        description: '從維修設施的殘骸堆裡挖出來的重型扳手，握把上還留著上一位使用者的手汗痕跡——那個人後來怎麼了，沒人知道。',
+        name: {
+            [Rarity.N]: '防割工作手套',
+            [Rarity.R]: '精密維修手套',
+            [Rarity.SR]: '電弧絕緣手套',
+            [Rarity.SSR]: 'GkBot 維修夾具',
+            [Rarity.L]: '應急接線手套',
+        },
+        description: {
+            [Rarity.N]: '普通的厚實工作手套，能抵禦碎金屬與鋒利零件。手指活動起來意外地靈活。',
+            [Rarity.R]: '給 GK 精密技師使用的薄型手套，可以放大細微的觸覺反饋。你第一次戴上時，甚至能分辨出牆後齒輪轉動的節奏。',
+            [Rarity.SR]: '原本是為高壓設備維修設計的防護手套。手掌內側有一層奇怪的金屬網，摸起來竟然有些溫熱。',
+            [Rarity.SSR]: '嚴格來說，這不是給人使用的工具。裝上手腕後卻異常服貼，連接處還會自動調整鬆緊。',
+            [Rarity.L]: '能快速連接斷裂電路的緊急維修裝備。說明書提醒使用者「請勿直接接觸自身接口」——你不知道為什麼會特別注意到這句話。',
+        },
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.RIGHT_HAND,
         weaponWeightClass: WeaponWeightClass.MEDIUM,
@@ -141,8 +153,20 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
     // Off-hand — LEFT_HAND
     'riot_shield_scrap': {
         templateId: 'riot_shield_scrap',
-        name: '拾荒防爆盾',
-        description: '補給設施保全機具的防爆盾牌殘件，邊緣還留著清晰的撞擊凹痕，扛起來卻莫名地順手。',
+        name: {
+            [Rarity.N]: '工程護腕',
+            [Rarity.R]: '磁吸工具腕帶',
+            [Rarity.SR]: '維修端子手套',
+            [Rarity.SSR]: '液壓作業護臂',
+            [Rarity.L]: '舊式校準手環',
+        },
+        description: {
+            [Rarity.N]: '普通的工程護腕，能減少搬運重物時手腕受到的衝擊。戴上之後，你開始覺得螺絲起子特別順手。',
+            [Rarity.R]: '能把小型工具固定在手腕上的實用裝備。奇怪的是，有幾次工具明明掉在地上，卻自己滾回了你的腳邊。',
+            [Rarity.SR]: '原本用來接觸裸露電路的絕緣手套。戴上後，你似乎能感覺到附近設備的電流流向。',
+            [Rarity.SSR]: '拆自工廠重型機械的輔助護臂。啟動時會發出低沉的嗡鳴聲，你的手臂卻沒有想像中那麼沉。',
+            [Rarity.L]: '研究設施裡找到的測試設備。沒有電池、沒有開關，卻總能在你需要的時候亮起來。',
+        },
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.LEFT_HAND,
         weaponWeightClass: WeaponWeightClass.HEAVY,
@@ -200,8 +224,20 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
     // Head
     'gkbot_faceplate': {
         templateId: 'gkbot_faceplate',
-        name: 'GkBot 頭部殘片',
-        description: '拆卸自失控 GkBot 的頭部外殼，戴上的瞬間有種說不出的熟悉感——熟悉到讓人有點不安。',
+        name: {
+            [Rarity.N]: 'GkBot 的頭部零件',
+            [Rarity.R]: '維修技師護目鏡',
+            [Rarity.SR]: '破損的技術人員校準頭盔',
+            [Rarity.SSR]: '退役保全頭盔',
+            [Rarity.L]: '黑色訊號罩',
+        },
+        description: {
+            [Rarity.N]: '從 GKBot 施工型機器人頭部拆解下來的零部件。不曉得為什麼，好像有些卡榫能夠對到頭部的某些輪廓。',
+            [Rarity.R]: '用來檢查精密零件的護目鏡。戴上它之後，總能第一時間看出哪一台機器「快壞了」。',
+            [Rarity.SR]: '研究設施裡找到的實驗型頭盔，標籤寫著「僅供校準用途」。戴上後，視野角落偶爾會閃過一些看不懂的數字。',
+            [Rarity.SSR]: '厚重得不像是給人戴的，內側還留著前任保全的名字。',
+            [Rarity.L]: '由不明材質製成的薄型頭罩，能降低周遭的電子干擾。戴久了以後，摘下來反而讓你覺得四周太吵。',
+        },
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.HEAD,
         weaponWeightClass: WeaponWeightClass.MEDIUM,
@@ -249,8 +285,20 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
     // Body
     'supply_crate_vest': {
         templateId: 'supply_crate_vest',
-        name: '補給箱改造護甲',
-        description: '拆解自倉儲區自動販賣機外殼焊接而成，內襯還印著一行褪色的 GK 公司標語。',
+        name: {
+            [Rarity.N]: '工程防護背心',
+            [Rarity.R]: '防爆維修外套',
+            [Rarity.SR]: '實驗室隔離衣',
+            [Rarity.SSR]: 'GkBot 搬運工背甲',
+            [Rarity.L]: '緊急維生外套',
+        },
+        description: {
+            [Rarity.N]: '維修人員的標準裝備，口袋多得離譜。穿上後，搬零件、爬管線、鑽維修孔都變得順手許多。',
+            [Rarity.R]: '厚重的耐熱外套，原本是給工廠技師使用的。',
+            [Rarity.SR]: '研究設施裡留下的防護服。材質柔軟得不像防護裝備，胸口卻偶爾會傳來細微的震動。',
+            [Rarity.SSR]: '從大型搬運機器上拆下來的防撞裝甲。正常人穿著它大概只能慢慢走，但你似乎很快就習慣了它的重量。',
+            [Rarity.L]: '設計給長時間困在廢棄設施裡的維修人員使用，內建保溫、濾氣與簡易供能模組。你不確定最後一項功能是做什麼的，但它好像確實有在運作。',
+        },
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.BODY,
         weaponWeightClass: WeaponWeightClass.HEAVY,
@@ -318,8 +366,20 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
     // Shoes
     'servo_greaves': {
         templateId: 'servo_greaves',
-        name: '伺服關節護脛',
-        description: '維修型 GkBot 淘汰下來的腿部伺服機構，接上之後走起路來輕快得不太自然。',
+        name: {
+            [Rarity.N]: '工程安全靴',
+            [Rarity.R]: '維修通道靴',
+            [Rarity.SR]: '靜音工作鞋',
+            [Rarity.SSR]: '磁力作業靴',
+            [Rarity.L]: '回收型動力靴',
+        },
+        description: {
+            [Rarity.N]: '鋼頭、防穿刺、防滑，標準的 GK 工程人員安全靴。鞋底磨損嚴重，卻比你找到的大多數新鞋都好走。',
+            [Rarity.R]: '專門給需要長時間走在金屬管線上的技師使用。鞋底能牢牢抓住濕滑鋼板，讓你走過垂直維修梯時也異常穩。',
+            [Rarity.SR]: '娛樂設施的維修人員使用的特殊鞋款，幾乎不會發出腳步聲。穿上後，你甚至開始嫌普通鞋走路太吵。',
+            [Rarity.SSR]: '工廠高空維修用的磁吸靴。啟動後能牢牢吸住金屬地面，但你有時會忘記自己其實還沒有開啟它。',
+            [Rarity.L]: '從某台報廢 GkBot 身上拆下來的實驗裝備。每走一步都會回收少量動能，鞋底偶爾傳來細微的機械聲。',
+        },
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.SHOES,
         weaponWeightClass: WeaponWeightClass.LIGHT,
@@ -361,8 +421,20 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
     // Ring
     'research_chip_ring': {
         templateId: 'research_chip_ring',
-        name: '殘留運算晶片戒',
-        description: '研究設施實驗品上拆下的殘留運算晶片，塞進戒指後仍在微弱運轉，戴著它思考時反應快得連自己都嚇一跳。',
+        name: {
+            [Rarity.N]: 'GK 員工識別環',
+            [Rarity.R]: '備用記憶環',
+            [Rarity.SR]: '微型磁力環',
+            [Rarity.SSR]: '實驗型同步環',
+            [Rarity.L]: '無標記黑環',
+        },
+        description: {
+            [Rarity.N]: '不知道是哪個年代的員工識別裝置。晶片早已失效，但某些廢棄設施的門禁看見它時，偶爾還是會亮一下綠燈。',
+            [Rarity.R]: '原本用來保存少量工作資料的可攜式儲存裝置。裡面的資料全毀了，只有一個檔案一直無法刪除。',
+            [Rarity.SR]: '簡單的工業用磁力裝置。靠近散落零件時會微微發熱，偶爾還會讓附近的小螺絲自己滾過來。',
+            [Rarity.SSR]: '研究設施中的未完成實驗品。戴上後，你會偶爾在機器啟動前就知道它準備做什麼。',
+            [Rarity.L]: '沒有品牌、沒有序號，也找不到任何製造紀錄。它戴起來很舒服，舒服得讓你不太想把它拿下來。',
+        },
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.RING,
         weaponWeightClass: WeaponWeightClass.LIGHT,

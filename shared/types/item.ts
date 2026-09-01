@@ -56,8 +56,12 @@ export type ItemGenerationContext = {
  */
 export type ItemTemplate = {
   templateId: string;
-  name: string;
-  description: string;
+
+  // EQUIPMENT: per-rarity name/description (docs/game-design/content/items.md §4).
+  // POTION: a single string shared across all rarities.
+  name: string | Record<Rarity, string>;
+  description: string | Record<Rarity, string>;
+
   type: ItemType;
   equipSlot?: EquipmentSlot; // Required for type: EQUIPMENT
 
@@ -90,6 +94,12 @@ export type ItemInstance = {
   type: ItemType;
   equipSlot?: EquipmentSlot;
   weaponWeightClass?: WeaponWeightClass; // Carried from template — type: EQUIPMENT only
+
+  // Name/description resolved from the template at roll time and fixed
+  // thereafter — a later template text edit doesn't change items already
+  // in a player's inventory.
+  name: string;
+  description: string;
 
   // Generated properties
   rarity: Rarity;

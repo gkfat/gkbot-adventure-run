@@ -4,6 +4,7 @@ import {
 import {
     rollRarity, rollStats, generateItemInstance, sumEquipmentStats,
 } from './item.service';
+import { getItemTemplate } from '../constants/templates';
 import {
     Rarity, WeaponWeightClass,
 } from '../../shared/types/common';
@@ -130,6 +131,32 @@ describe('generateItemInstance', () => {
         const instance = generateItemInstance('salvaged_wrench', { source: ItemSource.SHOP });
         expect(instance.stats.dodgeChanceMod).toBeUndefined();
     });
+
+    it('resolves name/description for the rolled rarity on an EQUIPMENT instance', () => {
+        const instance = generateItemInstance('gkbot_faceplate', {
+            source: ItemSource.DROP, maxRarity: Rarity.N,
+        });
+        expect(instance.name).toBe('GkBot 的頭部零件');
+        expect(instance.description).toContain('GKBot 施工型機器人頭部');
+    });
+
+    it('different rarities of the same template resolve different name/description', () => {
+        const template = getItemTemplate('gkbot_faceplate');
+        const nameByRarity = template?.name as Record<Rarity, string>;
+        const n = generateItemInstance('gkbot_faceplate', {
+            source: ItemSource.DROP, maxRarity: Rarity.N,
+        });
+        expect(n.name).not.toBe(nameByRarity[Rarity.L]);
+        expect(n.name).toBe(nameByRarity[Rarity.N]);
+    });
+
+    it('resolves the single shared name/description for a POTION instance regardless of rarity', () => {
+        const n = generateItemInstance('engine_oil_basic', {
+            source: ItemSource.DROP, maxRarity: Rarity.N,
+        });
+        expect(n.name).toBe('機油');
+        expect(n.description).toBe('為什麼喝機油會補血...？但真好喝，咕嚕咕嚕咕嚕。');
+    });
 });
 
 describe('sumEquipmentStats', () => {
@@ -146,6 +173,8 @@ describe('sumEquipmentStats', () => {
         stats: {
             DEF: 5, actionSpeedMod: 0.2, dodgeChanceMod: -0.1,
         },
+        name: '拾荒防爆盾',
+        description: '補給設施保全機具的防爆盾殘件。',
         source: ItemSource.DROP,
         characterId: 'char-1',
         createdAt: Date.now(),

@@ -63,6 +63,8 @@ function baseItem(overrides: Partial<ItemInstance> = {}): ItemInstance {
         equipSlot: EquipmentSlot.RIGHT_HAND,
         rarity: 'N' as ItemInstance['rarity'],
         stats: { ATK: 5 },
+        name: '維修殘骸扳手',
+        description: '從維修設施殘骸堆挖出的重型扳手。',
         source: 'DROP' as ItemInstance['source'],
         characterId: 'char-1',
         createdAt: Date.now(),
