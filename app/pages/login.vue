@@ -12,11 +12,11 @@ import { SystemBtn } from '../../.nuxt/components';
             <!-- Logo / Icon -->
             <div class="text-center">
                 <img
-                    src="/images/gkbot-login.png"
+                    src="/images/favicon-bot-pixel.png"
                     alt="GkBot"
                     class="login-gkbot"
                     width="140"
-                    height="140"
+                    height="163"
                 >
             </div>
 
