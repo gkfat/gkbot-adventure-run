@@ -379,9 +379,15 @@ export const COMBAT_CONFIG = {
     BASE_DODGE_CHANCE: 0.03,     // 3%
     DODGE_PER_AGI: 0.002,        // +0.2% per AGI
     DODGE_CAP: 0.25,             // 25% cap
-  
+
     // Damage calculation
     MIN_DAMAGE: 1,               // Minimum damage after DEF
+
+    // Carry capacity: STR+CON discounts HEAVY equipment's actionSpeedMod/
+    // dodgeChanceMod penalties (weapon-weight-class). Capped so a HEAVY
+    // penalty is never fully negated.
+    HEAVY_PENALTY_MITIGATION_PER_POINT: 0.02, // -2% penalty per (STR + CON) point
+    MAX_HEAVY_PENALTY_MITIGATION: 0.6,        // 60% cap
 } as const;
 
 /**

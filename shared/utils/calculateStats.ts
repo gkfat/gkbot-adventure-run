@@ -75,6 +75,7 @@ export function calculateBaseStats(
         critChance,
         critMultiplier: COMBAT_CONFIG.CRIT_MULTIPLIER,
         dodgeChance,
+        carryCapacity: STR + CON,
     };
 }
 
@@ -98,6 +99,16 @@ export function applyEquipmentStats(
         ),
         critChance: baseStats.critChance,
         critMultiplier: baseStats.critMultiplier,
-        dodgeChance: baseStats.dodgeChance,
+        dodgeChance: Math.max(
+            0,
+            Math.min(
+                COMBAT_CONFIG.DODGE_CAP,
+                baseStats.dodgeChance + (equipmentStats.dodgeChance || 0),
+            ),
+        ),
+        // Carry capacity is derived purely from attributes (STR+CON) —
+        // equipment doesn't change how much you can carry, only what you're
+        // carrying.
+        carryCapacity: baseStats.carryCapacity,
     };
 }

@@ -241,11 +241,11 @@ export function pickTargetSlot(
     item: ItemLike,
     equipment: Partial<Record<EquipmentSlot, string>>,
 ): EquipmentSlot | undefined {
-    if (!item.equipSlot) {
+    if (!item.equipSlot || !HAND_SLOTS.includes(item.equipSlot)) {
+        // Non-hand items always use their own equipSlot — leave `requestedSlot`
+        // unset rather than echoing it back, since the server now rejects a
+        // `requestedSlot` on a non-hand item.
         return undefined;
-    }
-    if (!HAND_SLOTS.includes(item.equipSlot)) {
-        return item.equipSlot;
     }
 
     const emptyHand = HAND_SLOTS.find(slot => !equipment[slot]);

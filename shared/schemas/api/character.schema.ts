@@ -16,6 +16,7 @@ const statsSchema = z.object({
     critChance: z.number(),
     critMultiplier: z.number(),
     dodgeChance: z.number(),
+    carryCapacity: z.number(),
 });
 
 // Only the keys equipment actually contributed to are present.
@@ -24,6 +25,7 @@ const equipmentBonusSchema = z.object({
     DEF: z.number().optional(),
     HP_MAX: z.number().optional(),
     actionIntervalSec: z.number().optional(),
+    dodgeChance: z.number().optional(),
 });
 
 const archetypeSchema = z.object({

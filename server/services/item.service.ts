@@ -1,6 +1,11 @@
 import { getItemTemplate } from '../constants/templates';
-import type { Stats } from '../../shared/types/common';
-import { Rarity } from '../../shared/types/common';
+import type {
+    Attributes, Stats, 
+} from '../../shared/types/common';
+import {
+    Rarity, WeaponWeightClass,
+} from '../../shared/types/common';
+import { COMBAT_CONFIG } from '../../shared/types/adventure';
 import { ItemType } from '../../shared/types/item';
 import type {
     ItemInstance, ItemStats, ItemTemplate, ItemGenerationContext, StatRange, RolledItem,
@@ -65,10 +70,17 @@ export function rollStats(templateId: string, rarity: Rarity): ItemStats {
     const statRanges = template.baseStatsRange?.[rarity] ?? {};
     const stats: ItemStats = {};
     for (const [key, range] of Object.entries(statRanges) as [keyof ItemStats, StatRange][]) {
-        stats[key] = rollInRange(range);
+        stats[key] = FRACTIONAL_STAT_KEYS.has(key) ? rollInRangeFractional(range) : rollInRange(range);
     }
     return stats;
 }
+
+/**
+ * ATK/DEF/HP/healPercent are whole numbers, but actionSpeedMod/dodgeChanceMod
+ * are small fractional modifiers (e.g. -0.05..-0.02) — rounding those with
+ * `rollInRange` would collapse every roll to 0.
+ */
+const FRACTIONAL_STAT_KEYS = new Set<keyof ItemStats>(['actionSpeedMod', 'dodgeChanceMod']);
 
 /**
  * Generate a full item instance: rolls rarity + stats and assigns a unique itemId.
@@ -86,6 +98,7 @@ export function generateItemInstance(templateId: string, context: ItemGeneration
         type: template.type,
         // Omit rather than set `undefined` — Firestore rejects undefined field values
         ...(template.equipSlot ? { equipSlot: template.equipSlot } : {}),
+        ...(template.weaponWeightClass ? { weaponWeightClass: template.weaponWeightClass } : {}),
         rarity,
         stats,
         source: context.source,
@@ -94,17 +107,45 @@ export function generateItemInstance(templateId: string, context: ItemGeneration
 }
 
 /**
- * Sum the rolled stats of a set of equipped items into the shape
- * `applyEquipmentStats` expects: ItemStats.HP maps to Stats.HP_MAX, and
- * ItemStats.actionSpeedMod maps to a delta on Stats.actionIntervalSec.
+ * Carry-capacity discount (weapon-weight-class): STR+CON shrinks the
+ * magnitude of a HEAVY item's actionSpeedMod/dodgeChanceMod penalty, capped
+ * so it's never fully negated. Sign-agnostic — actionSpeedMod penalties are
+ * positive (slower), dodgeChanceMod penalties are negative (less dodge);
+ * scaling by a factor in (0, 1] shrinks either toward zero without flipping it.
  */
-export function sumEquipmentStats(items: ItemInstance[]): Partial<Stats> {
-    return items.reduce<Partial<Stats>>((acc, item) => ({
-        ATK: (acc.ATK ?? 0) + (item.stats.ATK ?? 0),
-        DEF: (acc.DEF ?? 0) + (item.stats.DEF ?? 0),
-        HP_MAX: (acc.HP_MAX ?? 0) + (item.stats.HP ?? 0),
-        actionIntervalSec: (acc.actionIntervalSec ?? 0) + (item.stats.actionSpeedMod ?? 0),
-    }), {});
+function getHeavyPenaltyMitigation(attributes: Attributes): number {
+    const carryScore = attributes.STR + attributes.CON;
+    const discount = Math.min(
+        COMBAT_CONFIG.MAX_HEAVY_PENALTY_MITIGATION,
+        carryScore * COMBAT_CONFIG.HEAVY_PENALTY_MITIGATION_PER_POINT,
+    );
+    return 1 - discount;
+}
+
+/**
+ * Sum the rolled stats of a set of equipped items into the shape
+ * `applyEquipmentStats` expects: ItemStats.HP maps to Stats.HP_MAX,
+ * ItemStats.actionSpeedMod maps to a delta on Stats.actionIntervalSec, and
+ * ItemStats.dodgeChanceMod maps to a delta on Stats.dodgeChance. HEAVY items'
+ * actionSpeedMod/dodgeChanceMod are shrunk by the character's carry-capacity
+ * discount (STR+CON) before being summed in.
+ */
+export function sumEquipmentStats(items: ItemInstance[], attributes: Attributes): Partial<Stats> {
+    const mitigation = getHeavyPenaltyMitigation(attributes);
+
+    return items.reduce<Partial<Stats>>((acc, item) => {
+        const isHeavy = item.weaponWeightClass === WeaponWeightClass.HEAVY;
+        const actionSpeedMod = (item.stats.actionSpeedMod ?? 0) * (isHeavy ? mitigation : 1);
+        const dodgeChanceMod = (item.stats.dodgeChanceMod ?? 0) * (isHeavy ? mitigation : 1);
+
+        return {
+            ATK: (acc.ATK ?? 0) + (item.stats.ATK ?? 0),
+            DEF: (acc.DEF ?? 0) + (item.stats.DEF ?? 0),
+            HP_MAX: (acc.HP_MAX ?? 0) + (item.stats.HP ?? 0),
+            actionIntervalSec: (acc.actionIntervalSec ?? 0) + actionSpeedMod,
+            dodgeChance: (acc.dodgeChance ?? 0) + dodgeChanceMod,
+        };
+    }, {});
 }
 
 function getTemplateOrThrow(templateId: string): ItemTemplate {
@@ -117,4 +158,8 @@ function getTemplateOrThrow(templateId: string): ItemTemplate {
 
 function rollInRange(range: StatRange): number {
     return Math.round(range.min + Math.random() * (range.max - range.min));
+}
+
+function rollInRangeFractional(range: StatRange): number {
+    return range.min + Math.random() * (range.max - range.min);
 }

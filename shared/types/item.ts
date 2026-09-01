@@ -3,7 +3,7 @@
  */
 
 import type {
-    Rarity, EquipmentSlot, Timestamp, 
+    Rarity, EquipmentSlot, Timestamp, WeaponWeightClass,
 } from './common';
 
 /**
@@ -38,8 +38,9 @@ export type ItemStats = {
   ATK?: number;
   DEF?: number;
   HP?: number;
-  actionSpeedMod?: number; // Modifier to action speed (negative = faster)
-  healPercent?: number;    // POTION only: % of max HP restored
+  actionSpeedMod?: number;  // Modifier to action speed (negative = faster)
+  dodgeChanceMod?: number;  // Modifier to dodge chance (negative = HEAVY penalty)
+  healPercent?: number;     // POTION only: % of max HP restored
 };
 
 /**
@@ -59,6 +60,10 @@ export type ItemTemplate = {
   description: string;
   type: ItemType;
   equipSlot?: EquipmentSlot; // Required for type: EQUIPMENT
+
+  // Weight class (speed/power/dodge tradeoff) — required for type: EQUIPMENT,
+  // fixed per template regardless of rolled rarity.
+  weaponWeightClass?: WeaponWeightClass;
 
   // Rarity weights for generation
   rarityWeights: Record<Rarity, number>;
@@ -84,6 +89,7 @@ export type ItemInstance = {
   templateId: string;          // Reference to template
   type: ItemType;
   equipSlot?: EquipmentSlot;
+  weaponWeightClass?: WeaponWeightClass; // Carried from template — type: EQUIPMENT only
 
   // Generated properties
   rarity: Rarity;

@@ -38,7 +38,9 @@ export class EquipmentService extends BaseService {
      * `requestedSlot` only takes effect for hand items (sword/dagger-type
      * equipment, whose `equipSlot` is LEFT_HAND or RIGHT_HAND) — it lets the
      * caller choose which hand instead of always using the item's own
-     * default. Any other requested slot is ignored.
+     * default. If `requestedSlot` is given but isn't a valid HAND_SLOTS
+     * choice for a hand item — or is given at all for a non-hand item — this
+     * throws rather than silently falling back to `item.equipSlot`.
      */
     async equipItem(
         accountId: string, characterId: string, itemId: string, requestedSlot?: EquipmentSlot,
@@ -57,9 +59,12 @@ export class EquipmentService extends BaseService {
                 throw new ValidationError('Item is not equipment');
             }
 
-            const slot = (HAND_SLOTS.includes(item.equipSlot) && requestedSlot && HAND_SLOTS.includes(requestedSlot))
-                ? requestedSlot
-                : item.equipSlot;
+            const isHandItem = HAND_SLOTS.includes(item.equipSlot);
+            if (requestedSlot && (!isHandItem || !HAND_SLOTS.includes(requestedSlot))) {
+                throw new ValidationError('requestedSlot is not a valid hand slot for this item');
+            }
+
+            const slot = requestedSlot ?? item.equipSlot;
             const previousItemId = character.equipment[slot];
             let unequipped: ItemInstance | undefined;
             if (previousItemId) {

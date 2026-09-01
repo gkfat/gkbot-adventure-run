@@ -9,6 +9,7 @@ interface CharacterStats {
     critChance: number;
     critMultiplier: number;
     dodgeChance: number;
+    carryCapacity: number;
 }
 
 interface CharacterData {
@@ -30,7 +31,7 @@ interface CharacterData {
     nickname: string;
     spriteUrl: string;
     stats: CharacterStats;
-    equipmentBonus: Partial<Pick<CharacterStats, 'ATK' | 'DEF' | 'HP_MAX' | 'actionIntervalSec'>>;
+    equipmentBonus: Partial<Pick<CharacterStats, 'ATK' | 'DEF' | 'HP_MAX' | 'actionIntervalSec' | 'dodgeChance'>>;
     nextChapterIndex: number;
     currentLevelIndex: number;
     chapterTotalLevels: number;

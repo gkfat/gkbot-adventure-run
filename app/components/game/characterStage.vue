@@ -225,13 +225,6 @@
                             height="140"
                             class="character-stage__sprite"
                         >
-                        <img
-                            src="/images/effects/campfire.gif"
-                            alt=""
-                            width="80"
-                            height="80"
-                            class="character-stage__campfire"
-                        >
                     </div>
 
                     <div class="character-stage__equip-col">
@@ -544,6 +537,20 @@ const pendingPercentDeltaText = (current: number, preview: number | undefined) =
     return `${diff > 0 ? '+' : ''}${diff}%`;
 };
 
+// Percent-format sibling of `withEquipmentBonus` — `finalValue` already has
+// the equipment contribution (incl. HEAVY carry-capacity discount) baked in.
+const withEquipmentBonusPercent = (finalValue: number, bonus: number | undefined) => {
+    const percentValue = `${Math.round(finalValue * 100)}%`;
+    if (!bonus) {
+        return { value: percentValue, delta: '', buffed: false };
+    }
+    const diff = Math.round(bonus * 100);
+    const sign = diff > 0 ? '+' : '';
+    return {
+        value: percentValue, delta: `(${sign}${diff}%)`, buffed: true,
+    };
+};
+
 const statEntries = computed(() => {
     if (!character.value) return [];
     const { stats, equipmentBonus } = character.value;
@@ -579,9 +586,7 @@ const statEntries = computed(() => {
         },
         {
             label: '閃避',
-            value: `${Math.round(stats.dodgeChance * 100)}%`,
-            delta: '',
-            buffed: false,
+            ...withEquipmentBonusPercent(stats.dodgeChance, equipmentBonus.dodgeChance),
             pendingDelta: pendingPercentDeltaText(stats.dodgeChance, preview?.dodgeChance),
         },
     ];
@@ -634,15 +639,6 @@ watch(character, (value) => {
         z-index: 1;
         image-rendering: pixelated;
         filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
-    }
-
-    &__campfire {
-        position: absolute;
-        z-index: 2;
-        bottom: -60px;
-        left: 0;
-        image-rendering: pixelated;
-        pointer-events: none;
     }
 
     &__equip-row {

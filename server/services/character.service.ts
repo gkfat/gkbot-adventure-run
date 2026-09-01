@@ -155,6 +155,6 @@ export class CharacterService extends BaseService {
         }
 
         const equippedItems = await this.itemRepo.getByIds(equippedItemIds);
-        return sumEquipmentStats(equippedItems);
+        return sumEquipmentStats(equippedItems, character.attributes);
     }
 }

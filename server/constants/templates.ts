@@ -7,7 +7,7 @@ import type {
     ItemTemplate, QuestTemplate, AchievementTemplate, 
 } from '../../shared/types';
 import {
-    ItemType, EquipmentSlot, Rarity, QuestType, AchievementType, 
+    ItemType, EquipmentSlot, Rarity, WeaponWeightClass, QuestType, AchievementType,
 } from '../../shared/types';
 
 /**
@@ -106,6 +106,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         description: '從維修設施的殘骸堆裡挖出來的重型扳手，握把上還留著上一位使用者的手汗痕跡——那個人後來怎麼了，沒人知道。',
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.RIGHT_HAND,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
         baseStatsRange: {
             [Rarity.N]: {
@@ -144,31 +145,52 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         description: '補給設施保全機具的防爆盾牌殘件，邊緣還留著清晰的撞擊凹痕，扛起來卻莫名地順手。',
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.LEFT_HAND,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
         baseStatsRange: {
             [Rarity.N]: {
                 DEF: {
                     min: 4, max: 8,
+                }, actionSpeedMod: {
+                    min: 0.05, max: 0.1,
+                }, dodgeChanceMod: {
+                    min: -0.03, max: -0.015,
                 },
             },
             [Rarity.R]: {
                 DEF: {
                     min: 8, max: 16,
+                }, actionSpeedMod: {
+                    min: 0.1, max: 0.18,
+                }, dodgeChanceMod: {
+                    min: -0.05, max: -0.03,
                 },
             },
             [Rarity.SR]: {
                 DEF: {
                     min: 16, max: 28,
+                }, actionSpeedMod: {
+                    min: 0.18, max: 0.28,
+                }, dodgeChanceMod: {
+                    min: -0.08, max: -0.05,
                 },
             },
             [Rarity.SSR]: {
                 DEF: {
                     min: 28, max: 42,
+                }, actionSpeedMod: {
+                    min: 0.28, max: 0.4,
+                }, dodgeChanceMod: {
+                    min: -0.12, max: -0.08,
                 },
             },
             [Rarity.L]: {
                 DEF: {
                     min: 42, max: 60,
+                }, actionSpeedMod: {
+                    min: 0.4, max: 0.55,
+                }, dodgeChanceMod: {
+                    min: -0.16, max: -0.12,
                 },
             },
         },
@@ -182,6 +204,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         description: '拆卸自失控 GkBot 的頭部外殼，戴上的瞬間有種說不出的熟悉感——熟悉到讓人有點不安。',
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.HEAD,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
         baseStatsRange: {
             [Rarity.N]: {
@@ -230,6 +253,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         description: '拆解自倉儲區自動販賣機外殼焊接而成，內襯還印著一行褪色的 GK 公司標語。',
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.BODY,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
         baseStatsRange: {
             [Rarity.N]: {
@@ -237,6 +261,10 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 5, max: 9,
                 }, HP: {
                     min: 15, max: 25,
+                }, actionSpeedMod: {
+                    min: 0.04, max: 0.08,
+                }, dodgeChanceMod: {
+                    min: -0.02, max: -0.01,
                 },
             },
             [Rarity.R]: {
@@ -244,6 +272,10 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 9, max: 16,
                 }, HP: {
                     min: 25, max: 50,
+                }, actionSpeedMod: {
+                    min: 0.08, max: 0.14,
+                }, dodgeChanceMod: {
+                    min: -0.04, max: -0.02,
                 },
             },
             [Rarity.SR]: {
@@ -251,6 +283,10 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 16, max: 26,
                 }, HP: {
                     min: 50, max: 85,
+                }, actionSpeedMod: {
+                    min: 0.14, max: 0.22,
+                }, dodgeChanceMod: {
+                    min: -0.07, max: -0.04,
                 },
             },
             [Rarity.SSR]: {
@@ -258,6 +294,10 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 26, max: 38,
                 }, HP: {
                     min: 85, max: 130,
+                }, actionSpeedMod: {
+                    min: 0.22, max: 0.32,
+                }, dodgeChanceMod: {
+                    min: -0.1, max: -0.07,
                 },
             },
             [Rarity.L]: {
@@ -265,6 +305,10 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 38, max: 55,
                 }, HP: {
                     min: 130, max: 190,
+                }, actionSpeedMod: {
+                    min: 0.32, max: 0.45,
+                }, dodgeChanceMod: {
+                    min: -0.14, max: -0.1,
                 },
             },
         },
@@ -278,26 +322,21 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         description: '維修型 GkBot 淘汰下來的腿部伺服機構，接上之後走起路來輕快得不太自然。',
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.SHOES,
+        weaponWeightClass: WeaponWeightClass.LIGHT,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
         baseStatsRange: {
             [Rarity.N]: {
-                DEF: {
-                    min: 2, max: 4,
-                }, actionSpeedMod: {
+                actionSpeedMod: {
                     min: -0.05, max: -0.02,
                 },
             },
             [Rarity.R]: {
-                DEF: {
-                    min: 4, max: 8,
-                }, actionSpeedMod: {
+                actionSpeedMod: {
                     min: -0.1, max: -0.05,
                 },
             },
             [Rarity.SR]: {
-                DEF: {
-                    min: 8, max: 14,
-                }, actionSpeedMod: {
+                actionSpeedMod: {
                     min: -0.18, max: -0.1,
                 },
             },
@@ -326,6 +365,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         description: '研究設施實驗品上拆下的殘留運算晶片，塞進戒指後仍在微弱運轉，戴著它思考時反應快得連自己都嚇一跳。',
         type: ItemType.EQUIPMENT,
         equipSlot: EquipmentSlot.RING,
+        weaponWeightClass: WeaponWeightClass.LIGHT,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
         baseStatsRange: {
             [Rarity.N]: {
@@ -344,12 +384,16 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                 },
             },
             [Rarity.SSR]: {
-                actionSpeedMod: {
+                DEF: {
+                    min: 6, max: 10,
+                }, actionSpeedMod: {
                     min: -0.22, max: -0.14,
                 },
             },
             [Rarity.L]: {
-                actionSpeedMod: {
+                DEF: {
+                    min: 10, max: 16,
+                }, actionSpeedMod: {
                     min: -0.32, max: -0.22,
                 },
             },

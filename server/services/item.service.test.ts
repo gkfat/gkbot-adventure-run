@@ -2,12 +2,16 @@ import {
     describe, it, expect, vi, afterEach,
 } from 'vitest';
 import {
-    rollRarity, rollStats, generateItemInstance,
+    rollRarity, rollStats, generateItemInstance, sumEquipmentStats,
 } from './item.service';
-import { Rarity } from '../../shared/types/common';
+import {
+    Rarity, WeaponWeightClass,
+} from '../../shared/types/common';
+import type { Attributes } from '../../shared/types/common';
 import {
     ItemType, ItemSource,
 } from '../../shared/types/item';
+import type { ItemInstance } from '../../shared/types/item';
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -97,5 +101,95 @@ describe('generateItemInstance', () => {
 
     it('throws and does not return a partial instance for an unknown templateId', () => {
         expect(() => generateItemInstance('does_not_exist', { source: ItemSource.SHOP })).toThrow();
+    });
+
+    it('carries the template\'s weaponWeightClass onto the generated equipment instance', () => {
+        const instance = generateItemInstance('salvaged_wrench', { source: ItemSource.SHOP });
+        expect(instance.weaponWeightClass).toBe(WeaponWeightClass.MEDIUM);
+    });
+
+    it('carries weaponWeightClass for non-HAND EQUIPMENT slots too', () => {
+        const instance = generateItemInstance('gkbot_faceplate', { source: ItemSource.DROP });
+        expect(instance.weaponWeightClass).toBe(WeaponWeightClass.MEDIUM);
+    });
+
+    it('does not set weaponWeightClass on a POTION instance', () => {
+        const instance = generateItemInstance('engine_oil_basic', { source: ItemSource.DROP });
+        expect(instance.weaponWeightClass).toBeUndefined();
+    });
+
+    it('rolls a negative dodgeChanceMod for a HEAVY item, within the rarity range', () => {
+        const instance = generateItemInstance('riot_shield_scrap', {
+            source: ItemSource.DROP, maxRarity: Rarity.N,
+        });
+        expect(instance.weaponWeightClass).toBe(WeaponWeightClass.HEAVY);
+        expect(instance.stats.dodgeChanceMod).toBeLessThan(0);
+    });
+
+    it('does not roll dodgeChanceMod for a non-HEAVY item', () => {
+        const instance = generateItemInstance('salvaged_wrench', { source: ItemSource.SHOP });
+        expect(instance.stats.dodgeChanceMod).toBeUndefined();
+    });
+});
+
+describe('sumEquipmentStats', () => {
+    const attributes = (overrides: Partial<Attributes> = {}): Attributes => ({
+        STR: 0, AGI: 0, CON: 0, LUCK: 0, ...overrides,
+    });
+
+    const heavyItem = (overrides: Partial<ItemInstance> = {}): ItemInstance => ({
+        itemId: 'heavy-1',
+        templateId: 'riot_shield_scrap',
+        type: ItemType.EQUIPMENT,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
+        rarity: Rarity.N,
+        stats: {
+            DEF: 5, actionSpeedMod: 0.2, dodgeChanceMod: -0.1,
+        },
+        source: ItemSource.DROP,
+        characterId: 'char-1',
+        createdAt: Date.now(),
+        ...overrides,
+    });
+
+    it('sums ATK/DEF/HP/actionIntervalSec/dodgeChance across items with no HEAVY mitigation at 0 STR+CON', () => {
+        const result = sumEquipmentStats([heavyItem()], attributes());
+        expect(result.DEF).toBe(5);
+        expect(result.actionIntervalSec).toBeCloseTo(0.2);
+        expect(result.dodgeChance).toBeCloseTo(-0.1);
+    });
+
+    it('shrinks a HEAVY item\'s actionSpeedMod/dodgeChanceMod penalty as STR+CON increases', () => {
+        const lowCarry = sumEquipmentStats([heavyItem()], attributes({
+            STR: 1, CON: 1, 
+        }));
+        const highCarry = sumEquipmentStats([heavyItem()], attributes({
+            STR: 10, CON: 10, 
+        }));
+
+        expect(Math.abs(highCarry.actionIntervalSec as number)).toBeLessThan(Math.abs(lowCarry.actionIntervalSec as number));
+        expect(Math.abs(highCarry.dodgeChance as number)).toBeLessThan(Math.abs(lowCarry.dodgeChance as number));
+    });
+
+    it('caps the mitigation so a HEAVY penalty is never fully negated', () => {
+        const result = sumEquipmentStats([heavyItem()], attributes({
+            STR: 500, CON: 500, 
+        }));
+        expect(result.actionIntervalSec as number).toBeGreaterThan(0);
+        expect(result.dodgeChance as number).toBeLessThan(0);
+    });
+
+    it('does not mitigate LIGHT/MEDIUM items regardless of STR+CON', () => {
+        const lightItem = heavyItem({
+            weaponWeightClass: WeaponWeightClass.LIGHT, stats: { actionSpeedMod: -0.1 },
+        });
+        const lowCarry = sumEquipmentStats([lightItem], attributes({
+            STR: 0, CON: 0, 
+        }));
+        const highCarry = sumEquipmentStats([lightItem], attributes({
+            STR: 50, CON: 50, 
+        }));
+
+        expect(lowCarry.actionIntervalSec).toBeCloseTo(highCarry.actionIntervalSec as number);
     });
 });

@@ -36,6 +36,19 @@ export enum EquipmentSlot {
 export const HAND_SLOTS: EquipmentSlot[] = [EquipmentSlot.RIGHT_HAND, EquipmentSlot.LEFT_HAND];
 
 /**
+ * Equipment weight class (all EQUIPMENT-type ItemTemplates, not just weapons):
+ * a speed/power/dodge tradeoff independent of rarity. LIGHT favors the
+ * secondary stat (actionSpeedMod), MEDIUM is pure primary-stat growth, HEAVY
+ * maximizes the primary stat at the cost of actionSpeedMod/dodgeChanceMod
+ * penalties that worsen with rarity.
+ */
+export enum WeaponWeightClass {
+  LIGHT = 'LIGHT',
+  MEDIUM = 'MEDIUM',
+  HEAVY = 'HEAVY',
+}
+
+/**
  * Character attributes (permanent, player-controlled growth)
  */
 export type Attributes = {
@@ -57,6 +70,9 @@ export type Stats = {
   critChance: number;      // Critical hit chance (0.0 - 1.0)
   critMultiplier: number;  // Critical damage multiplier
   dodgeChance: number;     // Dodge chance (0.0 - 1.0)
+  carryCapacity: number;   // STR+CON — how much a HEAVY item's actionSpeedMod/
+                            // dodgeChanceMod penalty gets discounted; not
+                            // affected by equipment itself
 };
 
 /**
