@@ -124,11 +124,11 @@ const selectedIndex = ref(0);
 const selected = computed(() => archetypes.value[selectedIndex.value] ?? archetypes.value[0] ?? null);
 
 const ARCHETYPE_BLURB: Record<string, string> = {
-    fighter: '身體素質最好，最快適應戰鬥的近戰肉盾。',
-    adventurer: '靈活敏捷，擅長探索，非戰鬥的地方總能多發現點東西。',
-    scholar: '知識轉化為力量，越了解這個世界就越強。',
-    tinkerer: '擅長拾荒與修補，總能把撿到的零件變成活下去的辦法。',
-    gambler: '幸運加身，熱愛在風險與回報之間放手一搏。',
+    fighter: '身體素質最好，最快適應戰鬥的近戰肉盾。在無數次戰鬥後，痛覺對你來說越來越陌生——你隱約察覺，這副軀殼正在變成別的東西。',
+    adventurer: '靈活敏捷，擅長探索，非戰鬥的地方總能多發現點東西。你始終相信，這片廢土底下藏著答案，只要肯多走幾步、多看一眼。',
+    scholar: '知識轉化為力量，越了解這個世界就越強。你翻遍殘存的紀錄與典籍，試圖拼湊世界崩壞前的真相——代價是，你的身體從沒空好好鍛鍊。',
+    tinkerer: '擅長拾荒與修補，總能把撿到的零件變成活下去的辦法。你的雙手比誰都清楚機械的構造，因為某種程度上，你自己也是。',
+    gambler: '幸運加身，熱愛在風險與回報之間放手一搏。命運的骰子從不虧待你，你早已習慣把每個抉擇都當成一場賭局。',
 };
 
 const blurb = computed(() => ARCHETYPE_BLURB[selected.value?.archetypeId ?? ''] ?? '');
@@ -168,10 +168,10 @@ const step = (delta: number) => {
 const ATTRIBUTE_BAR_MAX = 5;
 
 const statBars = (attributes: { STR: number; AGI: number; CON: number; LUCK: number }) => [
-    { label: 'STR', percent: (attributes.STR / ATTRIBUTE_BAR_MAX) * 100 },
-    { label: 'AGI', percent: (attributes.AGI / ATTRIBUTE_BAR_MAX) * 100 },
-    { label: 'CON', percent: (attributes.CON / ATTRIBUTE_BAR_MAX) * 100 },
-    { label: 'LUCK', percent: (attributes.LUCK / ATTRIBUTE_BAR_MAX) * 100 },
+    { label: '力量', percent: (attributes.STR / ATTRIBUTE_BAR_MAX) * 100 },
+    { label: '敏捷', percent: (attributes.AGI / ATTRIBUTE_BAR_MAX) * 100 },
+    { label: '體質', percent: (attributes.CON / ATTRIBUTE_BAR_MAX) * 100 },
+    { label: '幸運', percent: (attributes.LUCK / ATTRIBUTE_BAR_MAX) * 100 },
 ];
 
 const handleConfirm = () => {
