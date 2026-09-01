@@ -103,5 +103,5 @@ Boss 節點固定 **1 波**，敵人陣容固定為「**1 隻 Boss 本體 + 該�
 
 - 事件（EVENT/CHOICE）節點內部各模板的抽取權重不在本文件範圍內（`adventure-events` spec 只定案「依權重表」，未列出實際權重值）——待確認，需另外查證事件模板定義檔案。
 - 第 3 節「每波敵人數」門檻堆疊的相加式判定方式（而非分層機率）是實際 code 行為，設計時間如需分析真實分佈，需按此堆疊方式重新計算，不可直接假設 `enemy2Chance`、`enemy3Chance` 各自獨立。
-- `openspec/changes/chapter-level-structure/` 已於 2026-09-01 sync 進 `openspec/specs/adventure-run-lifecycle/spec.md`（「章節與關卡的階層」等需求）並 archive，核心邏輯（`LEVEL_COUNT_RANGE_BY_FACILITY`、Boss 小兵陣容、補位機制）與正式 spec 已一致，本文件第 4 節即依此現況撰寫；四層階層的完整說明見 `docs/game-design/run.md` 第 2 節。
+- `openspec/changes/chapter-level-structure/` 已於 2026-09-01 sync 進 `openspec/specs/adventure-run-lifecycle/spec.md`（「章節與關卡的階層」等需求）並 archive，核心邏輯（`LEVEL_COUNT_RANGE_BY_FACILITY`、Boss 小兵陣容、補位機制）與正式 spec 已一致，本文件第 4 節即依此現況撰寫；四層階層的完整說明見 `docs/game-design/mechanics/run.md` 第 2 節。
 - 若日後 `enemy-factions-and-severity` 落地，本文件第 2、4、6 節需要整體改寫（tier/範本抽取權重會依風險分級與陣營重新設計），屆時應另開一版或整併更新，並移除第 6 節對應條目。

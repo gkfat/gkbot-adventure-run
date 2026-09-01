@@ -46,7 +46,7 @@
 
 ## 3. 道具售價曲線（依稀有度）
 
-售價來自 `server/constants/templates.ts` 的 `EQUIPMENT_PRICE_RANGE`（六個裝備部位共用）與 `POTION_PRICE_RANGE`（藥水專用），對應到 `ItemTemplate.priceRangeByRarity`（`shared/types/item.ts`：`Record<Rarity, { gold?: StatRange; gems?: StatRange }>`）。完整數值表已整理於 [`item-drop-and-stats.md`](./item-drop-and-stats.md)，此處僅摘要曲線走勢：
+售價來自 `server/constants/templates.ts` 的 `EQUIPMENT_PRICE_RANGE`（六個裝備部位共用）與 `POTION_PRICE_RANGE`（藥水專用），對應到 `ItemTemplate.priceRangeByRarity`（`shared/types/item.ts`：`Record<Rarity, { gold?: StatRange; gems?: StatRange }>`）。完整數值表已整理於 [`item-stats.md`](../balance/item-stats.md)，此處僅摘要曲線走勢：
 
 | 稀有度 | 裝備售價 | 藥水售價 |
 |---|---|---|

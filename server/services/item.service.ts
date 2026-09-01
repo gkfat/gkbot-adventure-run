@@ -110,7 +110,7 @@ export function generateItemInstance(templateId: string, context: ItemGeneration
 
 /**
  * EQUIPMENT templates carry per-rarity name/description
- * (docs/game-design/content/items.md §4); POTION templates share one string
+ * (docs/game-design/mechanics/content/items.md §4); POTION templates share one string
  * across all rarities. Resolve whichever shape the template uses.
  */
 function resolveTemplateText(text: string | Record<Rarity, string>, rarity: Rarity): string {

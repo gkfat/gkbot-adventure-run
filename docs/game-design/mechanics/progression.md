@@ -82,7 +82,7 @@
 
 ## 6. 角色與裝備/戰鬥系統的關聯
 
-- 裝備加成在 `applyEquipmentStats`（`server/constants/stats.ts`）疊加在屬性算出的 base stats 之上：`ATK`/`DEF`/`HP_MAX` 直接相加，`actionIntervalSec` 相加後再套用同一組 0.5–5.0 秒的夾限；`critChance`/`critMultiplier`/`dodgeChance` 目前的裝備加成邏輯**不修改**（維持 base stats 值，即裝備欄位如 `research_chip_ring`/`servo_greaves` 提供的 `actionSpeedMod` 才會影響出手速度，數值曲線見 `docs/game-design/item-drop-and-stats.md`）。
+- 裝備加成在 `applyEquipmentStats`（`server/constants/stats.ts`）疊加在屬性算出的 base stats 之上：`ATK`/`DEF`/`HP_MAX` 直接相加，`actionIntervalSec` 相加後再套用同一組 0.5–5.0 秒的夾限；`critChance`/`critMultiplier`/`dodgeChance` 目前的裝備加成邏輯**不修改**（維持 base stats 值，即裝備欄位如 `research_chip_ring`/`servo_greaves` 提供的 `actionSpeedMod` 才會影響出手速度，數值曲線見 `docs/game-design/balance/item-stats.md`）。
 - 對應到第 1 節的職業初始屬性分佈，各職業因此天生偏重不同的裝備搭配方向：
   - `fighter`（STR3/CON3）：ATK 與 DEF/HP 並重，適合搭配右手 ATK 裝備或身體/頭部 DEF+HP 裝備補強耐久。
   - `adventurer`（AGI3）：天生出手較快、閃避/爆擊率較高，適合疊加戒指/鞋子的 `actionSpeedMod`（負值）裝備進一步壓縮出手間隔。

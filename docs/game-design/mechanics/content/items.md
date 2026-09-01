@@ -1,10 +1,10 @@
 # 道具內容目錄（templates／圖示／文案落地狀態）
 
-> 本文件是內部設計參考文件，與 `docs/game-design/item-drop-and-stats.md` 分工互補：
-> - `item-drop-and-stats.md` 負責**數值面**——稀有度掉落權重、屬性區間、售價區間，把 `equipment-ideas.md` 的候補文案對應到現有數值曲線。
+> 本文件是內部設計參考文件，與 `docs/game-design/balance/item-stats.md` 分工互補：
+> - `item-stats.md` 負責**數值面**——稀有度掉落權重、屬性區間、售價區間，把 `equipment-ideas.md` 的候補文案對應到現有數值曲線。
 > - 本文件負責**內容清單面**——目前實際存在哪些道具模板（`ITEM_TEMPLATES`）、對應哪個像素圖示、`equipment-ideas.md` 的文案候補中哪些已經真正落地成 code。
 >
-> 數值/掉落率/售價一律不重複列在這裡，需要時請連結到 `item-drop-and-stats.md` 對應章節。權威資料來源：`server/constants/templates.ts`（`ITEM_TEMPLATES`）、`app/utils/pixelIcons.ts`、`app/utils/equipmentDisplay.ts`、`shared/types/item.ts`。
+> 數值/掉落率/售價一律不重複列在這裡，需要時請連結到 `item-stats.md` 對應章節。權威資料來源：`server/constants/templates.ts`（`ITEM_TEMPLATES`）、`app/utils/pixelIcons.ts`、`app/utils/equipmentDisplay.ts`、`shared/types/item.ts`。
 
 ## 0. 型別背景
 
@@ -28,9 +28,9 @@
 | `research_chip_ring` | 殘留運算晶片戒 | EQUIPMENT | RING | LIGHT | 研究設施實驗品拆下的運算晶片，戴著它思考反應快得連自己都嚇一跳 |
 | `engine_oil_basic` | 機油 | POTION | — | — | 「為什麼喝機油會補血...？但真好喝，咕嚕咕嚕咕嚕。」 |
 
-`weaponWeightClass`（LIGHT/MEDIUM/HEAVY）是速度/主屬性/閃避的取捨分類，掛在 template 層、不隨稀有度變化；機制與各分類走向規則見 `item-drop-and-stats.md`「裝備重量分類」章節。
+`weaponWeightClass`（LIGHT/MEDIUM/HEAVY）是速度/主屬性/閃避的取捨分類，掛在 template 層、不隨稀有度變化；機制與各分類走向規則見 `item-stats.md`「裝備重量分類」章節。
 
-各 template 的完整數值曲線（分稀有度的 ATK/DEF/HP/actionSpeedMod/dodgeChanceMod/healPercent 區間、售價區間）見 `item-drop-and-stats.md` 對應章節：頭部 / 身體 / 左手 / 右手 / 戒指 / 鞋子 / 藥水。
+各 template 的完整數值曲線（分稀有度的 ATK/DEF/HP/actionSpeedMod/dodgeChanceMod/healPercent 區間、售價區間）見 `item-stats.md` 對應章節：頭部 / 身體 / 左手 / 右手 / 戒指 / 鞋子 / 藥水。
 
 裝備 6 個欄位（HEAD/BODY/SHOES/LEFT_HAND/RIGHT_HAND/RING）目前每欄各 1 個 template，加上藥水 1 個，剛好對齊 7 筆。
 
@@ -78,14 +78,14 @@
 | 鞋子 Feet | 6（含 1 則替代款） | 0（`servo_greaves` 另寫） | 見下方說明 |
 | 藥水 Potion | — | 1（`engine_oil_basic`） | 直接落地，且文案幾乎逐字對應 `worldview.md` 4.1 節給的範例台詞 |
 
-**說明**：`item-drop-and-stats.md` 的「對應規則」章節設計了一套映射方式——把 `equipment-ideas.md` 每個部位的 6 則候補文案依稀有度序（N→L，取前 5 則）對應到該部位的稀有度曲線，第 6 則併入 SSR（戒指例外為 L）的「替代外觀池」。這套映射**設計面已定案**，完整文案對照見第 4 節；但**尚未真正寫進 code**：目前 6 個裝備 template 的 `name`/`description` 都還是重新撰寫、單一固定字串，不是 `equipment-ideas.md` 候補清單裡的任何一則。也就是說：
+**說明**：`item-stats.md` 的「對應規則」章節設計了一套映射方式——把 `equipment-ideas.md` 每個部位的 6 則候補文案依稀有度序（N→L，取前 5 則）對應到該部位的稀有度曲線，第 6 則併入 SSR（戒指例外為 L）的「替代外觀池」。這套映射**設計面已定案**，完整文案對照見第 4 節；但**尚未真正寫進 code**：目前 6 個裝備 template 的 `name`/`description` 都還是重新撰寫、單一固定字串，不是 `equipment-ideas.md` 候補清單裡的任何一則。也就是說：
 
 - `equipment-ideas.md` 的 36 則裝備候補文案（6 部位 × 6 則）→ 稀有度對照設計已定案（第 4 節），但 code 落地率仍是 **0 / 36**，全部仍停留在草案階段。
 - 藥水的候補基調（`worldview.md` 4.1）→ 已落地 1 則（`engine_oil_basic`），但同樣是單一字串，未依稀有度分級撰寫。
 
 ## 4. 稀有度文案對照（設計定案，待落地）
 
-依 `item-drop-and-stats.md`「對應規則」，把 `equipment-ideas.md` 每部位 6 則文案依 N→L 序對應到稀有度曲線，第 6 則併入替代外觀池（戒指例外，見下方備註）。此處為**完整文案定案版**（名稱＋description），數值/售價不重複列出，見 `item-drop-and-stats.md` 對應章節。
+依 `item-stats.md`「對應規則」，把 `equipment-ideas.md` 每部位 6 則文案依 N→L 序對應到稀有度曲線，第 6 則併入替代外觀池（戒指例外，見下方備註）。此處為**完整文案定案版**（名稱＋description），數值/售價不重複列出，見 `item-stats.md` 對應章節。
 
 ### 頭部 Head（對應 `gkbot_faceplate`）
 
@@ -142,7 +142,7 @@
 | L | 無標記黑環 | 沒有品牌、沒有序號，也找不到任何製造紀錄。它戴起來很舒服，舒服得讓你不太想把它拿下來。 |
 | L（替代款） | 陣亡倖存者的婚戒 | 從某個被搶劫殺害的倖存者身上取下的戒指，內側刻著一個名字和一個日期。你猜不出那個人是死於 GkBot，還是死於搶走這枚戒指的人手上。 |
 
-> 戒指的替代款掛在 L 而非 SSR，因為婚戒的伏筆最重，呼應「戒指承擔身份／記憶伏筆」的既定方向（`item-drop-and-stats.md` 已註記）。
+> 戒指的替代款掛在 L 而非 SSR，因為婚戒的伏筆最重，呼應「戒指承擔身份／記憶伏筆」的既定方向（`item-stats.md` 已註記）。
 
 ### 鞋子 Feet（對應 `servo_greaves`）
 
@@ -160,7 +160,7 @@
 ## 5. 內容缺口
 
 1. **每個裝備欄位僅 1 個 template，橫跨 5 個稀有度**：目前 `salvaged_wrench`/`riot_shield_scrap`/`gkbot_faceplate`/`supply_crate_vest`/`servo_greaves`/`research_chip_ring` 各自只有一筆 `ItemTemplate`，用同一個 `name`/`description` 搭配 `baseStatsRange` 裡分稀有度的數值區間來呈現「同一把扳手，數值隨稀有度變強」，而非 `equipment-ideas.md` 設想的「每個稀有度是外觀/敘述都不同的獨立道具」。
-2. **稀有度文案對照（第 4 節）已定案，但尚未拆成多個 template**：要落地「每個稀有度獨立文案」，依 `item-drop-and-stats.md` 文末「落地備註」，有兩種路徑：
+2. **稀有度文案對照（第 4 節）已定案，但尚未拆成多個 template**：要落地「每個稀有度獨立文案」，依 `item-stats.md` 文末「落地備註」，有兩種路徑：
    - 擴充 `ItemTemplate.name`/`description` 為依稀有度變化的欄位（維持 1 個 templateId／欄位）；或
    - 拆成多個 template（例如 `salvaged_wrench_n`、`salvaged_wrench_r`…），並各自設定 `rarityWeights`。
    兩者都動到 `ItemTemplate` 資料結構或 template 數量，屬於功能擴充，須先進 `/opsx:propose` 討論再實作，本文件不預先決定方向。

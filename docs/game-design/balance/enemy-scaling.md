@@ -129,4 +129,4 @@ baseDef = 1 + levelSteps * DEF_MULT_PER_LEVEL
 - `server/constants/difficulty.test.ts` 覆蓋：`getEnemyLevel` 的 3 組數值範例、NORMAL level=1 無 tier 加成、level 越高倍率越高、tier 遞增（NORMAL < ELITE < STRONG_ELITE）、BOSS 三項倍率皆高於 STRONG_ELITE，可作為公式正確性的最小驗證集。
 - BOSS tier 倍率（hp 4.0 / atk 2.8 / def 2.0）是原始碼明確標註的 ASSUMPTION，尚未有設計文件驗證是否符合實際戰鬥手感，若要調整需同步更新 `difficulty.ts` 與 `difficulty.test.ts` 的邊界斷言。
 - `ENEMY_ARCHETYPES` 的 baseAtk/baseDef/baseHp 同樣是 `combat.ts` 註解標明的發明值，四個 archetype 之間互有 ATK/DEF/HP 側重（爆發型 vs 坦克型 vs 均衡型），調整時建議連動檢查 `expForKill`/`goldForKill`（`combat.ts`）等獎勵公式是否仍與敵人強度匹配。
-- 本文件不含 EXP/金幣/寶石/掉落機率公式，該部分另見 `docs/game-design/item-drop-and-stats.md`（掉落率與裝備數值）與 `server/constants/combat.ts` 內的 `expForKill`/`goldForKill`/`gemsDropTier` 等函式（未另立文件）。
+- 本文件不含 EXP/金幣/寶石/掉落機率公式，該部分另見 `docs/game-design/balance/item-stats.md`（掉落率與裝備數值）與 `server/constants/combat.ts` 內的 `expForKill`/`goldForKill`/`gemsDropTier` 等函式（未另立文件）。
