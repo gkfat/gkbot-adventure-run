@@ -29,8 +29,7 @@ import { SystemBtn } from '../../.nuxt/components';
 
             <!-- Description -->
             <v-card-subtitle class="text-center text-body-1 mb-8 text-wrap">
-                公元 5487 年，GkBot 一夜倒戈。<br>
-                廢棄設施深處，還有東西在等你。
+                在機械智能叛變的末世，<br>你能生存多久？
             </v-card-subtitle>
 
             <!-- Error Alert -->

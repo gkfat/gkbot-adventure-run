@@ -1,7 +1,7 @@
 <template>
     <div class="archetype-gallery d-flex flex-column align-center fill-height pa-4">
         <div class="font-pixel text-h6 mb-4" style="color: rgb(var(--v-theme-primary)); opacity: 0.85;">
-            選擇職業
+            選擇角色
         </div>
 
         <!-- 角色 carousel：中間卡片較大，兩側較小並漸淡 -->
