@@ -34,6 +34,11 @@ export const itemInstanceSchema = z.object({
     rarity: z.nativeEnum(Rarity),
     stats: itemStatsSchema,
 
+    // Name/description resolved from the template at roll time and fixed
+    // thereafter (see server/services/item.service.ts generateItemInstance()).
+    name: z.string(),
+    description: z.string(),
+
     // Metadata
     source: z.nativeEnum(ItemSource),
     characterId: z.string(),
