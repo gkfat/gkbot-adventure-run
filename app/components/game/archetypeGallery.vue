@@ -1,6 +1,6 @@
 <template>
     <div class="archetype-gallery d-flex flex-column align-center fill-height pa-4">
-        <div class="font-pixel text-caption mb-4" style="color: rgb(var(--v-theme-primary)); opacity: 0.85;">
+        <div class="font-pixel text-h6 mb-4" style="color: rgb(var(--v-theme-primary)); opacity: 0.85;">
             選擇職業
         </div>
 
@@ -55,6 +55,31 @@
                     {{ blurb }}
                 </div>
 
+                <div class="text-caption text-medium-emphasis mb-1">
+                    初始配備
+                </div>
+                <div class="archetype-gallery__starter-row mb-3">
+                    <button
+                        v-for="preview in starterLoadoutPreview"
+                        :key="preview.templateId"
+                        type="button"
+                        class="pixel-slot pixel-slot--starter pixel-press"
+                        :style="{ borderColor: RARITY_COLOR[preview.rarity] }"
+                        @click="openStarterDetail(preview)"
+                    >
+                        <span
+                            class="pixel-slot__rarity font-pixel"
+                            :style="{ background: RARITY_COLOR[preview.rarity] }"
+                        >
+                            {{ preview.rarity }}
+                        </span>
+                        <GamePixelIcon
+                            :name="resolvePixelIcon(preview)"
+                            :size="28"
+                        />
+                    </button>
+                </div>
+
                 <div class="archetype-gallery__stats">
                     <div
                         v-for="stat in statBars(selected.attributes)"
@@ -70,16 +95,6 @@
                         </div>
                     </div>
                 </div>
-
-                <SystemBtn
-                    block
-                    color="green"
-                    class="text-none mt-4 flex-grow-0"
-                    :loading="loading"
-                    @click="handleConfirm"
-                >
-                    確認
-                </SystemBtn>
             </div>
 
             <button
@@ -98,6 +113,18 @@
         </div>
 
         <SystemBtn
+            v-if="selected"
+            block
+            size="large"
+            color="green"
+            class="text-none mt-4 flex-grow-0 archetype-gallery__confirm-btn"
+            :loading="loading"
+            @click="handleConfirm"
+        >
+            確認
+        </SystemBtn>
+
+        <SystemBtn
             v-if="roster.length > 0"
             variant="text"
             color="primary"
@@ -107,13 +134,81 @@
         >
             返回角色列表
         </SystemBtn>
+
+        <!-- 初始配備詳情 dialog（唯讀預覽，尚未創建角色，不提供裝備/卸下操作） -->
+        <v-dialog
+            v-model="starterDetailOpen"
+            max-width="300"
+        >
+            <div
+                v-if="starterDetail"
+                class="item-detail pa-4"
+            >
+                <div class="d-flex align-center ga-3 mb-3">
+                    <div
+                        class="pixel-slot pixel-slot--detail"
+                        :style="{ borderColor: RARITY_COLOR[starterDetail.rarity] }"
+                    >
+                        <span
+                            class="pixel-slot__rarity font-pixel"
+                            :style="{ background: RARITY_COLOR[starterDetail.rarity] }"
+                        >
+                            {{ starterDetail.rarity }}
+                        </span>
+                        <GamePixelIcon
+                            :name="resolvePixelIcon(starterDetail)"
+                            :size="40"
+                        />
+                    </div>
+                    <div>
+                        <div
+                            class="font-pixel text-subtitle-1"
+                            :style="{ color: RARITY_COLOR[starterDetail.rarity] }"
+                        >
+                            {{ starterDetail.name }}
+                        </div>
+                        <div class="text-caption text-medium-emphasis mb-1">
+                            稀有度 {{ starterDetail.rarity }}
+                        </div>
+                        <div class="text-body-2">
+                            {{ starterDetail.statLabel }}
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-body-2 text-medium-emphasis mb-3">
+                    {{ starterDetail.description }}
+                </p>
+
+                <SystemBtn
+                    block
+                    variant="outlined"
+                    color="primary"
+                    class="text-none"
+                    @click="starterDetailOpen = false"
+                >
+                    關閉
+                </SystemBtn>
+            </div>
+        </v-dialog>
     </div>
 </template>
 
 <script setup lang="ts">
 import { breatheFrameUrl } from '../../utils/spriteDisplay';
+import { RARITY_COLOR, resolvePixelIcon } from '../../utils/equipmentDisplay';
+import {
+    getStarterLoadoutPreview, type StarterLoadoutItemPreview,
+} from '../../../shared/constants/starterLoadout';
 
 defineEmits<{ cancel: [] }>();
+
+const starterDetailOpen = ref(false);
+const starterDetail = ref<StarterLoadoutItemPreview | null>(null);
+const openStarterDetail = (preview: StarterLoadoutItemPreview) => {
+    starterDetail.value = preview;
+    starterDetailOpen.value = true;
+};
 
 const {
     archetypes, roster, loading, createCharacter,
@@ -122,6 +217,9 @@ const breathStep = useIdleBreathingFrame();
 
 const selectedIndex = ref(0);
 const selected = computed(() => archetypes.value[selectedIndex.value] ?? archetypes.value[0] ?? null);
+const starterLoadoutPreview = computed(() => (
+    selected.value ? getStarterLoadoutPreview(selected.value.archetypeId) : []
+));
 
 const ARCHETYPE_BLURB: Record<string, string> = {
     fighter: '身體素質最好，最快適應戰鬥的近戰肉盾。在無數次戰鬥後，痛覺對你來說越來越陌生——你隱約察覺，這副軀殼正在變成別的東西。',
@@ -185,6 +283,11 @@ const handleConfirm = () => {
     width: 100%;
     overflow-y: auto;
 
+    &__starter-row {
+        display: flex;
+        gap: 6px;
+    }
+
     &__stats {
         display: flex;
         flex-direction: column;
@@ -196,6 +299,13 @@ const handleConfirm = () => {
         grid-template-columns: 32px 1fr;
         align-items: center;
         gap: 6px;
+    }
+
+    &__confirm-btn {
+        width: 100%;
+        max-width: 320px;
+        height: 48px;
+        font-size: 1rem;
     }
 
     &__bar {
@@ -302,5 +412,86 @@ const handleConfirm = () => {
         border: 1px solid rgba(196, 203, 219, 0.15);
         border-radius: 3px;
     }
+}
+
+// Shared "pixel cabinet slot" look (same visual language as inventory.vue /
+// itemDetailDialog.vue) — duplicated here since Vue scoped styles don't
+// cross component boundaries.
+.pixel-slot {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid rgba(196, 203, 219, 0.25);
+    border-radius: 3px;
+    background: #14171c;
+    color: rgb(var(--v-theme-primary));
+    box-shadow:
+        inset 2px 2px 0 rgba(255, 255, 255, 0.06),
+        inset -2px -2px 0 rgba(0, 0, 0, 0.55);
+
+    &::before,
+    &::after {
+        content: '';
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        pointer-events: none;
+        opacity: 0.55;
+    }
+
+    &::before {
+        top: -2px;
+        left: -2px;
+        border-top: 2px solid rgb(var(--v-theme-primary));
+        border-left: 2px solid rgb(var(--v-theme-primary));
+    }
+
+    &::after {
+        bottom: -2px;
+        right: -2px;
+        border-bottom: 2px solid rgb(var(--v-theme-primary));
+        border-right: 2px solid rgb(var(--v-theme-primary));
+    }
+
+    &--starter {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        cursor: pointer;
+        transition: transform 0.06s ease-out;
+
+        &:hover {
+            transform: translateY(-1px);
+        }
+
+        &:focus-visible {
+            outline: 2px solid rgb(var(--v-theme-primary));
+            outline-offset: 2px;
+        }
+    }
+
+    &--detail {
+        width: 64px;
+        height: 64px;
+        flex: 0 0 auto;
+    }
+
+    &__rarity {
+        position: absolute;
+        top: -6px;
+        left: -6px;
+        padding: 0 2px;
+        font-size: 7px;
+        line-height: 1.4;
+        color: #14171c;
+        border-radius: 2px;
+        white-space: nowrap;
+    }
+}
+
+.item-detail {
+    background: rgb(var(--v-theme-background));
+    border: 1px solid rgba(196, 203, 219, 0.15);
 }
 </style>

@@ -28,6 +28,7 @@ import {
     allocateAttributesResponseSchema,
     setNicknameRequestSchema,
     setNicknameResponseSchema,
+    deleteCharacterResponseSchema,
 } from '../../shared/schemas/api/character.schema';
 
 import {
@@ -414,6 +415,29 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             },
             404: {
                 description: 'Character not found, or item not found in the character\'s inventory',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'delete',
+        path: '/api/character/{characterId}',
+        description: 'Permanently delete a character (must belong to the caller). Equipped/inventory item documents are left intact — only the character\'s equipment map, its inventory reference list, and all of its adventure runs are removed.',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Character deleted',
+                content: { 'application/json': { schema: deleteCharacterResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
         },

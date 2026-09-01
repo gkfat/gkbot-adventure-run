@@ -256,6 +256,37 @@ export const useCharacter = () => {
     };
 
     /**
+     * 刪除指定角色（連同其冒險紀錄、永久背包一併移除，裝備物品本身不會被刪除，
+     * 僅解除其擁有者關聯），成功後從本地清單移除；若刪除的正是目前選定角色，
+     * 一併清空選定狀態與記住的 localStorage 紀錄。
+     */
+    const deleteCharacter = async (characterId: string): Promise<boolean> => {
+        loading.value = true;
+        error.value = null;
+
+        try {
+            await api.delete(`/api/character/${characterId}`);
+
+            roster.value = roster.value.filter(entry => entry.characterId !== characterId);
+
+            if (selectedCharacterId.value === characterId) {
+                selectedCharacterId.value = null;
+                character.value = null;
+                const accountId = user.value?.uid;
+                if (accountId) localStorage.removeItem(storageKey(accountId));
+            }
+
+            return true;
+        } catch (err: any) {
+            console.error('[useCharacter] Failed to delete character:', err);
+            error.value = err.message || '刪除角色失敗';
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    /**
      * 清空選定角色，回到角色列表畫面
      */
     const clearSelection = () => {
@@ -299,6 +330,7 @@ export const useCharacter = () => {
         equipItem,
         unequipItem,
         allocateAttributes,
+        deleteCharacter,
         clearSelection,
 
         reset,

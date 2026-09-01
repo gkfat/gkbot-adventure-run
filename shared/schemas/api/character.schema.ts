@@ -125,6 +125,14 @@ export const setNicknameResponseSchema = z.object({
     data: z.object({ nickname: z.string() }),
 });
 
+/**
+ * DELETE /api/character/:characterId
+ */
+export const deleteCharacterResponseSchema = z.object({
+    success: z.boolean(),
+    data: z.object({ message: z.string() }),
+});
+
 export type GetRosterResponse = z.infer<typeof getRosterResponseSchema>;
 export type CreateCharacterRequest = z.infer<typeof createCharacterRequestSchema>;
 export type GetCharacterResponse = z.infer<typeof getCharacterResponseSchema>;
@@ -132,3 +140,4 @@ export type AllocateAttributesRequest = z.infer<typeof allocateAttributesRequest
 export type AllocateAttributesResponse = z.infer<typeof allocateAttributesResponseSchema>;
 export type SetNicknameRequest = z.infer<typeof setNicknameRequestSchema>;
 export type SetNicknameResponse = z.infer<typeof setNicknameResponseSchema>;
+export type DeleteCharacterResponse = z.infer<typeof deleteCharacterResponseSchema>;

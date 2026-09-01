@@ -1,18 +1,29 @@
 import { BaseService } from './base.service';
 import {
-    CharacterRepository, CHARACTER_ROSTER_MAX, 
+    CharacterRepository, CHARACTER_ROSTER_MAX,
 } from '../repositories/character.repository';
 import { ItemRepository } from '../repositories/item.repository';
 import {
     calculateBaseStats, applyEquipmentStats,
 } from '../constants/stats';
 import { sumEquipmentStats } from './item.service';
+import { InventoryService } from './inventory.service';
+import { EquipmentService } from './equipment.service';
+import { InventoryRepository } from '../repositories/inventory.repository';
+import { AdventureRunRepository } from '../repositories/adventure-run.repository';
 import {
     SELECTABLE_CHARACTER_ARCHETYPES, getArchetypeById,
 } from '../constants/characterArchetypes';
+import {
+    getStarterEquipmentTemplateId, STARTER_POTION_TEMPLATE_ID,
+} from '../../shared/constants/starterLoadout';
 import type {
     Character, CharacterWithStats, CharacterSummary, AllocateAttributesInput,
 } from '../../shared/types/character';
+import {
+    ItemSource, type ItemGenerationContext,
+} from '../../shared/types/item';
+import { Rarity } from '../../shared/types/common';
 import {
     BusinessLogicError, NotFoundError,
 } from '../../shared/types/errors';
@@ -21,11 +32,19 @@ export class CharacterService extends BaseService {
     protected serviceName = 'character';
     private characterRepo: CharacterRepository;
     private itemRepo: ItemRepository;
+    private inventoryService: InventoryService;
+    private equipmentService: EquipmentService;
+    private inventoryRepo: InventoryRepository;
+    private adventureRunRepo: AdventureRunRepository;
 
     constructor() {
         super();
         this.characterRepo = new CharacterRepository();
         this.itemRepo = new ItemRepository();
+        this.inventoryService = new InventoryService();
+        this.equipmentService = new EquipmentService();
+        this.inventoryRepo = new InventoryRepository();
+        this.adventureRunRepo = new AdventureRunRepository();
     }
 
     /**
@@ -65,7 +84,30 @@ export class CharacterService extends BaseService {
         }
 
         const character = await this.characterRepo.createCharacterFromArchetype(accountId, archetype);
-        return this.withStats(character);
+        await this.grantStarterLoadout(accountId, character.characterId, archetype.archetypeId);
+
+        const withLoadout = await this.characterRepo.getByIdForAccount(character.characterId, accountId);
+        if (!withLoadout) {
+            throw new NotFoundError('character');
+        }
+        return this.withStats(withLoadout);
+    }
+
+    /**
+     * Grant a newly created character its starter loadout (character-starter-loadout,
+     * weapon/armor-by-class): one N-rarity equipment piece themed to the
+     * archetype (see getStarterEquipmentTemplateId), equipped straight into
+     * its slot, and one N-rarity potion left in the permanent inventory.
+     */
+    private async grantStarterLoadout(accountId: string, characterId: string, archetypeId: string): Promise<void> {
+        const context: ItemGenerationContext = {
+            source: ItemSource.STARTER, maxRarity: Rarity.N,
+        };
+
+        const equipmentTemplateId = getStarterEquipmentTemplateId(archetypeId);
+        const equipment = await this.inventoryService.grantItem(characterId, equipmentTemplateId, context);
+        await this.inventoryService.grantItem(characterId, STARTER_POTION_TEMPLATE_ID, context);
+        await this.equipmentService.equipItem(accountId, characterId, equipment.itemId);
     }
 
     /**
@@ -119,6 +161,25 @@ export class CharacterService extends BaseService {
         }
 
         return this.characterRepo.updateNickname(characterId, nickname);
+    }
+
+    /**
+     * Permanently delete a character owned by the caller. Equipped/inventory
+     * items are released (their `items/{itemId}` documents are left intact —
+     * only the character's `equipment` map and the character-owned
+     * `inventories/{characterId}` reference list are removed, along with
+     * every adventure run the character has ever started) before the
+     * character document itself is removed.
+     */
+    async deleteCharacter(accountId: string, characterId: string): Promise<void> {
+        const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
+        if (!character) {
+            throw new NotFoundError('character');
+        }
+
+        await this.adventureRunRepo.deleteAllByCharacterId(characterId);
+        await this.inventoryRepo.delete(characterId);
+        await this.characterRepo.delete(characterId);
     }
 
     private async withStats(character: Character): Promise<CharacterWithStats> {

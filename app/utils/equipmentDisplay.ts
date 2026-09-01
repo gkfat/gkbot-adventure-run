@@ -133,7 +133,7 @@ const STAT_DISPLAY_ORDER: {
     },
     {
         key: 'actionSpeedMod',
-        effectLabel: v => `攻擊間隔 ${v > 0 ? '+' : ''}${v}s`,
+        effectLabel: v => `攻擊間隔 ${v > 0 ? '+' : ''}${v.toFixed(2)}s`,
         compact: v => `${v >= 0 ? '+' : '-'}${Math.abs(v).toFixed(2)}`,
     },
     {

@@ -159,6 +159,26 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
     }
 
     /**
+     * Permanently delete every run document belonging to a character (active
+     * or ended) — used when the character itself is deleted.
+     */
+    async deleteAllByCharacterId(characterId: string): Promise<void> {
+        try {
+            const snapshot = await this.collection.where('characterId', '==', characterId).get();
+            if (snapshot.empty) {
+                return;
+            }
+
+            const batch = this.db.batch();
+            snapshot.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new DatabaseError(`Failed to delete adventure runs: ${message}`);
+        }
+    }
+
+    /**
      * Get a run document by ID (see BaseRepository.getById) with Chapter/
      * Stage fields backfilled — overridden so both this and the inherited
      * `getByIdOrThrow` (used by `saveCheckpoint`) return consistent defaults

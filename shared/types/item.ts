@@ -21,6 +21,7 @@ export enum ItemSource {
   DROP = 'DROP',       // Dropped from combat
   SHOP = 'SHOP',       // Purchased from shop
   EVENT = 'EVENT',     // Gained from event
+  STARTER = 'STARTER', // Granted on character creation
 }
 
 /**

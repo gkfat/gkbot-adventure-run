@@ -473,6 +473,67 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
+    // Weapon (LIGHT) — RIGHT_HAND, the 冒險家 starter weapon (character-starter-loadout)
+    'scrap_daggers': {
+        templateId: 'scrap_daggers',
+        name: {
+            [Rarity.N]: '拆信刀',
+            [Rarity.R]: '精密裁切刀',
+            [Rarity.SR]: '維修用手術刀',
+            [Rarity.SSR]: 'GkBot 微型刀刃',
+            [Rarity.L]: '無聲切割器',
+        },
+        description: {
+            [Rarity.N]: '辦公室裡隨處可見的拆信刀，刀刃單薄卻異常鋒利。你發現自己揮動它的速度，比想像中快上不少。',
+            [Rarity.R]: '技師用來裁切薄板與電纜外皮的精密刀具。輕巧得幾乎感覺不到重量，動作卻精準得嚇人。',
+            [Rarity.SR]: '手術等級的維修用刀，原本用來處理最細微的線路。握著它時，你的手總是比腦子更快做出反應。',
+            [Rarity.SSR]: '從報廢 GkBot 身上拆下的微型刀刃模組，輕得不像金屬。你甚至懷疑它其實比你的手還要敏捷。',
+            [Rarity.L]: '幾乎沒有實體回饋的切割器，出手時沒有聲音、沒有阻力。你不確定自己是在使用它，還是它在借用你的手。',
+        },
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.RIGHT_HAND,
+        weaponWeightClass: WeaponWeightClass.LIGHT,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: {
+            [Rarity.N]: {
+                ATK: {
+                    min: 3, max: 6,
+                }, actionSpeedMod: {
+                    min: -0.05, max: -0.02,
+                },
+            },
+            [Rarity.R]: {
+                ATK: {
+                    min: 6, max: 12,
+                }, actionSpeedMod: {
+                    min: -0.1, max: -0.05,
+                },
+            },
+            [Rarity.SR]: {
+                ATK: {
+                    min: 12, max: 20,
+                }, actionSpeedMod: {
+                    min: -0.18, max: -0.1,
+                },
+            },
+            [Rarity.SSR]: {
+                ATK: {
+                    min: 20, max: 30,
+                }, actionSpeedMod: {
+                    min: -0.28, max: -0.18,
+                },
+            },
+            [Rarity.L]: {
+                ATK: {
+                    min: 30, max: 42,
+                }, actionSpeedMod: {
+                    min: -0.4, max: -0.28,
+                },
+            },
+        },
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
     // Potions (consumable, used at REST nodes)
     'engine_oil_basic': {
         templateId: 'engine_oil_basic',
