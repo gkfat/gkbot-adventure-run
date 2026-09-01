@@ -26,6 +26,7 @@ import {
 } from './combat.service';
 import { EventService } from './event.service';
 import { BlessingService } from './blessing.service';
+import { findModifierTemplate } from '../../shared/constants/blessings';
 import {
     NoopLeaderboardUpdater, NoopProgressTracker,
 } from './adventure-run-stubs';
@@ -60,6 +61,27 @@ export function stripSeed(run: AdventureRun): Omit<AdventureRun, 'seed'> {
     const publicRun: Partial<AdventureRun> = { ...run };
     delete publicRun.seed;
     return publicRun as Omit<AdventureRun, 'seed'>;
+}
+
+/**
+ * A granted Blessing/Curse's `HP_MAX` statModifier changes the run's actual
+ * max HP, so `playerHpMax` must move with it (it otherwise stays frozen at
+ * run-creation's base value forever — see events-and-blessings design.md).
+ * Gaining max HP tops current HP up to the new max; losing it clamps current
+ * HP down so it never exceeds the new (lower) max.
+ */
+function applyHpMaxModifier(
+    modifierId: string | undefined, hpMax: number, hp: number,
+): { hpMax: number; hp: number } {
+    const delta = modifierId ? findModifierTemplate(modifierId)?.statModifiers?.HP_MAX : undefined;
+    if (!delta) return {
+        hpMax, hp,
+    };
+    const newHpMax = hpMax + delta;
+    return {
+        hpMax: newHpMax,
+        hp: delta > 0 ? newHpMax : clamp(hp, 0, newHpMax),
+    };
 }
 
 // Weighted-random node type picked when neither the rest guarantee nor the
@@ -386,8 +408,11 @@ export class AdventureRunService extends BaseService {
             currentNodeData: FieldValue.delete(),
             lastActivityAt: Date.now(),
         };
+        let {
+            playerHpMax: hpMax, playerHp: hp, 
+        } = run;
         if (result.hpHealed) {
-            patch.playerHp = clamp(run.playerHp + result.hpHealed, 0, run.playerHpMax);
+            hp = clamp(hp + result.hpHealed, 0, hpMax);
         }
         if (result.goldGained) {
             patch.goldEarned = run.goldEarned + result.goldGained;
@@ -400,10 +425,18 @@ export class AdventureRunService extends BaseService {
         }
         if (result.blessingGranted) {
             patch.blessings = [...run.blessings, result.blessingGranted];
+            ({
+                hpMax, hp, 
+            } = applyHpMaxModifier(result.blessingGranted, hpMax, hp));
         }
         if (result.curseApplied) {
             patch.curses = [...run.curses, result.curseApplied];
+            ({
+                hpMax, hp, 
+            } = applyHpMaxModifier(result.curseApplied, hpMax, hp));
         }
+        if (hpMax !== run.playerHpMax) patch.playerHpMax = hpMax;
+        if (hp !== run.playerHp) patch.playerHp = hp;
 
         await this.runRepo.saveCheckpoint(run.runId, patch);
         return result;
@@ -434,12 +467,17 @@ export class AdventureRunService extends BaseService {
         // never reach BLESSING_SELECT (see design.md), so this is always a
         // non-Boss node — plain stageNodeIndex advance.
         const { stageNodeIndex } = resolveStageFields(run);
+        const {
+            hpMax, hp, 
+        } = applyHpMaxModifier(chosen.modifierId, run.playerHpMax, run.playerHp);
         await this.runRepo.saveCheckpoint(run.runId, {
             state: AdventureStateType.EXPLORING,
             step: run.step + 1,
             stageNodeIndex: stageNodeIndex + 1,
             blessings: [...run.blessings, chosen.modifierId],
             blessingPoints: 0,
+            playerHpMax: hpMax,
+            playerHp: hp,
             currentNodeType: FieldValue.delete(),
             currentNodeData: FieldValue.delete(),
             lastActivityAt: Date.now(),

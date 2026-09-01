@@ -255,7 +255,11 @@
                     <div class="d-flex align-center justify-space-between mb-2">
                         <span class="text-caption text-medium-emphasis">HP</span>
                         <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-warning));">
-                            {{ displayedPlayerHp }} / {{ currentRun.playerHpMax }}
+                            {{ displayedPlayerHp }} / {{ currentRun.playerHpMax }}<span
+                                v-if="hpMaxBonus"
+                                class="text-caption"
+                                :style="{ color: hpMaxBonus > 0 ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-warning))' }"
+                            >({{ hpMaxBonus > 0 ? '+' : '' }}{{ hpMaxBonus }})</span>
                         </span>
                     </div>
                     <div
@@ -618,6 +622,11 @@ const acquiredModifiers = computed(() => {
         .filter(t => t !== undefined);
 });
 
+// 祝福/詛咒對生命上限的總加成，顯示在 HP 上限旁邊，例如 "171(+40)"。
+const hpMaxBonus = computed(() => acquiredModifiers.value.reduce(
+    (sum, modifier) => sum + (modifier.statModifiers?.HP_MAX ?? 0), 0,
+));
+
 // 單一祝福/詛咒 chip 下方的效果文字，例如 "防禦力 +6" 或 "掉落率 x1.30"。
 const describeModifierEffect = (modifier: (typeof MODIFIER_TEMPLATES)[number]) => {
     const parts = Object.entries(modifier.statModifiers ?? {}).map(([key, value]) => {
@@ -915,7 +924,8 @@ onMounted(() => {
         align-items: center;
         gap: 1px;
         min-width: 64px;
-        padding: 4px 8px 9px;
+        max-width: 100%;
+        padding: 4px 8px;
         text-align: center;
         color: rgb(var(--v-theme-green));
         background: rgba(var(--v-theme-green), 0.08);
@@ -940,15 +950,13 @@ onMounted(() => {
     }
 
     &__modifier-chip-value {
-        position: absolute;
-        bottom: -8px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 0 4px;
+        margin-top: 2px;
+        padding-top: 2px;
         font-size: 10px;
         line-height: 1.3;
-        background: #14171c;
-        white-space: nowrap;
+        white-space: normal;
+        word-break: keep-all;
+        border-top: 1px dashed rgba(196, 203, 219, 0.2);
     }
 
     &__item-chip-rarity {

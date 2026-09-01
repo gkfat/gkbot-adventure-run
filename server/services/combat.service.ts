@@ -26,8 +26,9 @@ import {
 } from '../constants/combat';
 import { generateItemInstance } from './item.service';
 import {
-    getItemTemplate, ITEM_TEMPLATES, 
+    getItemTemplate, ITEM_TEMPLATES,
 } from '../constants/templates';
+import { MODIFIER_TEMPLATES_BY_ID } from '../../shared/constants/blessings';
 import { ItemType } from '../../shared/types/item';
 import type { ItemInstance } from '../../shared/types/item';
 import {
@@ -59,10 +60,7 @@ export const NODE_TYPE_TO_ENEMY_TIER: Record<CombatContext['tier'], EnemyTier> =
 /**
  * Apply all currently-active Blessing/Curse RunModifiers to a base stat
  * block, additively — a pure,計算期-only transform (design.md: "不直接改動
- * Character 或 AdventureRun 文件"). `events-and-blessings` hasn't shipped
- * yet, so callers currently always pass `[]`; this is the wiring point that
- * change will plug real resolved RunModifiers into once it can turn
- * `run.blessings`/`run.curses` (id arrays) into actual RunModifier objects.
+ * Character 或 AdventureRun 文件").
  */
 export function applyModifiers(base: Stats, modifiers: RunModifier[]): Stats {
     return modifiers.reduce<Stats>((stats, modifier) => {
@@ -83,11 +81,23 @@ export function applyModifiers(base: Stats, modifiers: RunModifier[]): Stats {
 
 /**
  * Combined drop-rate multiplier from all active Blessing/Curse modifiers
- * (defaults to 1 — no-op — until events-and-blessings can populate real
- * modifiers; see applyModifiers()).
+ * (defaults to 1 when none apply — see applyModifiers()).
  */
 export function combinedDropRateMultiplier(modifiers: RunModifier[]): number {
     return modifiers.reduce((mult, modifier) => mult * (modifier.dropRateMultiplier ?? 1), 1);
+}
+
+/**
+ * Resolve a run's granted Blessing/Curse id arrays (`run.blessings`/
+ * `run.curses`) into their concrete `RunModifier` objects via the shared
+ * template table. An id with no matching template is skipped rather than
+ * thrown — it should not be possible to grant an unknown id, but combat must
+ * not fail to resolve over stale/unrecognized data.
+ */
+export function resolveActiveModifiers(run: Pick<AdventureRun, 'blessings' | 'curses'>): RunModifier[] {
+    return [...run.blessings, ...run.curses]
+        .map(modifierId => MODIFIER_TEMPLATES_BY_ID[modifierId])
+        .filter((modifier): modifier is RunModifier => modifier !== undefined);
 }
 
 /**
@@ -138,10 +148,7 @@ export class CombatService extends BaseService implements CombatResolver {
     async resolve(run: AdventureRun, context: CombatContext): Promise<CombatResolution> {
         const character = await this.characterService.getCharacterWithStats(run.accountId, run.characterId);
 
-        // TODO(events-and-blessings): run.blessings/run.curses are id arrays
-        // with no lookup table to resolve into RunModifier objects yet — this
-        // is the wiring point that change will fill in. Always [] for now.
-        const activeModifiers: RunModifier[] = [];
+        const activeModifiers = resolveActiveModifiers(run);
         const modifiedStats = applyModifiers(character.stats, activeModifiers);
 
         // All rolls for this combat come off one in-memory cursor started at

@@ -104,3 +104,12 @@ export function majorTierChance(luck: number): number {
     const minorWeight = BASE_MINOR_WEIGHT + BASE_MAJOR_WEIGHT - majorWeight;
     return majorWeight / (majorWeight + minorWeight);
 }
+
+/** Lookup table from `modifierId` (as stored on `AdventureRun.blessings`/`.curses`) back to its template. */
+export const MODIFIER_TEMPLATES_BY_ID: Record<string, RunModifier> = Object.fromEntries(
+    [...BLESSING_TEMPLATES, ...CURSE_TEMPLATES].map(template => [template.modifierId, template]),
+);
+
+export function findModifierTemplate(modifierId: string): RunModifier | undefined {
+    return MODIFIER_TEMPLATES_BY_ID[modifierId];
+}
