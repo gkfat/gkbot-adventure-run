@@ -1,13 +1,13 @@
 import { BREATH_FRAME_COUNT } from '../utils/spriteDisplay';
 
-const FRAME_DURATION_MS = 500;
-const PEAK_HOLD_MS = 2000;
-const RESTED_HOLD_MS = 3000;
+const FRAME_DURATION_MS = 350;
+const PEAK_HOLD_MS = 1200;
+const RESTED_HOLD_MS = 1500;
 
 /**
  * How long each step in the shared breath sequence (rest, L1, L2, L1) is held
- * before advancing: 2 inhale steps of 500ms, hold 2s at the peak, 2 exhale
- * steps of 500ms, hold 3s at rest, then repeat.
+ * before advancing: 2 inhale steps of 350ms, hold 1.2s at the peak, 2 exhale
+ * steps of 350ms, hold 1.5s at rest, then repeat.
  */
 const STEP_DURATIONS_MS = [
     RESTED_HOLD_MS,

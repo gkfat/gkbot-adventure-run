@@ -1,6 +1,6 @@
 <template>
-    <div class="archetype-gallery d-flex flex-column align-center fill-height pa-4">
-        <div class="font-pixel text-h6 mb-4" style="color: rgb(var(--v-theme-primary)); opacity: 0.85;">
+    <div class="archetype-gallery d-flex flex-column align-center fill-height pa-4 pt-2">
+        <div class="font-pixel text-h6" style="color: rgb(var(--v-theme-primary)); opacity: 0.85;">
             選擇角色
         </div>
 
@@ -20,8 +20,8 @@
                     <img
                         :src="breatheFrameUrl(archetype.spriteUrl, breathStep)"
                         :alt="archetype.className"
-                        width="84"
-                        height="84"
+                        width="100"
+                        height="100"
                         class="archetype-carousel__sprite"
                     >
                 </button>
@@ -31,22 +31,8 @@
         <!-- 角色說明欄 -->
         <div
             v-if="selected"
-            class="archetype-detail mt-5"
+            class="archetype-detail"
         >
-            <button
-                type="button"
-                class="archetype-detail__nav"
-                aria-label="上一個職業"
-                :disabled="loading"
-                @click="step(-1)"
-            >
-                <v-icon
-                    icon="mdi-chevron-left"
-                    size="22"
-                    color="primary"
-                />
-            </button>
-
             <div class="archetype-detail__panel">
                 <div class="text-body-1 font-weight-medium">
                     {{ selected.className }}
@@ -97,19 +83,35 @@
                 </div>
             </div>
 
-            <button
-                type="button"
-                class="archetype-detail__nav"
-                aria-label="下一個職業"
-                :disabled="loading"
-                @click="step(1)"
-            >
-                <v-icon
-                    icon="mdi-chevron-right"
-                    size="22"
-                    color="primary"
-                />
-            </button>
+            <div class="archetype-detail__nav-row">
+                <button
+                    type="button"
+                    class="archetype-detail__nav"
+                    aria-label="上一個職業"
+                    :disabled="loading"
+                    @click="step(-1)"
+                >
+                    <v-icon
+                        icon="mdi-chevron-left"
+                        size="22"
+                        color="primary"
+                    />
+                </button>
+
+                <button
+                    type="button"
+                    class="archetype-detail__nav"
+                    aria-label="下一個職業"
+                    :disabled="loading"
+                    @click="step(1)"
+                >
+                    <v-icon
+                        icon="mdi-chevron-right"
+                        size="22"
+                        color="primary"
+                    />
+                </button>
+            </div>
         </div>
 
         <SystemBtn
@@ -323,7 +325,7 @@ const handleConfirm = () => {
 
 .archetype-carousel {
     width: 100%;
-    height: 128px;
+    height: 152px;
     position: relative;
     overflow: hidden;
     flex: 0 0 auto;
@@ -338,9 +340,9 @@ const handleConfirm = () => {
         position: absolute;
         top: 50%;
         left: 50%;
-        width: 96px;
-        height: 96px;
-        margin: -48px 0 0 -48px;
+        width: 120px;
+        height: 120px;
+        margin: -60px 0 0 -60px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -368,17 +370,25 @@ const handleConfirm = () => {
 
 .archetype-detail {
     width: 100%;
-    max-width: 320px;
     display: flex;
-    align-items: stretch;
+    flex-direction: column;
     gap: 8px;
+    padding: 12px 14px;
+    background: #14171c;
+    border: 1px solid rgba(196, 203, 219, 0.15);
+    border-radius: 3px;
+
+    &__nav-row {
+        display: flex;
+        gap: 8px;
+    }
 
     &__nav {
-        flex: 0 0 auto;
+        flex: 1 1 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 32px;
+        height: 40px;
         border-radius: 3px;
         background: rgba(196, 203, 219, 0.06);
         border: none;
@@ -405,12 +415,7 @@ const handleConfirm = () => {
     }
 
     &__panel {
-        flex: 1 1 auto;
-        min-width: 0;
-        padding: 12px 14px;
-        background: rgba(196, 203, 219, 0.04);
-        border: 1px solid rgba(196, 203, 219, 0.15);
-        border-radius: 3px;
+        width: 100%;
     }
 }
 
