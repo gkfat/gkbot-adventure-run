@@ -176,6 +176,11 @@ const checked = ref(false); // whether fetchCurrent has resolved at least once
 const lastCombatResult = ref<CombatApiResult | null>(null);
 const lastEventResult = ref<EventOutcome | null>(null);
 const lastSettlement = ref<SettlementView | null>(null);
+// A settlement delivered by startCombat() on a loss, held back from
+// lastSettlement until the caller confirms GameCombatResultPanel finished
+// playing back the combat log — see startCombat/commitPendingSettlement.
+const pendingSettlement = ref<SettlementView | null>(null);
+let pendingSettlementCharacterId: string | null = null;
 const runLog = ref<RunLogEntry[]>([]);
 const runLogRunId = ref<string | null>(null);
 let runLogSeq = 0;
@@ -238,6 +243,8 @@ export const useAdventureRun = () => {
         // from a just-abandoned run) stale — clear it so /adventure doesn't
         // render the old summary instead of the fresh run.
         lastSettlement.value = null;
+        pendingSettlement.value = null;
+        pendingSettlementCharacterId = null;
 
         try {
             await api.post('/api/adventure/start', { characterId });
@@ -324,7 +331,17 @@ export const useAdventureRun = () => {
             // (adventure.vue) calls commitCombatLog() once the panel's
             // `playback-done` event fires.
             if (response.data.settlement) {
-                lastSettlement.value = response.data.settlement;
+                // A loss ends the run right away (server marks it ENDED), so
+                // fetchCurrent() below would flip currentRun to null before the
+                // player has even seen the fight play out — the page would
+                // bounce straight to the "no active run" empty state instead
+                // of GameCombatResultPanel (see known-issue.md). Hold the
+                // settlement and skip refetching until playback finishes;
+                // the caller applies it via commitPendingSettlement().
+                pendingSettlement.value = response.data.settlement;
+                pendingSettlementCharacterId = characterId;
+                loading.value = false;
+                return true;
             }
             await fetchCurrent(characterId);
             return true;
@@ -405,6 +422,23 @@ export const useAdventureRun = () => {
     };
 
     /**
+     * 套用 startCombat() 因為戰敗而暫扣住的結算摘要，並重新抓一次 run（此時
+     * 才會真的變成 null）。呼叫時機跟 commitCombatLog() 一樣，是
+     * GameCombatResultPanel 的 `playback-done` 事件觸發後——見 startCombat
+     * 裡的說明，戰敗結算不能在玩家看完戰鬥演繹前就套用。
+     */
+    const commitPendingSettlement = async () => {
+        if (!pendingSettlement.value) return;
+        const characterId = pendingSettlementCharacterId;
+        lastSettlement.value = pendingSettlement.value;
+        pendingSettlement.value = null;
+        pendingSettlementCharacterId = null;
+        if (characterId) {
+            await fetchCurrent(characterId);
+        }
+    };
+
+    /**
      * 立即放棄目前進行中的 run，強制以 DISCONNECT 結算（只取回 exp）。
      * 用於 main 頁「放棄本次冒險」按鈕，以及 /adventure 頁偵測到冷啟動
      * （直接載入/重新整理瀏覽器）時的自動放棄（known-issue.md #8）。
@@ -448,6 +482,7 @@ export const useAdventureRun = () => {
         selectBlessing,
         clearSettlement,
         commitCombatLog,
+        commitPendingSettlement,
         abandon,
     };
 };

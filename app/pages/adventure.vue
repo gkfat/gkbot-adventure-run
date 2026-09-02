@@ -567,7 +567,7 @@ const {
 const {
     currentRun, loading: runLoading, error: runError, checked, fetchCurrent, advance, useHealingItem,
     startCombat, lastCombatResult, resolveEvent, selectBlessing, lastEventResult,
-    lastSettlement, clearSettlement, runLog, abandon, commitCombatLog,
+    lastSettlement, clearSettlement, runLog, abandon, commitCombatLog, commitPendingSettlement,
 } = useAdventureRun();
 
 // A true browser reload (or a direct/bookmarked navigation) re-initializes
@@ -699,9 +699,10 @@ const combatPlaybackDone = ref(false);
 watch(lastCombatResult, () => {
     combatPlaybackDone.value = false;
 });
-const handleCombatPlaybackDone = () => {
+const handleCombatPlaybackDone = async () => {
     combatPlaybackDone.value = true;
     commitCombatLog();
+    await commitPendingSettlement();
 };
 const combatPlaybackPending = computed(() => (
     currentRun.value?.state === AdventureStateType.RESOLUTION
