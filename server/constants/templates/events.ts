@@ -3,10 +3,10 @@
  * table.
  *
  * ASSUMPTION (see events-and-blessings/design.md): `10_事件祝福與詛咒.md`
- * doesn't exist in this repo — the 5 templates below (one per EventType) and
- * the wheel odds/choice costs are invented for this change, themed after
- * docs/worldview.md's "虛擬實境設施" (VR facility, distorted reality) flavor
- * for the wheel event.
+ * doesn't exist in this repo — the templates below (one per EventType, with
+ * multiple HEAL variants for flavor/frequency) and the wheel odds/choice
+ * costs are invented for this change, themed after docs/worldview.md's
+ * "虛擬實境設施" (VR facility, distorted reality) flavor for the wheel event.
  */
 
 import { EventType } from '../../../shared/types/adventure';
@@ -35,6 +35,27 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
         weight: 25,
         description: '破損的醫療艙還殘留一些藥劑，你決定靠近查看。',
         healPercent: 20,
+    },
+    {
+        id: 'coolant_recovery_pool',
+        type: EventType.HEAL,
+        weight: 15,
+        description: '設施深處殘留的冷卻循環液散發溫熱氣息，你將傷處浸入其中緩解痛楚。',
+        healPercent: 15,
+    },
+    {
+        id: 'nanite_repair_pod',
+        type: EventType.HEAL,
+        weight: 12,
+        description: '半損壞的奈米修復艙自動啟動，銀色霧氣包裹住你的傷口。',
+        healPercent: 25,
+    },
+    {
+        id: 'emergency_stim_dispenser',
+        type: EventType.HEAL,
+        weight: 15,
+        description: '牆邊的緊急藥物噴劑系統偵測到你的生命徵象，自動注入合成腎上腺素。',
+        healPercent: 12,
     },
     {
         id: 'research_terminal',
