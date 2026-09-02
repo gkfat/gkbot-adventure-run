@@ -9,6 +9,7 @@ import {
 import { sumEquipmentStats } from './item.service';
 import { InventoryService } from './inventory.service';
 import { EquipmentService } from './equipment.service';
+import { ShopService } from './shop.service';
 import { InventoryRepository } from '../repositories/inventory.repository';
 import { AdventureRunRepository } from '../repositories/adventure-run.repository';
 import {
@@ -36,6 +37,7 @@ export class CharacterService extends BaseService {
     private equipmentService: EquipmentService;
     private inventoryRepo: InventoryRepository;
     private adventureRunRepo: AdventureRunRepository;
+    private shopService: ShopService;
 
     constructor() {
         super();
@@ -45,6 +47,7 @@ export class CharacterService extends BaseService {
         this.equipmentService = new EquipmentService();
         this.inventoryRepo = new InventoryRepository();
         this.adventureRunRepo = new AdventureRunRepository();
+        this.shopService = new ShopService();
     }
 
     /**
@@ -168,8 +171,10 @@ export class CharacterService extends BaseService {
      * items are released (their `items/{itemId}` documents are left intact —
      * only the character's `equipment` map and the character-owned
      * `inventories/{characterId}` reference list are removed, along with
-     * every adventure run the character has ever started) before the
-     * character document itself is removed.
+     * every adventure run the character has ever started, and its per-character
+     * shop documents — see ShopService.deleteShopsForCharacter, since once the
+     * character is gone the shop's own lazy-destroy on next generation will
+     * never run for it again) before the character document itself is removed.
      */
     async deleteCharacter(accountId: string, characterId: string): Promise<void> {
         const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
@@ -179,6 +184,7 @@ export class CharacterService extends BaseService {
 
         await this.adventureRunRepo.deleteAllByCharacterId(characterId);
         await this.inventoryRepo.delete(characterId);
+        await this.shopService.deleteShopsForCharacter(characterId);
         await this.characterRepo.delete(characterId);
     }
 

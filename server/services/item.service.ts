@@ -26,7 +26,8 @@ export const RARITY_ORDER: Rarity[] = [
 
 /**
  * Roll a rarity for the given template, weighted by `rarityWeights`.
- * When `context.maxRarity` is set, rarities above it are excluded before weighting.
+ * When `context.maxRarity`/`context.minRarity` are set, rarities outside that
+ * range are excluded before weighting.
  */
 export function rollRarity(templateId: string, context: ItemGenerationContext): Rarity {
     const template = getTemplateOrThrow(templateId);
@@ -34,9 +35,12 @@ export function rollRarity(templateId: string, context: ItemGenerationContext): 
     const maxRarityIndex = context.maxRarity
         ? RARITY_ORDER.indexOf(context.maxRarity)
         : RARITY_ORDER.length - 1;
+    const minRarityIndex = context.minRarity
+        ? RARITY_ORDER.indexOf(context.minRarity)
+        : 0;
 
     const eligibleRarities = RARITY_ORDER.filter(
-        (rarity, index) => index <= maxRarityIndex && template.rarityWeights[rarity] > 0,
+        (rarity, index) => index >= minRarityIndex && index <= maxRarityIndex && template.rarityWeights[rarity] > 0,
     );
 
     const totalWeight = eligibleRarities.reduce(
@@ -157,6 +161,29 @@ export function sumEquipmentStats(items: ItemInstance[], attributes: Attributes)
             dodgeChance: (acc.dodgeChance ?? 0) + dodgeChanceMod,
         };
     }, {});
+}
+
+/**
+ * Selling always pays out this fraction of the item's shop gold price
+ * (midpoint of its rarity's `priceRangeByRarity.gold` range) — half, so
+ * repeatedly buying-then-selling the same item is a net loss.
+ */
+const SELL_PRICE_RATIO = 0.5;
+
+/**
+ * Gold payout for selling an item back — half of its rarity's gold price
+ * midpoint. Every rarity has a `gold` range in `priceRangeByRarity` (SSR/L
+ * have one purely for this purpose, since their shop buy price is gems-only —
+ * see EQUIPMENT_PRICE_RANGE/POTION_PRICE_RANGE in constants/templates.ts).
+ */
+export function getSellPriceGold(templateId: string, rarity: Rarity): number {
+    const template = getTemplateOrThrow(templateId);
+    const goldRange = template.priceRangeByRarity[rarity]?.gold;
+    if (!goldRange) {
+        throw new NotFoundError(`gold price range for template '${templateId}' rarity ${rarity}`);
+    }
+    const midpoint = (goldRange.min + goldRange.max) / 2;
+    return Math.round(midpoint * SELL_PRICE_RATIO);
 }
 
 function getTemplateOrThrow(templateId: string): ItemTemplate {

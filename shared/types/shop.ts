@@ -9,8 +9,8 @@ import type { ItemInstance } from './item';
  * Shop type
  */
 export enum ShopType {
-  GOLD = 'GOLD',     // Gold shop (per-account)
-  GEMS = 'GEMS',     // Gems shop (global)
+  GOLD = 'GOLD',     // Gold shop (per-character)
+  GEMS = 'GEMS',     // Gems shop (per-character)
 }
 
 /**
@@ -22,29 +22,27 @@ export type ShopItem = {
   priceGold?: number;       // Gold price (if gold shop)
   priceGems?: number;       // Gems price (if gems shop)
   sold: boolean;            // Whether already purchased
-  purchasedBy?: string;     // AccountId of purchaser (for gold shop)
   purchasedAt?: Timestamp;  // Purchase timestamp
 };
 
 /**
- * Daily shop (gold shop - per account)
+ * Daily shop (gold shop - per character)
  */
 export type DailyGoldShop = {
-  accountId: string;
+  characterId: string;
   date: string;             // YYYY-MM-DD (UTC)
   items: ShopItem[];
   generatedAt: Timestamp;
-  seed: string;             // RNG seed for generation
 };
 
 /**
- * Daily shop (gems shop - global)
+ * Daily shop (gems shop - per character)
  */
 export type DailyGemsShop = {
+  characterId: string;
   date: string;             // YYYY-MM-DD (UTC)
   items: ShopItem[];
   generatedAt: Timestamp;
-  seed: string;             // RNG seed for generation
 };
 
 /**

@@ -86,6 +86,10 @@ const handleTap = (item: NavItem) => {
         navigateTo('/inventory');
         return;
     }
+    if (item.key === 'shop') {
+        navigateTo('/shop');
+        return;
+    }
     snackbarText.value = `${item.label}即將推出`;
     snackbar.value = true;
 };

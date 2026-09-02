@@ -48,10 +48,19 @@ const EQUIPMENT_PRICE_RANGE = {
         gems: {
             min: 30, max: 50,
         },
+        // Not used for shop purchase (gold shop caps at SR) — only for
+        // ItemService.getSellPriceGold(), since selling always pays gold
+        // regardless of the item's own buy-price currency.
+        gold: {
+            min: 1000, max: 1500,
+        },
     },
     [Rarity.L]: {
         gems: {
             min: 80, max: 120,
+        },
+        gold: {
+            min: 2500, max: 3500,
         },
     },
 };
@@ -81,10 +90,17 @@ const POTION_PRICE_RANGE = {
         gems: {
             min: 15, max: 25,
         },
+        // See EQUIPMENT_PRICE_RANGE's SSR/L comment — sell-only.
+        gold: {
+            min: 500, max: 750,
+        },
     },
     [Rarity.L]: {
         gems: {
             min: 30, max: 50,
+        },
+        gold: {
+            min: 1200, max: 1800,
         },
     },
 };

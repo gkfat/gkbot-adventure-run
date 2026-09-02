@@ -1,0 +1,299 @@
+<template>
+    <div class="fill-height shop-page pa-3">
+        <!-- 分頁：金幣商店 / 紅寶石商店 -->
+        <div class="d-flex ga-2 mb-3">
+            <SystemBtn
+                v-for="option in TAB_OPTIONS"
+                :key="option.key"
+                :variant="activeTab === option.key ? 'flat' : 'outlined'"
+                :color="activeTab === option.key ? 'primary' : undefined"
+                class="text-none flex-grow-0"
+                size="small"
+                @click="activeTab = option.key"
+            >
+                {{ option.label }}
+            </SystemBtn>
+        </div>
+
+        <!-- 讀取中 -->
+        <div
+            v-if="loading && !loaded"
+            class="d-flex flex-column align-center justify-center fill-height"
+        >
+            <v-progress-circular
+                indeterminate
+                color="green"
+                :size="56"
+                :width="5"
+                class="mb-4"
+            />
+            <div class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary)); opacity: 0.8;">
+                載入商店中
+            </div>
+        </div>
+
+        <!-- 取得失敗 -->
+        <div
+            v-else-if="currentError"
+            class="d-flex flex-column align-center justify-center fill-height px-6 text-center"
+        >
+            <v-icon
+                icon="mdi-alert-circle-outline"
+                size="40"
+                color="warning"
+                class="mb-3"
+            />
+            <div class="text-body-2 text-medium-emphasis mb-4">
+                {{ currentError }}
+            </div>
+            <SystemBtn
+                variant="outlined"
+                color="primary"
+                class="text-none flex-grow-0"
+                prepend-icon="mdi-refresh"
+                @click="loadCurrent"
+            >
+                重試
+            </SystemBtn>
+        </div>
+
+        <!-- 商品格狀清單，一列 3 格 -->
+        <div
+            v-else
+            class="shop-page__grid"
+        >
+            <button
+                v-for="slot in currentItems"
+                :key="slot.slotId"
+                type="button"
+                class="pixel-slot pixel-slot--item pixel-press"
+                :class="{ 'pixel-slot--sold': slot.sold }"
+                :style="{ borderColor: RARITY_COLOR[slot.item.rarity] }"
+                :disabled="slot.sold"
+                @click="openPurchase(slot)"
+            >
+                <span
+                    class="pixel-slot__rarity font-pixel"
+                    :style="{ background: RARITY_COLOR[slot.item.rarity] }"
+                >
+                    {{ slot.item.rarity }}
+                </span>
+                <GamePixelIcon
+                    :name="resolvePixelIcon(slot.item)"
+                    :size="32"
+                />
+                <span class="shop-page__name text-caption">
+                    {{ slot.item.name }}
+                </span>
+                <span
+                    v-if="primaryStatValue(slot.item)"
+                    class="shop-page__stat font-pixel"
+                    :style="{ color: RARITY_COLOR[slot.item.rarity] }"
+                >
+                    {{ primaryStatValue(slot.item) }}
+                </span>
+                <span class="shop-page__price font-pixel">
+                    <v-icon
+                        :icon="priceIcon"
+                        size="10"
+                        :style="priceIconStyle"
+                    />
+                    {{ activeTab === 'GOLD' ? slot.priceGold : slot.priceGems }}
+                </span>
+
+                <div
+                    v-if="slot.sold"
+                    class="pixel-slot__sold-badge font-pixel text-caption"
+                >
+                    已售出
+                </div>
+            </button>
+        </div>
+
+        <!-- 購買 dialog -->
+        <GameShopPurchaseDialog
+            ref="purchaseDialogRef"
+            :shop-type="activeTab"
+        />
+    </div>
+</template>
+
+<script setup lang="ts">
+import { RARITY_COLOR, resolvePixelIcon, primaryStatValue } from '../utils/equipmentDisplay';
+import type { ShopSlot, ShopType } from '../composables/useShop';
+
+definePageMeta({
+    middleware: ['auth'],
+    layout: 'game',
+});
+
+useHead({
+    title: '商店',
+    meta: [{ name: 'description', content: 'GkBot Adventure Run 商店頁面' }],
+});
+
+const TAB_OPTIONS: { key: ShopType; label: string }[] = [
+    { key: 'GOLD', label: '金幣商店' },
+    { key: 'GEMS', label: '紅寶石商店' },
+];
+
+const activeTab = ref<ShopType>('GOLD');
+
+const {
+    goldItems, gemsItems,
+    goldLoading, gemsLoading,
+    goldLoaded, gemsLoaded,
+    goldError, gemsError,
+    fetchGoldShop, fetchGemsShop,
+} = useShop();
+
+const currentItems = computed(() => {
+    const items = activeTab.value === 'GOLD' ? goldItems.value : gemsItems.value;
+    const priceOf = (slot: ShopSlot) => (activeTab.value === 'GOLD' ? slot.priceGold : slot.priceGems) ?? 0;
+    return [...items].sort((a, b) => priceOf(b) - priceOf(a));
+});
+const loading = computed(() => (activeTab.value === 'GOLD' ? goldLoading.value : gemsLoading.value));
+const loaded = computed(() => (activeTab.value === 'GOLD' ? goldLoaded.value : gemsLoaded.value));
+const currentError = computed(() => (activeTab.value === 'GOLD' ? goldError.value : gemsError.value));
+
+const priceIcon = computed(() => (activeTab.value === 'GOLD' ? 'mdi-circle-multiple' : 'mdi-diamond-stone'));
+const priceIconStyle = computed(() => (
+    activeTab.value === 'GOLD' ? { color: '#e0c063' } : { color: 'rgb(var(--v-theme-primary))' }
+));
+
+// eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
+type PurchaseDialog = { open: (slot: ShopSlot) => void };
+const purchaseDialogRef = ref<PurchaseDialog | null>(null);
+
+const openPurchase = (slot: ShopSlot) => {
+    if (slot.sold) return;
+    purchaseDialogRef.value?.open(slot);
+};
+
+const loadCurrent = () => {
+    if (activeTab.value === 'GOLD') {
+        if (!goldLoaded.value) fetchGoldShop();
+    } else if (!gemsLoaded.value) {
+        fetchGemsShop();
+    }
+};
+
+watch(activeTab, loadCurrent);
+onMounted(loadCurrent);
+</script>
+
+<style scoped lang="scss">
+.shop-page {
+    width: 100%;
+    overflow-y: auto;
+
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+
+    &__name {
+        max-width: 100%;
+        padding: 0 4px;
+        font-size: 10px;
+        line-height: 1.2;
+        text-align: center;
+        color: rgb(var(--v-theme-primary));
+    }
+
+    &__stat {
+        font-size: 9px;
+    }
+
+    &__price {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 9px;
+        color: rgb(var(--v-theme-secondary));
+    }
+}
+
+.pixel-slot {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    min-width: 0;
+    padding: 8px 2px 6px;
+    border: 2px solid rgba(196, 203, 219, 0.25);
+    border-radius: 3px;
+    background: #14171c;
+    color: rgb(var(--v-theme-primary));
+    cursor: pointer;
+    box-shadow:
+        inset 2px 2px 0 rgba(255, 255, 255, 0.06),
+        inset -2px -2px 0 rgba(0, 0, 0, 0.55);
+    transition: transform 0.06s ease-out;
+
+    &:hover:not(:disabled) {
+        transform: translateY(-1px);
+    }
+
+    &:focus-visible {
+        outline: 2px solid rgb(var(--v-theme-primary));
+        outline-offset: 2px;
+    }
+
+    &::before,
+    &::after {
+        content: '';
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        pointer-events: none;
+        opacity: 0.55;
+    }
+
+    &::before {
+        top: -2px;
+        left: -2px;
+        border-top: 2px solid rgb(var(--v-theme-primary));
+        border-left: 2px solid rgb(var(--v-theme-primary));
+    }
+
+    &::after {
+        bottom: -2px;
+        right: -2px;
+        border-bottom: 2px solid rgb(var(--v-theme-primary));
+        border-right: 2px solid rgb(var(--v-theme-primary));
+    }
+
+    &--sold {
+        cursor: default;
+        opacity: 0.4;
+    }
+
+    &__rarity {
+        position: absolute;
+        top: -6px;
+        left: -6px;
+        padding: 0 2px;
+        font-size: 7px;
+        line-height: 1.4;
+        color: #14171c;
+        border-radius: 2px;
+        white-space: nowrap;
+    }
+
+    &__sold-badge {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        background: rgba(0, 0, 0, 0.55);
+        color: rgb(var(--v-theme-secondary));
+    }
+}
+</style>

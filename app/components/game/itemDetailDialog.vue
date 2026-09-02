@@ -56,11 +56,11 @@
             </div>
 
             <div
-                v-if="equipActionError"
+                v-if="equipActionError || sellError"
                 class="text-body-2 mb-3"
                 style="color: rgb(var(--v-theme-warning));"
             >
-                {{ equipActionError }}
+                {{ equipActionError || sellError }}
             </div>
 
             <SystemBtn
@@ -76,6 +76,18 @@
             </SystemBtn>
 
             <SystemBtn
+                v-if="!isEquipped(item)"
+                block
+                variant="outlined"
+                color="warning"
+                class="text-none mb-2"
+                :loading="sellLoading"
+                @click="handleSell(item)"
+            >
+                販售(+{{ item.sellPriceGold }}金幣)
+            </SystemBtn>
+
+            <SystemBtn
                 block
                 variant="outlined"
                 color="primary"
@@ -85,6 +97,15 @@
                 關閉
             </SystemBtn>
         </div>
+
+        <v-snackbar
+            v-model="soldSnackbar"
+            timeout="1600"
+            location="top"
+            color="dark"
+        >
+            {{ soldSnackbarText }}
+        </v-snackbar>
     </v-dialog>
 </template>
 
@@ -97,13 +118,19 @@ import type { EquipmentSlot } from '../../../shared/types/common';
 const {
     character, equipItem, unequipItem,
 } = useCharacter();
+const {
+    sellItem, sellLoading, sellError,
+} = useInventory();
 
 const open = ref(false);
-const item = ref<ItemLike & { itemId: string } | null>(null);
+const item = ref<ItemLike & { itemId: string; sellPriceGold: number } | null>(null);
 const detailInfo = computed(() => (item.value ? describeItem(item.value) : null));
 
 const equipActionLoading = ref(false);
 const equipActionError = ref<string | null>(null);
+
+const soldSnackbar = ref(false);
+const soldSnackbarText = ref('');
 
 const isEquipped = (target: { itemId: string }) => (
     Object.values(character.value?.equipment ?? {}).includes(target.itemId)
@@ -114,7 +141,7 @@ const findEquippedSlot = (target: { itemId: string }): EquipmentSlot | undefined
     return entry?.[0] as EquipmentSlot | undefined;
 };
 
-const handleEquip = async (target: ItemLike & { itemId: string }) => {
+const handleEquip = async (target: ItemLike & { itemId: string; sellPriceGold: number }) => {
     equipActionLoading.value = true;
     equipActionError.value = null;
 
@@ -129,7 +156,7 @@ const handleEquip = async (target: ItemLike & { itemId: string }) => {
     }
 };
 
-const handleUnequip = async (target: ItemLike & { itemId: string }) => {
+const handleUnequip = async (target: ItemLike & { itemId: string; sellPriceGold: number }) => {
     const slot = findEquippedSlot(target);
     if (!slot) return;
 
@@ -146,8 +173,17 @@ const handleUnequip = async (target: ItemLike & { itemId: string }) => {
     }
 };
 
+const handleSell = async (target: ItemLike & { itemId: string; sellPriceGold: number }) => {
+    const goldEarned = await sellItem(target.itemId);
+    if (goldEarned !== null) {
+        open.value = false;
+        soldSnackbarText.value = `已販售，獲得 ${goldEarned} 金幣`;
+        soldSnackbar.value = true;
+    }
+};
+
 defineExpose({
-    open: (target: ItemLike & { itemId: string }) => {
+    open: (target: ItemLike & { itemId: string; sellPriceGold: number }) => {
         item.value = target;
         equipActionError.value = null;
         open.value = true;

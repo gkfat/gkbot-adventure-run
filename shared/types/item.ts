@@ -50,6 +50,7 @@ export type ItemStats = {
 export type ItemGenerationContext = {
   source: ItemSource;
   maxRarity?: Rarity; // Caps the roll to this rarity or lower (e.g. shop tier limits)
+  minRarity?: Rarity; // Floors the roll to this rarity or higher (e.g. gems shop tier limits)
 };
 
 /**

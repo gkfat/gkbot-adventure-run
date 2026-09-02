@@ -20,6 +20,7 @@ interface InventoryItem {
     source: 'DROP' | 'SHOP' | 'EVENT';
     characterId: string;
     createdAt: number;
+    sellPriceGold: number;
 }
 
 interface GetInventoryResponse {
@@ -37,6 +38,8 @@ const maxCount = ref(500);
 const loading = ref(false);
 const loaded = ref(false);
 const error = ref<string | null>(null);
+const sellLoading = ref(false);
+const sellError = ref<string | null>(null);
 
 /**
  * Permanent Inventory Composable
@@ -80,6 +83,36 @@ export const useInventory = () => {
     };
 
     /**
+     * 販售背包內一件物品換取金幣；成功後從本地清單移除該物品、重新整理角色資料
+     * （更新金幣顯示），回傳實際獲得的金幣數（失敗回傳 null）。裝備中的物品無法販售。
+     */
+    const sellItem = async (itemId: string): Promise<number | null> => {
+        if (!selectedCharacterId.value) return null;
+
+        sellLoading.value = true;
+        sellError.value = null;
+
+        try {
+            const response = await api.post<{ success: boolean; data: { goldEarned: number } }>(
+                `/api/character/${selectedCharacterId.value}/inventory/${itemId}/sell`,
+            );
+            items.value = items.value.filter(item => item.itemId !== itemId);
+            count.value = Math.max(0, count.value - 1);
+
+            const { fetchCharacter } = useCharacter();
+            await fetchCharacter();
+
+            return response.data.goldEarned;
+        } catch (err: any) {
+            console.error('[useInventory] Failed to sell item:', err);
+            sellError.value = err.message || '販售失敗';
+            return null;
+        } finally {
+            sellLoading.value = false;
+        }
+    };
+
+    /**
      * 標記本地快取為過期（保留現有 items 供畫面繼續顯示，不清空），下次
      * `onMounted` 檢查 `loaded` 時就會重新 fetch。用於背包內容可能已在背景
      * 被更動之後（例如冒險結算把掉落道具寫入永久背包），確保下次進入背包頁
@@ -99,6 +132,8 @@ export const useInventory = () => {
         loaded.value = false;
         error.value = null;
         loading.value = false;
+        sellLoading.value = false;
+        sellError.value = null;
     };
 
     return {
@@ -108,8 +143,11 @@ export const useInventory = () => {
         loading: computed(() => loading.value),
         loaded: computed(() => loaded.value),
         error: computed(() => error.value),
+        sellLoading: computed(() => sellLoading.value),
+        sellError: computed(() => sellError.value),
         fetchInventory,
         itemById,
+        sellItem,
         invalidate,
         reset,
     };

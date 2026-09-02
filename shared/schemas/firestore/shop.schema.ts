@@ -14,29 +14,27 @@ export const shopItemSchema = z.object({
     priceGold: z.number().int().min(0).optional(),
     priceGems: z.number().int().min(0).optional(),
     sold: z.boolean(),
-    purchasedBy: z.string().optional(),
     purchasedAt: z.number().optional(),
 }).strict();
 
 /**
- * Daily gold shop schema (per-account)
+ * Daily gold shop schema (per-character)
  */
 export const dailyGoldShopSchema = z.object({
-    accountId: z.string(),
+    characterId: z.string(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
     items: z.array(shopItemSchema),
     generatedAt: z.number(),
-    seed: z.string(),
 }).strict();
 
 /**
- * Daily gems shop schema (global)
+ * Daily gems shop schema (per-character)
  */
 export const dailyGemsShopSchema = z.object({
+    characterId: z.string(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
     items: z.array(shopItemSchema),
     generatedAt: z.number(),
-    seed: z.string(),
 }).strict();
 
 export type ShopItem = z.infer<typeof shopItemSchema>;

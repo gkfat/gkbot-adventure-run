@@ -22,3 +22,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 新增負重系統，角色力量與體質決定能承受多少裝備重量帶來的影響
 - 裝備系統新增稀有度設計
 - 實作選擇角色初始裝備與刪除角色功能
+- 實作商店功能

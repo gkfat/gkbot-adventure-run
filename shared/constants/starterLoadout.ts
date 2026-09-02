@@ -8,7 +8,9 @@
  * The potion is the same for every archetype.
  */
 
-import { EquipmentSlot, Rarity } from '../types/common';
+import {
+    EquipmentSlot, Rarity, 
+} from '../types/common';
 import { ItemType } from '../types/item';
 
 export const STARTER_POTION_TEMPLATE_ID = 'engine_oil_basic';

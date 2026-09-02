@@ -240,10 +240,10 @@ const isEquipped = (item: { itemId: string }) => (
 );
 
 // eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
-type ItemDetailDialog = { open: (item: ItemLike & { itemId: string }) => void };
+type ItemDetailDialog = { open: (item: ItemLike & { itemId: string; sellPriceGold: number }) => void };
 const itemDetailDialogRef = ref<ItemDetailDialog | null>(null);
 
-const openDetail = (item: ItemLike & { itemId: string }) => {
+const openDetail = (item: ItemLike & { itemId: string; sellPriceGold: number }) => {
     itemDetailDialogRef.value?.open(item);
 };
 

@@ -2,7 +2,7 @@ import {
     describe, it, expect, vi, afterEach,
 } from 'vitest';
 import {
-    rollRarity, rollStats, generateItemInstance, sumEquipmentStats,
+    rollRarity, rollStats, generateItemInstance, sumEquipmentStats, getSellPriceGold,
 } from './item.service';
 import { getItemTemplate } from '../constants/templates';
 import {
@@ -220,5 +220,33 @@ describe('sumEquipmentStats', () => {
         }));
 
         expect(lowCarry.actionIntervalSec).toBeCloseTo(highCarry.actionIntervalSec as number);
+    });
+});
+
+describe('getSellPriceGold', () => {
+    it('returns half of the rarity\'s gold price midpoint for a normal (N) equipment item', () => {
+        // salvaged_wrench N gold range is 100-200 (EQUIPMENT_PRICE_RANGE) -> midpoint 150 * 0.5 = 75
+        expect(getSellPriceGold('salvaged_wrench', Rarity.N)).toBe(75);
+    });
+
+    it('returns a gold payout for SSR/L items even though their shop buy price is gems-only', () => {
+        expect(getSellPriceGold('salvaged_wrench', Rarity.SSR)).toBeGreaterThan(0);
+        expect(getSellPriceGold('salvaged_wrench', Rarity.L)).toBeGreaterThan(0);
+    });
+
+    it('sell price increases with rarity', () => {
+        const n = getSellPriceGold('salvaged_wrench', Rarity.N);
+        const r = getSellPriceGold('salvaged_wrench', Rarity.R);
+        const sr = getSellPriceGold('salvaged_wrench', Rarity.SR);
+        const ssr = getSellPriceGold('salvaged_wrench', Rarity.SSR);
+        const l = getSellPriceGold('salvaged_wrench', Rarity.L);
+        expect(n).toBeLessThan(r);
+        expect(r).toBeLessThan(sr);
+        expect(sr).toBeLessThan(ssr);
+        expect(ssr).toBeLessThan(l);
+    });
+
+    it('throws for an unknown template', () => {
+        expect(() => getSellPriceGold('not_a_real_template', Rarity.N)).toThrow();
     });
 });

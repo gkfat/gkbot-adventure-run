@@ -2,14 +2,12 @@ import {
     defineEventHandler, getRouterParam,
 } from 'h3';
 import { requireAuth } from '../../../../utils/auth';
-import { InventoryService } from '../../../../services/inventory.service';
-import { getSellPriceGold } from '../../../../services/item.service';
+import { ShopService } from '../../../../services/shop.service';
 import { CharacterRepository } from '../../../../repositories/character.repository';
-import { RESOURCE_LIMITS } from '../../../../../shared/types/common';
-import { getInventoryResponseSchema } from '../../../../../shared/schemas/api/inventory.schema';
+import { getGemsShopResponseSchema } from '../../../../../shared/schemas/api/shop.schema';
 import { toH3Error } from '../../../../utils/errorHandler';
 import {
-    NotFoundError, ValidationError, 
+    AppError, NotFoundError, ValidationError,
 } from '../../../../../shared/types/errors';
 import { logRequest } from '../../../../utils/logger';
 
@@ -31,19 +29,12 @@ export default defineEventHandler(async (event) => {
             throw new NotFoundError('character');
         }
 
-        const inventoryService = new InventoryService();
-        const {
-            inventory, items,
-        } = await inventoryService.getInventoryWithItems(characterId);
-
-        const itemsWithSellPrice = items.map(item => ({
-            ...item,
-            sellPriceGold: getSellPriceGold(item.templateId, item.rarity),
-        }));
+        const shopService = new ShopService();
+        const shop = await shopService.getOrGenerateGemsShop(characterId);
 
         logRequest({
             severity: 'INFO',
-            message: 'Inventory retrieved',
+            message: 'Gems shop retrieved',
             method: event.method,
             path: event.path,
             status: 200,
@@ -55,20 +46,19 @@ export default defineEventHandler(async (event) => {
         const response = {
             success: true,
             data: {
-                items: itemsWithSellPrice,
-                count: inventory.items.length,
-                maxCount: RESOURCE_LIMITS.INVENTORY_PERMANENT_MAX,
+                date: shop.date,
+                items: shop.items,
             },
         };
 
-        return getInventoryResponseSchema.parse(response);
-    } catch (error: any) {
+        return getGemsShopResponseSchema.parse(response);
+    } catch (error: unknown) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to get inventory',
+            message: 'Failed to get gems shop',
             method: event.method,
             path: event.path,
-            status: error.statusCode || 500,
+            status: error instanceof AppError ? error.statusCode : 500,
             durationMs: Date.now() - startTime,
             requestId,
             error,

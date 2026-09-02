@@ -7,7 +7,7 @@ import { CharacterService } from './character.service';
 const {
     listByAccountIdMock, createCharacterFromArchetypeMock, getByIdForAccountMock, characterDeleteMock,
     grantItemMock, equipItemMock,
-    inventoryDeleteMock, deleteAllByCharacterIdMock,
+    inventoryDeleteMock, deleteAllByCharacterIdMock, deleteShopsForCharacterMock,
 } = vi.hoisted(() => ({
     listByAccountIdMock: vi.fn(),
     createCharacterFromArchetypeMock: vi.fn(),
@@ -17,6 +17,7 @@ const {
     equipItemMock: vi.fn(),
     inventoryDeleteMock: vi.fn(),
     deleteAllByCharacterIdMock: vi.fn(),
+    deleteShopsForCharacterMock: vi.fn(),
 }));
 
 vi.mock('../repositories/character.repository', () => ({
@@ -58,6 +59,12 @@ vi.mock('./inventory.service', () => ({
 vi.mock('./equipment.service', () => ({
     EquipmentService: vi.fn().mockImplementation(function EquipmentServiceMock() {
         return { equipItem: equipItemMock };
+    }),
+}));
+
+vi.mock('./shop.service', () => ({
+    ShopService: vi.fn().mockImplementation(function ShopServiceMock() {
+        return { deleteShopsForCharacter: deleteShopsForCharacterMock };
     }),
 }));
 
@@ -189,6 +196,7 @@ describe('CharacterService.deleteCharacter', () => {
         characterDeleteMock.mockReset();
         inventoryDeleteMock.mockReset();
         deleteAllByCharacterIdMock.mockReset();
+        deleteShopsForCharacterMock.mockReset();
     });
 
     it('rejects deleting a character that does not belong to the caller', async () => {
@@ -199,11 +207,12 @@ describe('CharacterService.deleteCharacter', () => {
         expect(characterDeleteMock).not.toHaveBeenCalled();
         expect(inventoryDeleteMock).not.toHaveBeenCalled();
         expect(deleteAllByCharacterIdMock).not.toHaveBeenCalled();
+        expect(deleteShopsForCharacterMock).not.toHaveBeenCalled();
     });
 
-    it('deletes adventure runs, the inventory reference list, then the character document — without touching item documents', async () => {
+    it('deletes adventure runs, the inventory reference list, the shop documents, then the character document — without touching item documents', async () => {
         getByIdForAccountMock.mockResolvedValue({
-            characterId: 'char-1', accountId: 'account-1', 
+            characterId: 'char-1', accountId: 'account-1',
         });
         const service = new CharacterService();
 
@@ -211,6 +220,7 @@ describe('CharacterService.deleteCharacter', () => {
 
         expect(deleteAllByCharacterIdMock).toHaveBeenCalledWith('char-1');
         expect(inventoryDeleteMock).toHaveBeenCalledWith('char-1');
+        expect(deleteShopsForCharacterMock).toHaveBeenCalledWith('char-1');
         expect(characterDeleteMock).toHaveBeenCalledWith('char-1');
     });
 });

@@ -53,11 +53,19 @@ import {
 import {
     getInventoryResponseSchema,
     deleteItemResponseSchema,
+    sellItemResponseSchema,
     equipItemRequestSchema,
     equipItemResponseSchema,
     unequipItemRequestSchema,
     unequipItemResponseSchema,
 } from '../../shared/schemas/api/inventory.schema';
+
+import {
+    getGoldShopResponseSchema,
+    getGemsShopResponseSchema,
+    purchaseItemRequestSchema,
+    purchaseItemResponseSchema,
+} from '../../shared/schemas/api/shop.schema';
 
 // Extend Zod with OpenAPI methods
 extendZodWithOpenApi(z);
@@ -113,10 +121,15 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         RestHealResponse: restHealResponseSchema,
         GetInventoryResponse: getInventoryResponseSchema,
         DeleteItemResponse: deleteItemResponseSchema,
+        SellItemResponse: sellItemResponseSchema,
         EquipItemRequest: equipItemRequestSchema,
         EquipItemResponse: equipItemResponseSchema,
         UnequipItemRequest: unequipItemRequestSchema,
         UnequipItemResponse: unequipItemResponseSchema,
+        GetGoldShopResponse: getGoldShopResponseSchema,
+        GetGemsShopResponse: getGemsShopResponseSchema,
+        PurchaseItemRequest: purchaseItemRequestSchema,
+        PurchaseItemResponse: purchaseItemResponseSchema,
         ErrorResponse: errorResponseSchema,
     };
 
@@ -421,9 +434,121 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
     });
 
     registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/inventory/{itemId}/sell',
+        description: 'Sell an item from a character\'s inventory for gold (half of its rarity\'s shop gold price; cannot be undone; fails if the item is currently equipped)',
+        tags: ['Inventory'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({
+                characterId: z.string(), itemId: z.string(),
+            }),
+        },
+        responses: {
+            200: {
+                description: 'Item sold',
+                content: { 'application/json': { schema: sellItemResponseSchema } },
+            },
+            400: {
+                description: 'Item is currently equipped',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found, or item not found in the character\'s inventory',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    // Register Shop Endpoints
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}/shop/gold',
+        description: 'Get the character\'s daily gold shop (N/R/SR items, priced in gold), lazily generating it if today\'s shop doesn\'t exist yet',
+        tags: ['Shop'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Gold shop retrieved',
+                content: { 'application/json': { schema: getGoldShopResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}/shop/gems',
+        description: 'Get the character\'s daily gems shop (SR/SSR/L items, priced in gems), lazily generating it if today\'s shop doesn\'t exist yet',
+        tags: ['Shop'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Gems shop retrieved',
+                content: { 'application/json': { schema: getGemsShopResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/shop/purchase',
+        description: 'Purchase an unsold shop slot: deducts gold/gems, marks the slot sold, and delivers the item that was already rolled at shop-generation time into the character\'s permanent inventory (and equipment slot, if destination is EQUIP)',
+        tags: ['Shop'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: purchaseItemRequestSchema } } },
+        },
+        responses: {
+            200: {
+                description: 'Item purchased',
+                content: { 'application/json': { schema: purchaseItemResponseSchema } },
+            },
+            400: {
+                description: 'Insufficient gold/gems, inventory full, or item is not equipment (EQUIP destination)',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found, shop not generated yet, or shop slot not found',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            409: {
+                description: 'Shop slot already sold',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
         method: 'delete',
         path: '/api/character/{characterId}',
-        description: 'Permanently delete a character (must belong to the caller). Equipped/inventory item documents are left intact — only the character\'s equipment map, its inventory reference list, and all of its adventure runs are removed.',
+        description: 'Permanently delete a character (must belong to the caller). Equipped/inventory item documents are left intact — only the character\'s equipment map, its inventory reference list, all of its adventure runs, and its per-character shop documents are removed.',
         tags: ['Character'],
         security: [{ bearerAuth: [] }],
         request: { params: z.object({ characterId: z.string() }) },
