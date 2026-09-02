@@ -11,14 +11,12 @@ import { BaseService } from './base.service';
 import { CharacterService } from './character.service';
 import { RngService } from './rng.service';
 import { BlessingService } from './blessing.service';
-import {
-    EVENT_TEMPLATES, pickEventTemplate, type EventTemplate,
-    WHEEL_GEMS_CHANCE, WHEEL_GEMS_MIN, WHEEL_GEMS_MAX, WHEEL_GOLD_CHANCE, WHEEL_RISK_CURSE_CHANCE,
-} from '../constants/events';
 import { CURSE_TEMPLATES } from '../../shared/constants/blessings';
 import { generateItemInstance } from './item.service';
 import {
-    getItemTemplate, ITEM_TEMPLATES, 
+    EVENT_TEMPLATES, pickEventTemplate, type EventTemplate,
+    WHEEL_GEMS_CHANCE, WHEEL_GEMS_MIN, WHEEL_GEMS_MAX, WHEEL_GOLD_CHANCE, WHEEL_RISK_CURSE_CHANCE,
+    getItemTemplate, ITEM_TEMPLATES,
 } from '../constants/templates';
 import {
     ItemType, ItemSource, 

@@ -3,7 +3,7 @@ import {
 } from 'vitest';
 import {
     getSeverityChances, rollSeverityTier, rollFactionType, SEVERITY_CONFIG,
-} from '../../shared/types/adventure';
+} from './adventure';
 
 describe('getSeverityChances', () => {
     it('increases HIGHLY_ACTIVE/PARTIAL_ACTIVE chance with chapterIndex, but caps it', () => {

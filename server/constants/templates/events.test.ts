@@ -1,8 +1,8 @@
 import {
-    describe, it, expect, 
+    describe, it, expect,
 } from 'vitest';
 import {
-    pickEventTemplate, EVENT_TEMPLATES, 
+    pickEventTemplate, EVENT_TEMPLATES,
 } from './events';
 
 describe('pickEventTemplate', () => {

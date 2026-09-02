@@ -1,14 +1,11 @@
 /**
- * Game data templates (items, quests, achievements, etc.)
- * These are static definitions loaded into memory
+ * Item templates (equipment/potion static definitions)
  */
 
-import type {
-    ItemTemplate, QuestTemplate, AchievementTemplate, 
-} from '../../shared/types';
+import type { ItemTemplate } from '../../../shared/types';
 import {
-    ItemType, EquipmentSlot, Rarity, WeaponWeightClass, QuestType, AchievementType,
-} from '../../shared/types';
+    ItemType, EquipmentSlot, Rarity, WeaponWeightClass,
+} from '../../../shared/types';
 
 /**
  * Shared rarity weight curve for all equipment/potion templates below
@@ -579,79 +576,6 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
 };
 
 /**
- * Quest templates
- * TODO: Expand with actual quest definitions
- */
-export const QUEST_TEMPLATES: Record<string, QuestTemplate> = {
-    'complete_run': {
-        templateId: 'complete_run',
-        type: QuestType.COMPLETE_RUN,
-        name: 'Complete Adventure',
-        description: 'Complete 1 adventure run',
-        targetCount: 1,
-        rewardGold: 50,
-        rewardGems: 1,
-    },
-    'kill_10_enemies': {
-        templateId: 'kill_10_enemies',
-        type: QuestType.KILL_ENEMIES,
-        name: 'Monster Slayer',
-        description: 'Kill 10 enemies',
-        targetCount: 10,
-        rewardGold: 30,
-        rewardGems: 0,
-    },
-    'purchase_item': {
-        templateId: 'purchase_item',
-        type: QuestType.PURCHASE_SHOP,
-        name: 'Shopping Spree',
-        description: 'Purchase 1 item from shop',
-        targetCount: 1,
-        rewardGold: 20,
-        rewardGems: 0,
-    },
-};
-
-/**
- * Achievement templates
- * TODO: Expand with actual achievement definitions
- */
-export const ACHIEVEMENT_TEMPLATES: Record<string, AchievementTemplate> = {
-    'first_blood': {
-        templateId: 'first_blood',
-        type: AchievementType.TOTAL_KILLS,
-        name: 'First Blood',
-        description: 'Kill your first enemy',
-        targetCount: 1,
-        rewardGems: 3,
-    },
-    'monster_hunter': {
-        templateId: 'monster_hunter',
-        type: AchievementType.TOTAL_KILLS,
-        name: 'Monster Hunter',
-        description: 'Kill 100 enemies',
-        targetCount: 100,
-        rewardGems: 5,
-    },
-    'adventurer': {
-        templateId: 'adventurer',
-        type: AchievementType.TOTAL_RUNS,
-        name: 'Adventurer',
-        description: 'Complete 10 adventure runs',
-        targetCount: 10,
-        rewardGems: 5,
-    },
-    'high_score': {
-        templateId: 'high_score',
-        type: AchievementType.MAX_SCORE,
-        name: 'High Scorer',
-        description: 'Reach 10,000 score in a single run',
-        targetCount: 10000,
-        rewardGems: 5,
-    },
-};
-
-/**
  * Get all item templates as array
  */
 export function getAllItemTemplates(): ItemTemplate[] {
@@ -663,32 +587,4 @@ export function getAllItemTemplates(): ItemTemplate[] {
  */
 export function getItemTemplate(templateId: string): ItemTemplate | undefined {
     return ITEM_TEMPLATES[templateId];
-}
-
-/**
- * Get all quest templates as array
- */
-export function getAllQuestTemplates(): QuestTemplate[] {
-    return Object.values(QUEST_TEMPLATES);
-}
-
-/**
- * Get quest template by ID
- */
-export function getQuestTemplate(templateId: string): QuestTemplate | undefined {
-    return QUEST_TEMPLATES[templateId];
-}
-
-/**
- * Get all achievement templates as array
- */
-export function getAllAchievementTemplates(): AchievementTemplate[] {
-    return Object.values(ACHIEVEMENT_TEMPLATES);
-}
-
-/**
- * Get achievement template by ID
- */
-export function getAchievementTemplate(templateId: string): AchievementTemplate | undefined {
-    return ACHIEVEMENT_TEMPLATES[templateId];
 }

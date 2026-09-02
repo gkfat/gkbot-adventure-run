@@ -20,10 +20,12 @@ import {
 } from '../constants/difficulty';
 import {
     ENEMY_ARCHETYPES, HUMAN_ARCHETYPES, GKBOT_BOSS_ARCHETYPES, HUMAN_BOSS_ARCHETYPES,
+    type EnemyArchetype,
+} from '../constants/templates/enemies';
+import {
     ENEMY_COMBAT_STATS, BOSS_REINFORCE_CONFIG,
     expForKill, goldForKill, applyLuckToGold, itemDropChance,
     blessingPointsForVictory, maxDropRarity, gemsDropTier, DROP_ITEM_CONTEXT,
-    type EnemyArchetype,
 } from '../constants/combat';
 import { generateItemInstance } from './item.service';
 import {

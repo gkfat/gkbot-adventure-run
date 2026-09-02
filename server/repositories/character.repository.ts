@@ -23,7 +23,7 @@ import {
 } from '../../shared/types/common';
 import {
     LEGACY_ARCHETYPE_ID, LEGACY_CLASS_NAME, type CharacterArchetype,
-} from '../constants/characterArchetypes';
+} from '../constants/templates/characterArchetypes';
 import { random } from '../services/rng.service';
 
 export const CHARACTER_ROSTER_MAX = 3;

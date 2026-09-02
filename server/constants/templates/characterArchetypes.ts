@@ -3,7 +3,7 @@
  * Attribute totals are fixed at 8 across all archetypes so they stay comparable.
  */
 
-import type { Attributes } from '../../shared/types/common';
+import type { Attributes } from '../../../shared/types/common';
 
 export type CharacterArchetype = {
     archetypeId: string;

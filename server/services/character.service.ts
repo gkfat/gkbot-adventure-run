@@ -14,7 +14,7 @@ import { InventoryRepository } from '../repositories/inventory.repository';
 import { AdventureRunRepository } from '../repositories/adventure-run.repository';
 import {
     SELECTABLE_CHARACTER_ARCHETYPES, getArchetypeById,
-} from '../constants/characterArchetypes';
+} from '../constants/templates/characterArchetypes';
 import {
     getStarterEquipmentTemplateId, STARTER_POTION_TEMPLATE_ID,
 } from '../../shared/constants/starterLoadout';

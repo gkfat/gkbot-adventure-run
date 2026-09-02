@@ -9,7 +9,7 @@
  * for the wheel event.
  */
 
-import { EventType } from '../../shared/types/adventure';
+import { EventType } from '../../../shared/types/adventure';
 
 export type EventChoiceDefinition = {
     label: string;
@@ -63,7 +63,7 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
             {
                 label: '強行打開', kind: 'RISK', goldOnSuccess: 30, riskCurseOnFailure: true,
             }, {
-                label: '留下箱子離開', kind: 'SAFE', goldOnSuccess: 5, 
+                label: '留下箱子離開', kind: 'SAFE', goldOnSuccess: 5,
             },
         ],
     },

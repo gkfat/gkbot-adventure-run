@@ -7,7 +7,7 @@ import {
 import { getStatMultipliers } from '../constants/difficulty';
 import {
     ENEMY_ARCHETYPES, HUMAN_ARCHETYPES, GKBOT_BOSS_ARCHETYPES, HUMAN_BOSS_ARCHETYPES,
-} from '../constants/combat';
+} from '../constants/templates/enemies';
 import {
     AdventureStateType, NodeType, type AdventureRun, type CombatContext, type RunModifier,
 } from '../../shared/types/adventure';
