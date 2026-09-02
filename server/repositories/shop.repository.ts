@@ -11,9 +11,10 @@
  * nested transactions.
  */
 
+import type { CollectionReference } from 'firebase-admin/firestore';
 import { BaseRepository } from './base.repository';
 import type {
-    DailyGoldShop, DailyGemsShop, 
+    DailyGoldShop, DailyGemsShop,
 } from '../../shared/types/shop';
 import { DatabaseError } from '../../shared/types/errors';
 
@@ -93,6 +94,40 @@ export class ShopRepository extends BaseRepository<DailyGoldShop> {
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Unknown error';
             throw new DatabaseError(`Failed to delete gems shop: ${message}`);
+        }
+    }
+
+    /**
+     * Delete every gold shop document for this character other than
+     * `keepDate` (today's, just generated) — not just "yesterday's", so a
+     * character that skips several days still has every stale, unsold-item
+     * shop document cleaned up instead of only the single most recent one.
+     */
+    async deleteOldGoldShops(characterId: string, keepDate: string): Promise<void> {
+        await this.deleteOldShops(this.collection, characterId, keepDate, 'gold shop');
+    }
+
+    async deleteOldGemsShops(characterId: string, keepDate: string): Promise<void> {
+        await this.deleteOldShops(this.gemsCollection, characterId, keepDate, 'gems shop');
+    }
+
+    private async deleteOldShops(
+        collection: CollectionReference,
+        characterId: string,
+        keepDate: string,
+        label: string,
+    ): Promise<void> {
+        try {
+            const snapshot = await collection.where('characterId', '==', characterId).get();
+            const stale = snapshot.docs.filter(doc => doc.get('date') !== keepDate);
+            if (stale.length === 0) return;
+
+            const batch = this.db.batch();
+            stale.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new DatabaseError(`Failed to delete old ${label}s: ${message}`);
         }
     }
 }

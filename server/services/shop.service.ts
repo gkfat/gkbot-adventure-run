@@ -64,7 +64,8 @@ export class ShopService extends BaseService {
 
     /**
      * Get today's gold shop for a character, generating it (and best-effort
-     * deleting yesterday's document) if it doesn't exist yet.
+     * deleting every other, stale shop document for this character) if it
+     * doesn't exist yet.
      */
     async getOrGenerateGoldShop(characterId: string): Promise<DailyGoldShop> {
         const today = getTodayUtcDate();
@@ -85,13 +86,14 @@ export class ShopService extends BaseService {
             throw new DatabaseError('Failed to generate gold shop');
         }
 
-        await this.shopRepo.deleteGoldShop(characterId, getYesterdayUtcDate(today));
+        await this.shopRepo.deleteOldGoldShops(characterId, today);
         return result;
     }
 
     /**
      * Get today's gems shop for a character, generating it (and best-effort
-     * deleting yesterday's document) if it doesn't exist yet.
+     * deleting every other, stale shop document for this character) if it
+     * doesn't exist yet.
      */
     async getOrGenerateGemsShop(characterId: string): Promise<DailyGemsShop> {
         const today = getTodayUtcDate();
@@ -112,7 +114,7 @@ export class ShopService extends BaseService {
             throw new DatabaseError('Failed to generate gems shop');
         }
 
-        await this.shopRepo.deleteGemsShop(characterId, getYesterdayUtcDate(today));
+        await this.shopRepo.deleteOldGemsShops(characterId, today);
         return result;
     }
 
