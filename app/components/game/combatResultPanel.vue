@@ -4,22 +4,22 @@
              各自獨立的攻速充能條，跟著 combatLog 即時播放進度走。 -->
         <div class="combat-result-panel__arena mb-3">
             <div
-                v-if="waveBanner"
+                v-if="displayedBanner"
                 class="combat-result-panel__wave-banner"
-                :class="{ 'combat-result-panel__wave-banner--exit': waveBanner.containerExiting }"
+                :class="{ 'combat-result-panel__wave-banner--exit': displayedBanner.containerExiting }"
             >
                 <div
-                    v-if="waveBanner.showText"
-                    :key="waveBanner.textKey"
+                    v-if="displayedBanner.showText"
+                    :key="displayedBanner.textKey"
                     class="combat-result-panel__wave-banner-text"
-                    :class="{ 'combat-result-panel__wave-banner-text--exit': waveBanner.textExiting }"
+                    :class="{ 'combat-result-panel__wave-banner-text--exit': displayedBanner.textExiting }"
                 >
-                    <span class="font-pixel combat-result-panel__wave-banner-title">{{ waveBanner.label }}</span>
+                    <span class="font-pixel combat-result-panel__wave-banner-title">{{ displayedBanner.label }}</span>
                     <span
-                        v-if="waveBanner.showCount"
+                        v-if="displayedBanner.showCount"
                         class="font-pixel combat-result-panel__wave-banner-count"
                     >
-                        {{ waveBanner.waveNumber }}/{{ waveBanner.totalWaves }} 波次
+                        {{ displayedBanner.waveNumber }}/{{ displayedBanner.totalWaves }} 波次
                     </span>
                 </div>
             </div>
@@ -243,8 +243,27 @@ const schedule = computed<ScheduledGroup[]>(() => {
     return result;
 });
 
+// 最後一個 wave 播完後，一律再播一段「戰鬥結束」banner 才揭曉勝敗結果——
+// 涵蓋只有一個 wave 的戰鬥（原本的換 wave 邏輯只在第二個 wave以後才會產生
+// 「戰鬥結束」這段文字，單一 wave 的戰鬥完全沒有機會播到，見使用者回報）。
+// 從最後一批 log 的 displayAt 往後推：先等 WAVE_END_DELAY_MS，再播一段
+// 「戰鬥結束」文字自己的 enter/hold/exit。
+const combatEndBannerTiming = computed(() => {
+    const lastDisplayAt = schedule.value.at(-1)?.displayAt ?? 0;
+    const bannerAt = lastDisplayAt + WAVE_END_DELAY_MS;
+    const textEnterAt = bannerAt + BANNER_TEXT_ENTER_DELAY_MS;
+    const textExitAt = textEnterAt + BANNER_TEXT_HOLD_MS;
+    const goneAt = textExitAt + BANNER_TEXT_EXIT_MS;
+    return {
+        bannerAt, textEnterAt, textExitAt, goneAt,
+    };
+});
 const visibleGroupCount = ref(0);
-const playbackDone = computed(() => visibleGroupCount.value >= groups.value.length && groups.value.length > 0);
+const playbackDone = computed(() => (
+    visibleGroupCount.value >= groups.value.length
+    && groups.value.length > 0
+    && nowMs.value >= combatEndBannerTiming.value.goneAt
+));
 watch(playbackDone, (done) => {
     if (done) emit('playback-done');
 });
@@ -461,6 +480,25 @@ const waveBanner = computed<WaveBanner | null>(() => {
     };
 });
 
+// 最後一個 wave 播完後的「戰鬥結束」banner，跟 waveBanner 是分開的獨立時段
+// （waveBanner 只在有下一個 wave 要開始時才會播出對應的 end* 文字，最後一個
+// wave 播完並沒有「下一個 wave」可以掛，見 combatEndBannerTiming 的說明）。
+const combatEndBanner = computed<WaveBanner | null>(() => {
+    const timing = combatEndBannerTiming.value;
+    if (nowMs.value < timing.bannerAt || nowMs.value >= timing.goneAt) return null;
+    return {
+        label: '戰鬥結束',
+        textKey: 'combat-end',
+        showText: nowMs.value >= timing.textEnterAt,
+        textExiting: nowMs.value >= timing.textExitAt,
+        containerExiting: nowMs.value >= timing.goneAt - BANNER_TEXT_EXIT_MS,
+        waveNumber: totalWaveCount.value,
+        totalWaves: totalWaveCount.value,
+        showCount: false,
+    };
+});
+const displayedBanner = computed(() => waveBanner.value ?? combatEndBanner.value);
+
 // 判斷「目前播放進度落在哪個 wave 已經揭露」——用 banner 消失的時間點
 // （goneAt）而非充能開始的時間點（startAt）：增援/下一波敵人要在 banner
 // 播完、退場的當下就站上場（給玩家時間看清楚新一波敵人），而不是要等到
@@ -499,11 +537,21 @@ const enemyStatus = computed(() => {
         if (entry.action === 'DEATH') unit.alive = false;
     }
 
-    return Array.from(status.values()).map(unit => ({
+    const units = Array.from(status.values()).map(unit => ({
         ...unit,
         hpPercent: unit.hpMax > 0 ? Math.max(0, Math.min(100, (unit.hpCurrent / unit.hpMax) * 100)) : 0,
         tierLabel: hasBossComposition.value ? (unit.isBoss ? '頭目' : '小兵') : '',
     }));
+
+    // Boss 站中間：把 Boss 從原本位置抽出來，塞回陣列正中央的 index，其餘
+    // 小兵維持原本相對順序（增援小兵陸續加入時，Boss 仍會被重新置中）。
+    const bossIndex = units.findIndex(unit => unit.isBoss);
+    if (bossIndex !== -1) {
+        const [boss] = units.splice(bossIndex, 1);
+        units.splice(Math.floor(units.length / 2), 0, boss!);
+    }
+
+    return units;
 });
 
 const playerAlive = computed(() => (
