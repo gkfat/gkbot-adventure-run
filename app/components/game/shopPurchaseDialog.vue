@@ -44,11 +44,7 @@
             </p>
 
             <div class="d-flex align-center ga-1 mb-3">
-                <v-icon
-                    :icon="priceIcon"
-                    size="14"
-                    :style="priceIconStyle"
-                />
+                <GameCurrencyIcon :type="props.shopType" />
                 <span class="font-pixel text-body-2">{{ price }}</span>
                 <span
                     v-if="!canAfford"
@@ -117,10 +113,6 @@ const detailInfo = computed(() => (slot.value ? describeItem(slot.value.item) : 
 const price = computed(() => (
     props.shopType === 'GOLD' ? slot.value?.priceGold : slot.value?.priceGems
 ) ?? 0);
-const priceIcon = computed(() => (props.shopType === 'GOLD' ? 'mdi-circle-multiple' : 'mdi-diamond-stone'));
-const priceIconStyle = computed(() => (
-    props.shopType === 'GOLD' ? { color: '#e0c063' } : { color: 'rgb(var(--v-theme-primary))' }
-));
 const balance = computed(() => (
     props.shopType === 'GOLD' ? character.value?.gold : character.value?.gems
 ) ?? 0);

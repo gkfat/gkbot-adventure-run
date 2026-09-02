@@ -62,20 +62,18 @@
                 <div class="text-caption text-medium-emphasis mb-1">經濟</div>
                 <div class="d-flex align-center ga-4 mb-3">
                     <div class="d-flex align-center ga-1">
-                        <v-icon
-                            icon="mdi-circle-multiple"
-                            size="12"
-                            style="color: #e0c063;"
+                        <GameCurrencyIcon
+                            type="GOLD"
+                            :size="12"
                         />
                         <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-secondary));">
                             {{ detail.gold }}
                         </span>
                     </div>
                     <div class="d-flex align-center ga-1">
-                        <v-icon
-                            icon="mdi-diamond-stone"
-                            size="12"
-                            color="primary"
+                        <GameCurrencyIcon
+                            type="GEMS"
+                            :size="12"
                         />
                         <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
                             {{ detail.gems }}

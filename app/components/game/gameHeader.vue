@@ -31,7 +31,7 @@ defineEmits<{ 'open-drawer': [] }>();
 <style scoped lang="scss">
 .game-header {
     flex: 0 0 auto;
-    height: 52px;
+    height: 44px;
     border-bottom: 1px solid rgba(196, 203, 219, 0.12);
 
     &__wordmark {

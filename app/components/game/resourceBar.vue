@@ -2,22 +2,14 @@
     <div class="resource-bar">
         <div class="resource-bar__row d-flex align-center ga-4 px-4">
             <div class="d-flex align-center ga-1">
-                <v-icon
-                    icon="mdi-circle-multiple"
-                    size="14"
-                    style="color: #e0c063;"
-                />
+                <GameCurrencyIcon type="GOLD" />
                 <span class="font-pixel text-caption resource-bar__value">
                     {{ character ? character.gold : '—' }}
                 </span>
             </div>
 
             <div class="d-flex align-center ga-1">
-                <v-icon
-                    icon="mdi-diamond-stone"
-                    size="14"
-                    color="primary"
-                />
+                <GameCurrencyIcon type="GEMS" />
                 <span class="font-pixel text-caption resource-bar__value">
                     {{ character ? character.gems : '—' }}
                 </span>
@@ -39,7 +31,7 @@
             :model-value="expPercent"
             color="primary"
             bg-color="dark"
-            height="4"
+            height="3"
         />
     </div>
 </template>

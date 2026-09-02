@@ -132,22 +132,25 @@ describe('generateItemInstance', () => {
         expect(instance.stats.dodgeChanceMod).toBeUndefined();
     });
 
-    it('resolves name/description for the rolled rarity on an EQUIPMENT instance', () => {
+    it('resolves name/description from the template on an EQUIPMENT instance', () => {
         const instance = generateItemInstance('gkbot_faceplate', {
             source: ItemSource.DROP, maxRarity: Rarity.N,
         });
-        expect(instance.name).toBe('GkBot 的頭部零件');
-        expect(instance.description).toContain('GKBot 施工型機器人頭部');
+        expect(instance.name).toBe('GkBot 頭部零件');
+        expect(instance.description).toContain('施工型機器人頭部');
     });
 
-    it('different rarities of the same template resolve different name/description', () => {
+    it('different rarities of the same template resolve the same shared name/description', () => {
         const template = getItemTemplate('gkbot_faceplate');
-        const nameByRarity = template?.name as Record<Rarity, string>;
         const n = generateItemInstance('gkbot_faceplate', {
             source: ItemSource.DROP, maxRarity: Rarity.N,
         });
-        expect(n.name).not.toBe(nameByRarity[Rarity.L]);
-        expect(n.name).toBe(nameByRarity[Rarity.N]);
+        const l = generateItemInstance('gkbot_faceplate', {
+            source: ItemSource.DROP, minRarity: Rarity.L,
+        });
+        expect(n.name).toBe(template?.name);
+        expect(l.name).toBe(template?.name);
+        expect(n.name).toBe(l.name);
     });
 
     it('resolves the single shared name/description for a POTION instance regardless of rarity', () => {

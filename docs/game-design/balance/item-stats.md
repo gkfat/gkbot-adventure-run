@@ -1,6 +1,6 @@
 # 道具稀有度、掉落率與戰鬥數值加成表
 
-> 本文件是內部設計參考文件，把 `equipment-ideas.md` 的裝備文案對應進現有 `server/constants/templates.ts` 的數值曲線（稀有度權重、屬性區間、售價區間）。**目前 code 尚未落地** —— `templates.ts` 每個部位仍只有 1 個 template，用同一份數值曲線橫跨 N→L 五個稀有度，文案也還是單一字串，尚未依稀有度拆分。若要照本文件實裝，需要擴充 `ItemTemplate` 讓 `name`/`description` 可依稀有度變化，或拆成多個 template；詳見文末「落地備註」。
+> 本文件是內部設計參考文件，記錄 `server/constants/templates/items.ts` 各 template 的數值曲線（稀有度權重、屬性區間、售價區間）。每個 template 的 `name`/`description`/圖示不隨稀有度變化（設計已定案，見 `content/items.md` 第 3 節）——同一部位的同一把裝備，稀有度只影響下面表格裡的數值與售價，不影響名稱或敘述。名稱/描述的實際文案以 `content/items.md` 第 1 節總覽表為準，本文件不重複列出。
 
 ## 裝備重量分類（`weaponWeightClass`）
 
@@ -14,16 +14,23 @@
 
 **負重能力折扣**：角色 `STR`+`CON`（`COMBAT_CONFIG.HEAVY_PENALTY_MITIGATION_PER_POINT` = 每點 2%，`MAX_HEAVY_PENALTY_MITIGATION` = 60% 上限）會折扣 `HEAVY` 裝備的 `actionSpeedMod`/`dodgeChanceMod` 懲罰幅度：`折扣後懲罰 = 基礎懲罰 × (1 - min(0.6, (STR + CON) × 0.02))`。折扣有上限，不會把懲罰完全抵銷。
 
-現有 6 個 template 的分類：
+現有 13 個裝備 template 的分類：
 
 | templateId | 槽位 | weaponWeightClass |
 |---|---|---|
 | `salvaged_wrench` | RIGHT_HAND | MEDIUM |
+| `scrap_daggers` | RIGHT_HAND | LIGHT |
+| `raider_commander_gauntlet` | RIGHT_HAND | HEAVY |
 | `riot_shield_scrap` | LEFT_HAND | HEAVY |
+| `hydraulic_arm_guard` | LEFT_HAND | MEDIUM |
 | `gkbot_faceplate` | HEAD | MEDIUM |
+| `tech_goggles` | HEAD | LIGHT |
 | `supply_crate_vest` | BODY | HEAVY |
+| `cargo_bot_plate` | BODY | MEDIUM |
 | `servo_greaves` | SHOES | LIGHT |
+| `magnetic_work_boots` | SHOES | HEAVY |
 | `research_chip_ring` | RING | LIGHT |
+| `micro_magnet_ring` | RING | MEDIUM |
 
 ## 共通掉落機率（各來源共用權重，`STANDARD_RARITY_WEIGHTS`）
 
@@ -35,69 +42,163 @@
 | SSR | 4 | 4% |
 | L | 1 | 1% |
 
-## 頭部 Head（對應現有模板 `gkbot_faceplate`，weaponWeightClass = MEDIUM）
+## 頭部 Head（MEDIUM／DEF+HP）
 
-| 稀有度 | 名稱 | DEF | HP | 售價 |
-|---|---|---|---|---|
-| N | GkBot 的頭部零件 | 3–6 | 10–20 | 金幣 100–200 |
-| R | 維修技師護目鏡 | 6–12 | 20–40 | 金幣 300–500 |
-| SR | 破損的技術人員校準頭盔 | 12–20 | 40–70 | 金幣 800–1200 + 寶石 10–20 |
-| SSR | 退役保全頭盔 *(替代款：掠奪者拼裝面罩)* | 20–30 | 70–110 | 寶石 30–50 |
-| L | 黑色訊號罩 | 30–45 | 110–160 | 寶石 80–120 |
+`gkbot_faceplate`（weaponWeightClass = MEDIUM）：
 
-## 身體 Body（對應現有模板 `supply_crate_vest`，weaponWeightClass = HEAVY）
-
-| 稀有度 | 名稱 | DEF | HP | actionSpeedMod | dodgeChanceMod | 售價 |
-|---|---|---|---|---|---|---|
-| N | 工程防護背心 | 5–9 | 15–25 | 0.04 ~ 0.08 | -0.02 ~ -0.01 | 金幣 100–200 |
-| R | 防爆維修外套 | 9–16 | 25–50 | 0.08 ~ 0.14 | -0.04 ~ -0.02 | 金幣 300–500 |
-| SR | 實驗室隔離衣 | 16–26 | 50–85 | 0.14 ~ 0.22 | -0.07 ~ -0.04 | 金幣 800–1200 + 寶石 10–20 |
-| SSR | GkBot 搬運工背甲 *(替代款：私兵繳獲護甲)* | 26–38 | 85–130 | 0.22 ~ 0.32 | -0.1 ~ -0.07 | 寶石 30–50 |
-| L | 緊急維生外套 | 38–55 | 130–190 | 0.32 ~ 0.45 | -0.14 ~ -0.1 | 寶石 80–120 |
-
-## 左手 Left Hand（對應現有模板 `riot_shield_scrap`，weaponWeightClass = HEAVY）
-
-| 稀有度 | 名稱 | DEF | actionSpeedMod | dodgeChanceMod | 售價 |
-|---|---|---|---|---|---|
-| N | 工程護腕 | 4–8 | 0.05 ~ 0.1 | -0.03 ~ -0.015 | 金幣 100–200 |
-| R | 磁吸工具腕帶 | 8–16 | 0.1 ~ 0.18 | -0.05 ~ -0.03 | 金幣 300–500 |
-| SR | 維修端子手套 | 16–28 | 0.18 ~ 0.28 | -0.08 ~ -0.05 | 金幣 800–1200 + 寶石 10–20 |
-| SSR | 液壓作業護臂 *(替代款：掠奪者綁帶護具)* | 28–42 | 0.28 ~ 0.4 | -0.12 ~ -0.08 | 寶石 30–50 |
-| L | 舊式校準手環 | 42–60 | 0.4 ~ 0.55 | -0.16 ~ -0.12 | 寶石 80–120 |
-
-## 右手 Right Hand（對應現有模板 `salvaged_wrench`，weaponWeightClass = MEDIUM，ATK）
-
-| 稀有度 | 名稱 | ATK | 售價 |
+| 稀有度 | DEF | HP | 售價 |
 |---|---|---|---|
-| N | 防割工作手套 | 5–10 | 金幣 100–200 |
-| R | 精密維修手套 | 10–20 | 金幣 300–500 |
-| SR | 電弧絕緣手套 | 20–35 | 金幣 800–1200 + 寶石 10–20 |
-| SSR | GkBot 維修夾具 *(替代款：佔領軍指揮官護手)* | 35–55 | 寶石 30–50 |
-| L | 應急接線手套 | 55–80 | 寶石 80–120 |
+| N | 3–6 | 10–20 | 金幣 100–200 |
+| R | 6–12 | 20–40 | 金幣 300–500 |
+| SR | 12–20 | 40–70 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 20–30 | 70–110 | 寶石 30–50 |
+| L | 30–45 | 110–160 | 寶石 80–120 |
 
-## 戒指 Ring（對應現有模板 `research_chip_ring`，weaponWeightClass = LIGHT，actionSpeedMod 負值＝行動更快）
+## 頭部 Head（LIGHT／DEF + actionSpeedMod）
 
-| 稀有度 | 名稱 | DEF | actionSpeedMod | 售價 |
+`tech_goggles`（weaponWeightClass = LIGHT，actionSpeedMod 負值＝行動更快）：
+
+| 稀有度 | DEF | actionSpeedMod | 售價 |
+|---|---|---|---|
+| N | — | -0.04 ~ -0.02 | 金幣 100–200 |
+| R | — | -0.08 ~ -0.04 | 金幣 300–500 |
+| SR | — | -0.14 ~ -0.08 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 5–8 | -0.22 ~ -0.14 | 寶石 30–50 |
+| L | 8–13 | -0.32 ~ -0.22 | 寶石 80–120 |
+
+## 身體 Body（HEAVY／DEF+HP + 懲罰）
+
+`supply_crate_vest`（weaponWeightClass = HEAVY）：
+
+| 稀有度 | DEF | HP | actionSpeedMod | dodgeChanceMod | 售價 |
+|---|---|---|---|---|---|
+| N | 5–9 | 15–25 | 0.04 ~ 0.08 | -0.02 ~ -0.01 | 金幣 100–200 |
+| R | 9–16 | 25–50 | 0.08 ~ 0.14 | -0.04 ~ -0.02 | 金幣 300–500 |
+| SR | 16–26 | 50–85 | 0.14 ~ 0.22 | -0.07 ~ -0.04 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 26–38 | 85–130 | 0.22 ~ 0.32 | -0.1 ~ -0.07 | 寶石 30–50 |
+| L | 38–55 | 130–190 | 0.32 ~ 0.45 | -0.14 ~ -0.1 | 寶石 80–120 |
+
+## 身體 Body（MEDIUM／DEF+HP，無懲罰）
+
+`cargo_bot_plate`（weaponWeightClass = MEDIUM）：
+
+| 稀有度 | DEF | HP | 售價 |
+|---|---|---|---|
+| N | 3–6 | 12–20 | 金幣 100–200 |
+| R | 6–12 | 20–38 | 金幣 300–500 |
+| SR | 12–20 | 38–65 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 20–30 | 65–100 | 寶石 30–50 |
+| L | 30–42 | 100–145 | 寶石 80–120 |
+
+## 左手 Left Hand（HEAVY／DEF + 懲罰）
+
+`riot_shield_scrap`（weaponWeightClass = HEAVY）：
+
+| 稀有度 | DEF | actionSpeedMod | dodgeChanceMod | 售價 |
 |---|---|---|---|---|
-| N | GK 員工識別環 | — | -0.04 ~ -0.02 | 金幣 100–200 |
-| R | 備用記憶環 | — | -0.08 ~ -0.04 | 金幣 300–500 |
-| SR | 微型磁力環 | — | -0.14 ~ -0.08 | 金幣 800–1200 + 寶石 10–20 |
-| SSR | 實驗型同步環 | 6–10 | -0.22 ~ -0.14 | 寶石 30–50 |
-| L | 無標記黑環 *(替代款：陣亡倖存者的婚戒)* | 10–16 | -0.32 ~ -0.22 | 寶石 80–120 |
+| N | 4–8 | 0.05 ~ 0.1 | -0.03 ~ -0.015 | 金幣 100–200 |
+| R | 8–16 | 0.1 ~ 0.18 | -0.05 ~ -0.03 | 金幣 300–500 |
+| SR | 16–28 | 0.18 ~ 0.28 | -0.08 ~ -0.05 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 28–42 | 0.28 ~ 0.4 | -0.12 ~ -0.08 | 寶石 30–50 |
+| L | 42–60 | 0.4 ~ 0.55 | -0.16 ~ -0.12 | 寶石 80–120 |
 
-> 戒指第 6 則文案（婚戒）伏筆最重，因此不放在替代 SSR，而是直接作為 L 的替代款，呼應「戒指承擔身份／記憶伏筆」的既定方向。
+## 左手 Left Hand（MEDIUM／DEF，無懲罰）
 
-## 鞋子 Feet（對應現有模板 `servo_greaves`，weaponWeightClass = LIGHT）
+`hydraulic_arm_guard`（weaponWeightClass = MEDIUM）：
 
-| 稀有度 | 名稱 | DEF | actionSpeedMod | 售價 |
+| 稀有度 | DEF | 售價 |
+|---|---|---|
+| N | 3–6 | 金幣 100–200 |
+| R | 6–12 | 金幣 300–500 |
+| SR | 12–20 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 20–30 | 寶石 30–50 |
+| L | 30–42 | 寶石 80–120 |
+
+## 右手 Right Hand（MEDIUM／ATK）
+
+`salvaged_wrench`（weaponWeightClass = MEDIUM）：
+
+| 稀有度 | ATK | 售價 |
+|---|---|---|
+| N | 5–10 | 金幣 100–200 |
+| R | 10–20 | 金幣 300–500 |
+| SR | 20–35 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 35–55 | 寶石 30–50 |
+| L | 55–80 | 寶石 80–120 |
+
+## 右手 Right Hand（LIGHT／ATK + actionSpeedMod，冒險家 starter 武器）
+
+`scrap_daggers`（weaponWeightClass = LIGHT，actionSpeedMod 負值＝行動更快）：
+
+| 稀有度 | ATK | actionSpeedMod | 售價 |
+|---|---|---|---|
+| N | 3–6 | -0.05 ~ -0.02 | 金幣 100–200 |
+| R | 6–12 | -0.1 ~ -0.05 | 金幣 300–500 |
+| SR | 12–20 | -0.18 ~ -0.1 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 20–30 | -0.28 ~ -0.18 | 寶石 30–50 |
+| L | 30–42 | -0.4 ~ -0.28 | 寶石 80–120 |
+
+## 右手 Right Hand（HEAVY／ATK + 懲罰）
+
+`raider_commander_gauntlet`（weaponWeightClass = HEAVY）：
+
+| 稀有度 | ATK | actionSpeedMod | dodgeChanceMod | 售價 |
 |---|---|---|---|---|
-| N | 工程安全靴 | — | -0.05 ~ -0.02 | 金幣 100–200 |
-| R | 維修通道靴 | — | -0.1 ~ -0.05 | 金幣 300–500 |
-| SR | 靜音工作鞋 | — | -0.18 ~ -0.1 | 金幣 800–1200 + 寶石 10–20 |
-| SSR | 磁力作業靴 *(替代款：掠奪者踏勘靴)* | 14–20 | -0.28 ~ -0.18 | 寶石 30–50 |
-| L | 回收型動力靴 | 20–28 | -0.4 ~ -0.28 | 寶石 80–120 |
+| N | 7–14 | 0.05 ~ 0.1 | -0.03 ~ -0.015 | 金幣 100–200 |
+| R | 14–26 | 0.1 ~ 0.18 | -0.05 ~ -0.03 | 金幣 300–500 |
+| SR | 26–45 | 0.18 ~ 0.28 | -0.08 ~ -0.05 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 45–70 | 0.28 ~ 0.4 | -0.12 ~ -0.08 | 寶石 30–50 |
+| L | 70–100 | 0.4 ~ 0.55 | -0.16 ~ -0.12 | 寶石 80–120 |
 
-## 藥水 Potion（對應現有模板 `engine_oil_basic`，healPercent）
+## 戒指 Ring（LIGHT／actionSpeedMod + DEF）
+
+`research_chip_ring`（weaponWeightClass = LIGHT，actionSpeedMod 負值＝行動更快）：
+
+| 稀有度 | DEF | actionSpeedMod | 售價 |
+|---|---|---|---|
+| N | — | -0.04 ~ -0.02 | 金幣 100–200 |
+| R | — | -0.08 ~ -0.04 | 金幣 300–500 |
+| SR | — | -0.14 ~ -0.08 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 6–10 | -0.22 ~ -0.14 | 寶石 30–50 |
+| L | 10–16 | -0.32 ~ -0.22 | 寶石 80–120 |
+
+## 戒指 Ring（MEDIUM／DEF，無懲罰）
+
+`micro_magnet_ring`（weaponWeightClass = MEDIUM）：
+
+| 稀有度 | DEF | 售價 |
+|---|---|---|
+| N | 2–4 | 金幣 100–200 |
+| R | 4–8 | 金幣 300–500 |
+| SR | 8–14 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 14–20 | 寶石 30–50 |
+| L | 20–28 | 寶石 80–120 |
+
+## 鞋子 Feet（LIGHT／actionSpeedMod + DEF）
+
+`servo_greaves`（weaponWeightClass = LIGHT）：
+
+| 稀有度 | DEF | actionSpeedMod | 售價 |
+|---|---|---|---|
+| N | — | -0.05 ~ -0.02 | 金幣 100–200 |
+| R | — | -0.1 ~ -0.05 | 金幣 300–500 |
+| SR | — | -0.18 ~ -0.1 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 14–20 | -0.28 ~ -0.18 | 寶石 30–50 |
+| L | 20–28 | -0.4 ~ -0.28 | 寶石 80–120 |
+
+## 鞋子 Feet（HEAVY／DEF + 懲罰）
+
+`magnetic_work_boots`（weaponWeightClass = HEAVY）：
+
+| 稀有度 | DEF | actionSpeedMod | dodgeChanceMod | 售價 |
+|---|---|---|---|---|
+| N | 4–8 | 0.05 ~ 0.1 | -0.03 ~ -0.015 | 金幣 100–200 |
+| R | 8–16 | 0.1 ~ 0.18 | -0.05 ~ -0.03 | 金幣 300–500 |
+| SR | 16–28 | 0.18 ~ 0.28 | -0.08 ~ -0.05 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 28–42 | 0.28 ~ 0.4 | -0.12 ~ -0.08 | 寶石 30–50 |
+| L | 42–60 | 0.4 ~ 0.55 | -0.16 ~ -0.12 | 寶石 80–120 |
+
+## 藥水 Potion（`engine_oil_basic`，healPercent）
 
 | 稀有度 | healPercent | 售價 |
 |---|---|---|
@@ -106,13 +207,3 @@
 | SR | 35–40% | 金幣 150–250 + 寶石 5–10 |
 | SSR | 40–45% | 寶石 15–25 |
 | L | 45–50% | 寶石 30–50 |
-
-## 對應規則
-
-- `equipment-ideas.md` 每個部位提供 6 則文案，依「越稀有、違和感越重」的既定方向依序對應 N→L 五個稀有度（取前 5 則）。
-- 第 6 則（多為「掠奪者」系列）不佔獨立稀有度，而是併入 SSR 或 L 的**替代外觀池**（同數值、不同名稱/敘述），用來強化「敵人是加害者而非受害者」的立場。戒指例外：第 6 則（婚戒）伏筆最重，改列為 L 的替代款。
-
-## 落地備註
-
-- 每個部位目前仍可維持 1 個 template，只需把 `name`/`description` 改成依稀有度動態選字（目前 `ItemTemplate.name`/`description` 是單一字串，需擴充成 per-rarity 文案，或拆成多個 template）。
-- 若要讓「替代款」成為真正獨立的掉落項，需要新增對應 `templateId` 並各自設定 `rarityWeights`（例如把該稀有度的權重拆給兩個 template 各一半），這會動到 `ItemTemplate` 資料結構，屬於功能擴充，建議先確認需求再進 `/opsx:propose`。

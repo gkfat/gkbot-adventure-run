@@ -50,17 +50,8 @@
             <div class="w-100 text-center character-stage__content">
                 <!-- LV / 職業 + 屬性 + 可分配屬性點：合併為單一精簡區塊，寬度 100% -->
                 <div class="character-stage__box character-stage__summary">
-                    <div class="character-stage__summary-grid">
+                    <div class="character-stage__summary-grid character-stage__summary-grid--no-level">
                         <div class="character-stage__summary-col">
-                            <div class="font-pixel text-caption" style="color: rgb(var(--v-theme-green));">
-                                LV {{ character.level }}
-                            </div>
-                            <div class="text-body-2 text-medium-emphasis">
-                                {{ character.className }}
-                            </div>
-                        </div>
-
-                        <div class="character-stage__summary-col character-stage__col--divided">
                             <v-row dense>
                                 <v-col
                                     v-for="attr in attributeEntries"
@@ -102,12 +93,11 @@
                         </div>
 
                         <div class="character-stage__summary-col character-stage__col--divided character-stage__summary-col--points">
-                            <span class="text-caption text-medium-emphasis">可分配</span>
                             <span
                                 class="font-pixel text-caption"
                                 :style="{ color: remainingPoints > 0 ? 'rgb(var(--v-theme-warning))' : 'rgb(var(--v-theme-primary))' }"
                             >
-                                +{{ remainingPoints }}
+                                +{{ remainingPoints }} 可用屬性點
                             </span>
                             <SystemBtn
                                 v-if="!allocating && character.unspentAttributePoints > 0"
@@ -121,28 +111,26 @@
                             </SystemBtn>
                             <div
                                 v-else-if="allocating"
-                                class="d-flex flex-column ga-1 mt-1"
+                                class="d-flex ga-2 mt-1"
                             >
-                                <SystemBtn
-                                    size="x-small"
-                                    variant="flat"
-                                    color="primary"
-                                    class="text-none"
-                                    :loading="savingAllocation"
-                                    :disabled="totalPending === 0"
+                                <button
+                                    type="button"
+                                    class="attr-allocation-btn pixel-press"
+                                    aria-label="儲存"
+                                    :disabled="totalPending === 0 || savingAllocation"
                                     @click="saveAllocation"
                                 >
-                                    儲存
-                                </SystemBtn>
-                                <SystemBtn
-                                    size="x-small"
-                                    variant="outlined"
-                                    color="error"
-                                    class="text-none"
+                                    <GamePixelIcon name="confirm" :size="18" />
+                                </button>
+                                <button
+                                    type="button"
+                                    class="attr-allocation-btn pixel-press"
+                                    aria-label="取消"
+                                    :disabled="savingAllocation"
                                     @click="cancelAllocating"
                                 >
-                                    取消
-                                </SystemBtn>
+                                    <GamePixelIcon name="cancel" :size="18" />
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -184,7 +172,7 @@
                     </v-row>
                 </div>
 
-                <!-- 裝備欄位：角色圖像左右各 4 格 -->
+                <!-- 裝備欄位：角色圖像左右各 3 格 -->
                 <div class="character-stage__equip-row my-5">
                     <div class="character-stage__equip-col">
                         <button
@@ -205,7 +193,8 @@
                             </span>
                             <GamePixelIcon
                                 :name="slotIcon(slot)"
-                                :size="26"
+                                :size="32"
+                                :class="{ 'equip-slot__icon--empty': !equippedItem(slot) }"
                             />
                             <span
                                 v-if="slotValue(slot)"
@@ -217,14 +206,36 @@
                         </button>
                     </div>
 
-                    <div class="character-stage__sprite-wrap">
-                        <img
-                            :src="breatheFrameUrl(character.spriteUrl, breathStep)"
-                            alt="角色"
-                            width="140"
-                            height="140"
-                            class="character-stage__sprite"
-                        >
+                    <div class="character-stage__sprite-col">
+                        <div class="character-stage__sprite-header">
+                            <div class="d-flex align-center ga-2">
+                                <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-green));">
+                                    LV {{ character.level }}
+                                </span>
+                                <v-chip
+                                    label
+                                    size="x-small"
+                                    color="primary"
+                                    variant="outlined"
+                                    class="font-pixel"
+                                >
+                                    {{ character.className }}
+                                </v-chip>
+                            </div>
+                            <div class="text-body-2 text-medium-emphasis">
+                                {{ character.nickname }}
+                            </div>
+                        </div>
+
+                        <div class="character-stage__sprite-wrap">
+                            <img
+                                :src="breatheFrameUrl(character.spriteUrl, breathStep)"
+                                alt="角色"
+                                width="140"
+                                height="140"
+                                class="character-stage__sprite"
+                            >
+                        </div>
                     </div>
 
                     <div class="character-stage__equip-col">
@@ -246,7 +257,8 @@
                             </span>
                             <GamePixelIcon
                                 :name="slotIcon(slot)"
-                                :size="26"
+                                :size="32"
+                                :class="{ 'equip-slot__icon--empty': !equippedItem(slot) }"
                             />
                             <span
                                 v-if="slotValue(slot)"
@@ -389,9 +401,9 @@ const slotLabel = (slot: EquipmentSlot, item: ReturnType<typeof equippedItem>) =
 const slotStyle = (slot: EquipmentSlot) => {
     const item = equippedItem(slot);
     if (!item) {
-        return { borderColor: 'rgba(196, 203, 219, 0.25)', opacity: 0.5 };
+        return { borderColor: 'rgba(196, 203, 219, 0.25)', background: 'rgba(196, 203, 219, 0.08)' };
     }
-    return { borderColor: RARITY_COLOR[item.rarity], opacity: 1 };
+    return { borderColor: RARITY_COLOR[item.rarity], background: 'rgba(196, 203, 219, 0.04)' };
 };
 
 // Show the equipped item's own picture when the slot is filled, otherwise
@@ -628,6 +640,20 @@ watch(character, (value) => {
         padding-top: 8px;
     }
 
+    &__sprite-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
+
+    &__sprite-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+    }
+
     &__sprite-wrap {
         position: relative;
         width: 140px;
@@ -675,6 +701,10 @@ watch(character, (value) => {
         grid-template-columns: auto 1fr auto;
         align-items: center;
         column-gap: 12px;
+
+        &--no-level {
+            grid-template-columns: 1fr auto;
+        }
     }
 
     &__summary-col {
@@ -685,6 +715,7 @@ watch(character, (value) => {
             flex-direction: column;
             align-items: center;
             gap: 2px;
+            white-space: nowrap;
         }
     }
 
@@ -708,8 +739,7 @@ watch(character, (value) => {
 
     &__stat {
         display: flex;
-        align-items: baseline;
-        justify-content: space-between;
+        align-items: center;
         gap: 6px;
         min-width: 0;
     }
@@ -741,6 +771,24 @@ watch(character, (value) => {
     }
 }
 
+.attr-allocation-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid rgba(196, 203, 219, 0.3);
+    border-radius: 3px;
+    background: rgba(196, 203, 219, 0.06);
+    cursor: pointer;
+
+    &:disabled {
+        opacity: 0.3;
+        cursor: default;
+    }
+}
+
 .attr-step-btn {
     display: flex;
     align-items: center;
@@ -767,8 +815,8 @@ watch(character, (value) => {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     border: 2px solid rgba(196, 203, 219, 0.25);
     border-radius: 6px;
@@ -798,6 +846,10 @@ watch(character, (value) => {
         color: #14171c;
         border-radius: 2px;
         white-space: nowrap;
+    }
+
+    &__icon--empty {
+        opacity: 0.4;
     }
 }
 

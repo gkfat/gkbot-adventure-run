@@ -105,20 +105,11 @@ export function generateItemInstance(templateId: string, context: ItemGeneration
         ...(template.weaponWeightClass ? { weaponWeightClass: template.weaponWeightClass } : {}),
         rarity,
         stats,
-        name: resolveTemplateText(template.name, rarity),
-        description: resolveTemplateText(template.description, rarity),
+        name: template.name,
+        description: template.description,
         source: context.source,
         createdAt: Date.now(),
     };
-}
-
-/**
- * EQUIPMENT templates carry per-rarity name/description
- * (docs/game-design/mechanics/content/items.md §4); POTION templates share one string
- * across all rarities. Resolve whichever shape the template uses.
- */
-function resolveTemplateText(text: string | Record<Rarity, string>, rarity: Rarity): string {
-    return typeof text === 'string' ? text : text[rarity];
 }
 
 /**

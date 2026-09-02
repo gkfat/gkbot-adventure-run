@@ -9,13 +9,13 @@ import type { PixelIconName } from './pixelIcons';
 
 export const EQUIP_SLOTS_LEFT: EquipmentSlot[] = [
     EquipmentSlot.HEAD,
-    EquipmentSlot.BODY,
-    EquipmentSlot.LEFT_HAND,
+    EquipmentSlot.RIGHT_HAND,
+    EquipmentSlot.RING,
 ];
 export const EQUIP_SLOTS_RIGHT: EquipmentSlot[] = [
-    EquipmentSlot.RING,
+    EquipmentSlot.BODY,
+    EquipmentSlot.LEFT_HAND,
     EquipmentSlot.SHOES,
-    EquipmentSlot.RIGHT_HAND,
 ];
 export const EQUIP_SLOTS_ALL: EquipmentSlot[] = [...EQUIP_SLOTS_LEFT, ...EQUIP_SLOTS_RIGHT];
 
@@ -26,10 +26,10 @@ export const EQUIP_SLOTS_ALL: EquipmentSlot[] = [...EQUIP_SLOTS_LEFT, ...EQUIP_S
 export const SLOT_PIXEL_ICON: Record<EquipmentSlot, PixelIconName> = {
     [EquipmentSlot.HEAD]: 'hat',
     [EquipmentSlot.BODY]: 'tshirt',
-    [EquipmentSlot.SHOES]: 'boot',
+    [EquipmentSlot.SHOES]: 'foot',
     [EquipmentSlot.LEFT_HAND]: 'hand',
     [EquipmentSlot.RIGHT_HAND]: 'hand',
-    [EquipmentSlot.RING]: 'ring',
+    [EquipmentSlot.RING]: 'ringSlot',
 };
 
 // Fallback item art for a future EQUIPMENT template that hasn't been given
@@ -79,6 +79,17 @@ const TEMPLATE_ICON: Record<string, PixelIconName> = {
     servo_greaves: 'greaves',
     research_chip_ring: 'chipRing',
     engine_oil_basic: 'engineOil',
+    tech_goggles: 'techGoggles',
+    cargo_bot_plate: 'cargoBotPlate',
+    hydraulic_arm_guard: 'hydraulicArmGuard',
+    raider_commander_gauntlet: 'raiderGauntlet',
+    micro_magnet_ring: 'magnetRing',
+    magnetic_work_boots: 'magneticBoots',
+    maintenance_terminal_gloves: 'terminalGloves',
+    veteran_security_helmet: 'securityHelmet',
+    lab_isolation_suit: 'isolationSuit',
+    catwalk_maintenance_boots: 'catwalkBoots',
+    fallen_survivor_wedding_ring: 'weddingRing',
 };
 
 export type ItemLike = {

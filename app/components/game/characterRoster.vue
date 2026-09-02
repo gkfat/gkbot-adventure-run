@@ -31,20 +31,18 @@
                         </div>
                         <div class="d-flex align-center ga-3 mt-1">
                             <div class="d-flex align-center ga-1">
-                                <v-icon
-                                    icon="mdi-circle-multiple"
-                                    size="12"
-                                    style="color: #e0c063;"
+                                <GameCurrencyIcon
+                                    type="GOLD"
+                                    :size="12"
                                 />
                                 <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-secondary));">
                                     {{ entry.gold }}
                                 </span>
                             </div>
                             <div class="d-flex align-center ga-1">
-                                <v-icon
-                                    icon="mdi-diamond-stone"
-                                    size="12"
-                                    color="primary"
+                                <GameCurrencyIcon
+                                    type="GEMS"
+                                    :size="12"
                                 />
                                 <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
                                     {{ entry.gems }}

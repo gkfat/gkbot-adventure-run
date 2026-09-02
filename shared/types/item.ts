@@ -59,10 +59,9 @@ export type ItemGenerationContext = {
 export type ItemTemplate = {
   templateId: string;
 
-  // EQUIPMENT: per-rarity name/description (docs/game-design/mechanics/content/items.md §4).
-  // POTION: a single string shared across all rarities.
-  name: string | Record<Rarity, string>;
-  description: string | Record<Rarity, string>;
+  // Shared across all rarities of this template — only the rolled stats differ.
+  name: string;
+  description: string;
 
   type: ItemType;
   equipSlot?: EquipmentSlot; // Required for type: EQUIPMENT
