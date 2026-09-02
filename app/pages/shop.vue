@@ -57,57 +57,64 @@
             </SystemBtn>
         </div>
 
-        <!-- 商品格狀清單，一列 3 格 -->
-        <div
-            v-else
-            class="shop-page__grid"
-        >
-            <button
-                v-for="slot in currentItems"
-                :key="slot.slotId"
-                type="button"
-                class="pixel-slot pixel-slot--item pixel-press"
-                :class="{ 'pixel-slot--sold': slot.sold }"
-                :style="{ borderColor: RARITY_COLOR[slot.item.rarity] }"
-                :disabled="slot.sold"
-                @click="openPurchase(slot)"
+        <!-- 商品分層：裝備 / 道具 -->
+        <div v-else>
+            <div
+                v-for="tier in tiers"
+                :key="tier.key"
+                class="shop-page__tier"
             >
-                <span
-                    class="pixel-slot__rarity font-pixel"
-                    :style="{ background: RARITY_COLOR[slot.item.rarity] }"
-                >
-                    {{ slot.item.rarity }}
-                </span>
-                <GamePixelIcon
-                    :name="resolvePixelIcon(slot.item)"
-                    :size="32"
-                />
-                <span class="shop-page__name text-caption">
-                    {{ slot.item.name }}
-                </span>
-                <span
-                    v-if="primaryStatValue(slot.item)"
-                    class="shop-page__stat font-pixel"
-                    :style="{ color: RARITY_COLOR[slot.item.rarity] }"
-                >
-                    {{ primaryStatValue(slot.item) }}
-                </span>
-                <span class="shop-page__price font-pixel">
-                    <v-icon
-                        :icon="priceIcon"
-                        size="10"
-                        :style="priceIconStyle"
-                    />
-                    {{ activeTab === 'GOLD' ? slot.priceGold : slot.priceGems }}
-                </span>
-
-                <div
-                    v-if="slot.sold"
-                    class="pixel-slot__sold-badge font-pixel text-caption"
-                >
-                    已售出
+                <div class="shop-page__tier-label font-pixel text-caption">
+                    {{ tier.label }}
                 </div>
-            </button>
+                <div class="shop-page__grid">
+                    <button
+                        v-for="slot in tier.items"
+                        :key="slot.slotId"
+                        type="button"
+                        class="pixel-slot pixel-slot--item pixel-press"
+                        :class="{ 'pixel-slot--sold': slot.sold }"
+                        :style="{ borderColor: RARITY_COLOR[slot.item.rarity] }"
+                        :disabled="slot.sold"
+                        @click="openPurchase(slot)"
+                    >
+                        <span
+                            class="pixel-slot__rarity font-pixel"
+                            :style="{ background: RARITY_COLOR[slot.item.rarity] }"
+                        >
+                            {{ slot.item.rarity }}
+                        </span>
+                        <GamePixelIcon
+                            :name="resolvePixelIcon(slot.item)"
+                            :size="32"
+                        />
+                        <span class="shop-page__name text-caption">
+                            {{ slot.item.name }}
+                        </span>
+                        <span
+                            v-if="primaryStatValue(slot.item)"
+                            class="shop-page__stat font-pixel"
+                            :style="{ color: RARITY_COLOR[slot.item.rarity] }"
+                        >
+                            {{ primaryStatValue(slot.item) }}
+                        </span>
+                        <span class="shop-page__price font-pixel">
+                            <GameCurrencyIcon
+                                :type="activeTab"
+                                :size="10"
+                            />
+                            {{ activeTab === 'GOLD' ? slot.priceGold : slot.priceGems }}
+                        </span>
+
+                        <div
+                            v-if="slot.sold"
+                            class="pixel-slot__sold-badge font-pixel text-caption"
+                        >
+                            已售出
+                        </div>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- 購買 dialog -->
@@ -119,7 +126,10 @@
 </template>
 
 <script setup lang="ts">
-import { RARITY_COLOR, resolvePixelIcon, primaryStatValue } from '../utils/equipmentDisplay';
+import {
+    RARITY_COLOR, RARITY_ORDER_DESC, resolvePixelIcon, primaryStatValue, primaryStatMagnitude,
+} from '../utils/equipmentDisplay';
+import { ItemType } from '../../shared/types/item';
 import type { ShopSlot, ShopType } from '../composables/useShop';
 
 definePageMeta({
@@ -147,19 +157,30 @@ const {
     fetchGoldShop, fetchGemsShop,
 } = useShop();
 
-const currentItems = computed(() => {
-    const items = activeTab.value === 'GOLD' ? goldItems.value : gemsItems.value;
-    const priceOf = (slot: ShopSlot) => (activeTab.value === 'GOLD' ? slot.priceGold : slot.priceGems) ?? 0;
-    return [...items].sort((a, b) => priceOf(b) - priceOf(a));
+// 稀有度高到低，同稀有度時主要能力值高到低
+const sortByRarityThenStat = (items: ShopSlot[]) => [...items].sort((a, b) => {
+    const rarityDiff = RARITY_ORDER_DESC.indexOf(a.item.rarity) - RARITY_ORDER_DESC.indexOf(b.item.rarity);
+    if (rarityDiff !== 0) return rarityDiff;
+    return primaryStatMagnitude(b.item) - primaryStatMagnitude(a.item);
 });
+
+const currentItems = computed(() => (activeTab.value === 'GOLD' ? goldItems.value : gemsItems.value));
+
+const tiers = computed(() => [
+    {
+        key: 'EQUIPMENT',
+        label: '裝備',
+        items: sortByRarityThenStat(currentItems.value.filter(slot => slot.item.type === ItemType.EQUIPMENT)),
+    },
+    {
+        key: 'POTION',
+        label: '道具',
+        items: sortByRarityThenStat(currentItems.value.filter(slot => slot.item.type === ItemType.POTION)),
+    },
+]);
 const loading = computed(() => (activeTab.value === 'GOLD' ? goldLoading.value : gemsLoading.value));
 const loaded = computed(() => (activeTab.value === 'GOLD' ? goldLoaded.value : gemsLoaded.value));
 const currentError = computed(() => (activeTab.value === 'GOLD' ? goldError.value : gemsError.value));
-
-const priceIcon = computed(() => (activeTab.value === 'GOLD' ? 'mdi-circle-multiple' : 'mdi-diamond-stone'));
-const priceIconStyle = computed(() => (
-    activeTab.value === 'GOLD' ? { color: '#e0c063' } : { color: 'rgb(var(--v-theme-primary))' }
-));
 
 // eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
 type PurchaseDialog = { open: (slot: ShopSlot) => void };
@@ -186,6 +207,17 @@ onMounted(loadCurrent);
 .shop-page {
     width: 100%;
     overflow-y: auto;
+
+    &__tier {
+        margin-bottom: 16px;
+    }
+
+    &__tier-label {
+        margin-bottom: 6px;
+        font-size: 11px;
+        color: rgb(var(--v-theme-secondary));
+        opacity: 0.85;
+    }
 
     &__grid {
         display: grid;

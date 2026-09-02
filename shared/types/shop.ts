@@ -49,8 +49,8 @@ export type DailyGemsShop = {
  * Shop configuration
  */
 export const SHOP_CONFIG = {
-    GOLD_SHOP_SLOTS: 6,       // 6 items in gold shop
-    GEMS_SHOP_SLOTS: 6,       // 6 items in gems shop
+    EQUIPMENT_SLOTS: 6,       // 6 equipment items per shop
+    POTION_SLOTS: 3,          // 3 potion items per shop
     RESET_HOUR_UTC: 0,        // Reset at UTC 00:00
 } as const;
 

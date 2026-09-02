@@ -275,15 +275,18 @@ function rollPrice(min: number, max: number): number {
 }
 
 /**
- * Generate a fixed number of shop slots. Gold shop caps at SR (N/R/SR);
- * gems shop floors at SR (SR/SSR/L) — see design.md's rarity tiers.
- * `characterId` is set on the embedded ItemInstance immediately since shop
- * slots are already scoped to one character; purchase delivers this exact
- * item, never re-rolling it.
+ * Generate a fixed number of shop slots, laid out in two type-scoped tiers —
+ * SHOP_CONFIG.EQUIPMENT_SLOTS equipment items followed by
+ * SHOP_CONFIG.POTION_SLOTS potion items (each tier rolls only from its own
+ * template pool). Gold shop caps at SR (N/R/SR); gems shop floors at SR
+ * (SR/SSR/L) — see design.md's rarity tiers. `characterId` is set on the
+ * embedded ItemInstance immediately since shop slots are already scoped to
+ * one character; purchase delivers this exact item, never re-rolling it.
  */
 function generateShopItems(shopType: ShopType, characterId: string): ShopItem[] {
-    const slotCount = shopType === ShopType.GOLD ? SHOP_CONFIG.GOLD_SHOP_SLOTS : SHOP_CONFIG.GEMS_SHOP_SLOTS;
-    const templates = getAllItemTemplates();
+    const allTemplates = getAllItemTemplates();
+    const equipmentTemplates = allTemplates.filter(t => t.type === ItemType.EQUIPMENT);
+    const potionTemplates = allTemplates.filter(t => t.type === ItemType.POTION);
     const context: ItemGenerationContext = shopType === ShopType.GOLD
         ? {
             source: ItemSource.SHOP, maxRarity: Rarity.SR,
@@ -292,7 +295,7 @@ function generateShopItems(shopType: ShopType, characterId: string): ShopItem[] 
             source: ItemSource.SHOP, minRarity: Rarity.SR,
         };
 
-    return Array.from({ length: slotCount }, (_, index) => {
+    const rollSlot = (templates: typeof allTemplates, index: number): ShopItem => {
         const template = templates[Math.floor(Math.random() * templates.length)];
         if (!template) {
             throw new DatabaseError('No item templates available for shop generation');
@@ -311,12 +314,22 @@ function generateShopItems(shopType: ShopType, characterId: string): ShopItem[] 
         }
         const price = rollPrice(priceRange.min, priceRange.max);
 
-        const shopItem: ShopItem = {
+        return {
             slotId: `slot-${index}`,
             item,
             sold: false,
             ...(shopType === ShopType.GOLD ? { priceGold: price } : { priceGems: price }),
         };
-        return shopItem;
-    });
+    };
+
+    const equipmentSlots = Array.from(
+        { length: SHOP_CONFIG.EQUIPMENT_SLOTS },
+        (_, i) => rollSlot(equipmentTemplates, i),
+    );
+    const potionSlots = Array.from(
+        { length: SHOP_CONFIG.POTION_SLOTS },
+        (_, i) => rollSlot(potionTemplates, SHOP_CONFIG.EQUIPMENT_SLOTS + i),
+    );
+
+    return [...equipmentSlots, ...potionSlots];
 }
