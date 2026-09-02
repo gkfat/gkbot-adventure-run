@@ -52,7 +52,17 @@ export default defineNuxtConfig({
     ],
 
     // Vercel deployment preset
-    nitro: { preset: 'vercel' },
+    nitro: {
+        preset: 'vercel',
+        // sharp (pulled in transitively by @nuxt/image's ipx provider) lists
+        // every platform's native binary as an optionalDependency; pnpm only
+        // installs the ones matching this machine, but nitro's build-time
+        // dependency trace (@vercel/nft) still tries to resolve all of them,
+        // crashing on ENOENT for platforms pnpm skipped (e.g. sharp-wasm32).
+        // Excluding it from the trace is safe since it's never loaded at
+        // runtime on Vercel's actual (non-wasm) platform.
+        externals: { traceOptions: { ignore: (path: string) => path.includes('@img/sharp-wasm32') } },
+    },
 
     /**
      * Env handling:
