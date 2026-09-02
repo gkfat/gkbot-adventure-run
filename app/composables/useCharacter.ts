@@ -274,6 +274,10 @@ export const useCharacter = () => {
                 character.value = null;
                 const accountId = user.value?.uid;
                 if (accountId) localStorage.removeItem(storageKey(accountId));
+
+                // 該角色的永久背包、商店已隨伺服器端一併刪除，清空本地快取避免顯示已刪除角色的殘留資料
+                useInventory().reset();
+                useShop().reset();
             }
 
             return true;
