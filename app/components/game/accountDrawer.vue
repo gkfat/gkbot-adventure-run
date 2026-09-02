@@ -33,33 +33,22 @@
                 <div class="text-caption text-medium-emphasis mb-2">
                     {{ user?.email }}
                 </div>
-
-                <div
-                    v-if="character"
-                    class="mt-2"
-                >
-                    <span class="text-caption text-medium-emphasis">
-                        {{ character.nickname }}
-                    </span>
-                </div>
             </div>
 
             <v-divider />
 
-            <div class="pa-2">
-                <button
+            <div class="pa-4">
+                <SystemBtn
                     v-if="character"
-                    type="button"
-                    class="account-drawer__menu-item pixel-press"
+                    block
+                    color="primary"
+                    variant="flat"
+                    class="text-none"
+                    prepend-icon="mdi-account-switch-outline"
                     @click="handleSwitchCharacter"
                 >
-                    <v-icon
-                        icon="mdi-account-switch-outline"
-                        size="20"
-                        color="primary"
-                    />
-                    <span class="text-body-2">切換角色</span>
-                </button>
+                    切換角色
+                </SystemBtn>
             </div>
 
             <v-spacer />
@@ -103,31 +92,3 @@ const handleSwitchCharacter = () => {
     navigateTo('/main');
 };
 </script>
-
-<style scoped lang="scss">
-.account-drawer__menu-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 10px 12px;
-    background: none;
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-    text-align: left;
-
-    &:hover {
-        background: rgba(196, 203, 219, 0.08);
-    }
-
-    &:active {
-        background: rgba(196, 203, 219, 0.14);
-    }
-
-    &:focus-visible {
-        outline: 2px solid rgb(var(--v-theme-primary));
-        outline-offset: -2px;
-    }
-}
-</style>
