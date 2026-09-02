@@ -47,6 +47,18 @@ export enum NodeType {
 };
 
 /**
+ * Combat-tier node types (COMBAT/ELITE/STRONG_ELITE/BOSS) — the "戰鬥節點"
+ * category that todo #7's no-consecutive-non-combat-node rule exempts from
+ * its cap of 1 (combat-tier nodes may repeat up to NODE_CONFIG.COMBAT_STREAK_CAP times).
+ */
+export function isCombatNodeType(type: NodeType): boolean {
+    return type === NodeType.COMBAT
+        || type === NodeType.ELITE
+        || type === NodeType.STRONG_ELITE
+        || type === NodeType.BOSS;
+}
+
+/**
  * Facility risk severity for a run (enemy-factions-and-severity) — rolled
  * once at `createRun`, fixed for the whole run. See SEVERITY_CONFIG.
  */
@@ -313,6 +325,13 @@ export type AdventureRun = {
   // Current node
   currentNodeType?: NodeType;
   currentNodeData?: any; // Node-specific data
+
+  // Last node type decided by decideNextNode and how many times in a row it
+  // has repeated — drives the no-consecutive-non-combat-node rule (todo #7).
+  // Unlike currentNodeType, this is never deleted on EXPLORING transitions so
+  // the streak survives across a node's resolution.
+  lastNodeType?: NodeType;
+  nodeTypeStreak?: number;
   
   // Player state
   playerHp: number;
@@ -398,6 +417,14 @@ export const NODE_CONFIG = {
     REST_GUARANTEED_INTERVAL: 4,  // At least 1 rest per 4 steps
     ELITE_INTERVAL: 5,            // Elite every 5 steps
     STRONG_ELITE_INTERVAL: 9,     // Strong elite every 9 steps
+
+    // Consecutive-node-type cap for the weighted-random pick (see todo #7 —
+    // known-issue.md): non-combat node types (EVENT/REST/CHOICE) may never
+    // repeat back-to-back (cap 1); combat-tier types may repeat up to this
+    // many times. Only constrains the weighted-random branch of
+    // decideNextNode — the deterministic Boss/guaranteed-Rest/Elite cadence
+    // branches are priority-driven and exempt (see decideNextNode's comment).
+    COMBAT_STREAK_CAP: 2,
 
     // Reconnection window — after this much idle time, getCurrentRun()
     // auto-settles the run as DISCONNECT (known-issue.md #8).

@@ -283,7 +283,7 @@ describe('AdventureRunService.advance — node generation priority', () => {
 
     it('falls back to a weighted random pick using RngService when neither guarantee applies', async () => {
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
-            step: 1, lastRestStep: 0, 
+            step: 1, lastRestStep: 0,
         }));
         rngNextMock.mockResolvedValue(0); // lowest roll -> first weighted bucket (COMBAT)
 
@@ -294,7 +294,72 @@ describe('AdventureRunService.advance — node generation priority', () => {
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
             state: AdventureStateType.COMBAT,
             currentNodeType: NodeType.COMBAT,
+            lastNodeType: NodeType.COMBAT,
+            nodeTypeStreak: 1,
         }));
+    });
+
+    // todo #7 (known-issue.md): non-combat node types (EVENT/REST/CHOICE)
+    // must never repeat back-to-back; COMBAT may repeat up to
+    // NODE_CONFIG.COMBAT_STREAK_CAP (2) times.
+    describe('no-consecutive-non-combat-node rule', () => {
+        it('excludes the previous non-combat node type from the weighted pool, picking the next bucket down instead', async () => {
+            // WEIGHTED_NODE_WEIGHTS: COMBAT 55, EVENT 25, REST 5, CHOICE 15 (total 100).
+            // roll=0.6*100=60 falls in EVENT's unfiltered bucket [55,80); with EVENT
+            // excluded (lastNodeType=EVENT, streak=1 >= cap 1), the pool becomes
+            // COMBAT 55 / REST 5 / CHOICE 15 (total 75) and roll=0.6*75=45 falls
+            // back into COMBAT's bucket [0,55).
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 1, lastRestStep: 0, lastNodeType: NodeType.EVENT, nodeTypeStreak: 1,
+            }));
+            rngNextMock.mockResolvedValue(0.6);
+
+            const service = new AdventureRunService();
+            await service.advance('account-1', 'char-1');
+
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+                currentNodeType: NodeType.COMBAT,
+                lastNodeType: NodeType.COMBAT,
+                nodeTypeStreak: 1,
+            }));
+        });
+
+        it('still allows COMBAT to repeat when its streak is below the cap', async () => {
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 1, lastRestStep: 0, lastNodeType: NodeType.COMBAT, nodeTypeStreak: 1,
+            }));
+            rngNextMock.mockResolvedValue(0); // lowest roll -> COMBAT's bucket, unfiltered
+
+            const service = new AdventureRunService();
+            await service.advance('account-1', 'char-1');
+
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+                currentNodeType: NodeType.COMBAT,
+                lastNodeType: NodeType.COMBAT,
+                nodeTypeStreak: 2,
+            }));
+        });
+
+        it('excludes COMBAT once its streak hits the cap, picking the next bucket down instead', async () => {
+            // COMBAT excluded (streak 2 >= cap 2) -> pool becomes EVENT 25 / REST 5
+            // / CHOICE 15 (total 45); roll=0*45=0 falls into EVENT's bucket [0,25).
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 1, lastRestStep: 0, lastNodeType: NodeType.COMBAT, nodeTypeStreak: 2,
+            }));
+            rngNextMock.mockResolvedValue(0);
+            selectEventMock.mockResolvedValue({
+                id: 'medbay_leak', type: 'HEAL', description: 'flavor text', choices: undefined,
+            });
+
+            const service = new AdventureRunService();
+            await service.advance('account-1', 'char-1');
+
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+                currentNodeType: NodeType.EVENT,
+                lastNodeType: NodeType.EVENT,
+                nodeTypeStreak: 1,
+            }));
+        });
     });
 });
 

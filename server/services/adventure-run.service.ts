@@ -34,7 +34,7 @@ import {
     getEnemyLevel, getStatMultipliers, rollWaveCount, rollEnemyCount,
 } from '../constants/difficulty';
 import {
-    AdventureStateType, AdventureEndReason, NodeType, NODE_CONFIG, STAGE_CONFIG,
+    AdventureStateType, AdventureEndReason, NodeType, NODE_CONFIG, STAGE_CONFIG, isCombatNodeType,
     type AdventureRun, type LeaderboardUpdater, type ProgressTracker,
     type CombatResolver, type CombatContext, type CombatResolution, type CombatSummary, type CombatLogEntry,
     type EventResult, type RunModifier, type SettleSummary, type EnemyPreview,
@@ -99,7 +99,23 @@ const WEIGHTED_NODE_TYPES: { type: NodeType; weight: number }[] = [
         type: NodeType.CHOICE, weight: NODE_CONFIG.WEIGHTED_NODE_WEIGHTS.CHOICE, 
     },
 ];
-const WEIGHTED_NODE_TOTAL = WEIGHTED_NODE_TYPES.reduce((sum, entry) => sum + entry.weight, 0);
+
+// Todo #7 (known-issue.md): non-combat node types (EVENT/REST/CHOICE) must
+// never repeat back-to-back; COMBAT may repeat up to NODE_CONFIG.COMBAT_STREAK_CAP
+// times. Only applies to this weighted-random pool — ELITE/STRONG_ELITE/BOSS
+// are decided deterministically by cadence/priority before this pool is ever
+// consulted (see decideNextNode), so they're outside its scope.
+function weightedNodePoolExcludingStreak(
+    lastNodeType: NodeType | undefined, streak: number,
+): { type: NodeType; weight: number }[] {
+    if (!lastNodeType) return WEIGHTED_NODE_TYPES;
+    const cap = isCombatNodeType(lastNodeType) ? NODE_CONFIG.COMBAT_STREAK_CAP : 1;
+    if (streak < cap) return WEIGHTED_NODE_TYPES;
+    const filtered = WEIGHTED_NODE_TYPES.filter(entry => entry.type !== lastNodeType);
+    // Pool never actually empties in practice — lastNodeType is always one of
+    // the 4 weighted types when this branch runs — but fall back defensively.
+    return filtered.length > 0 ? filtered : WEIGHTED_NODE_TYPES;
+}
 
 // Stage fields are optional on old (pre-migration) run documents — see
 // design.md Migration Plan: tolerate `undefined` as "stage 1, node 0" rather
@@ -511,6 +527,9 @@ export class AdventureRunService extends BaseService {
     /**
      * Node generation priority: Stage boundary (Boss) > guaranteed Rest >
      * fixed elite cadence > weighted random (see spec.md "節點生成優先序").
+     * The weighted-random branch excludes types that would break the
+     * no-consecutive-non-combat-node rule (todo #7) — see
+     * weightedNodePoolExcludingStreak.
      */
     private async decideNextNode(run: AdventureRun): Promise<NodeType> {
         const {
@@ -529,9 +548,11 @@ export class AdventureRunService extends BaseService {
             return NodeType.ELITE;
         }
 
-        const roll = (await this.rngService.next(run.runId)) * WEIGHTED_NODE_TOTAL;
+        const pool = weightedNodePoolExcludingStreak(run.lastNodeType, run.nodeTypeStreak ?? 0);
+        const total = pool.reduce((sum, entry) => sum + entry.weight, 0);
+        const roll = (await this.rngService.next(run.runId)) * total;
         let cursor = 0;
-        for (const entry of WEIGHTED_NODE_TYPES) {
+        for (const entry of pool) {
             cursor += entry.weight;
             if (roll < cursor) {
                 return entry.type;
@@ -542,8 +563,11 @@ export class AdventureRunService extends BaseService {
 
     private async advanceFromExploring(run: AdventureRun): Promise<AdventureRun> {
         const nodeType = await this.decideNextNode(run);
+        const nodeTypeStreak = run.lastNodeType === nodeType ? (run.nodeTypeStreak ?? 0) + 1 : 1;
         const patch: Record<string, unknown> = {
             currentNodeType: nodeType,
+            lastNodeType: nodeType,
+            nodeTypeStreak,
             lastActivityAt: Date.now(),
         };
 

@@ -98,6 +98,11 @@ export const adventureRunSchema = z.object({
     // Current node
     currentNodeType: z.nativeEnum(NodeType).optional(),
     currentNodeData: z.any().optional(),
+
+    // Consecutive-node-type streak tracking (todo #7 — never deleted on
+    // EXPLORING transitions, unlike currentNodeType)
+    lastNodeType: z.nativeEnum(NodeType).optional(),
+    nodeTypeStreak: z.number().int().min(0).optional(),
   
     // Player state
     playerHp: z.number().min(0),
