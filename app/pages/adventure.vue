@@ -254,45 +254,57 @@
                                 x{{ currentRun.runInventory.length }}
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- 狀態：目前 HP，以及本次冒險已獲得的祝福/詛咒清單 -->
-                <div class="adventure-page__box mb-3">
-                    <div class="d-flex align-center justify-space-between mb-2">
-                        <span class="text-caption text-medium-emphasis">HP</span>
-                        <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-warning));">
-                            {{ displayedPlayerHp }} / {{ currentRun.playerHpMax }}<span
-                                v-if="hpMaxBonus"
-                                class="text-caption"
-                                :style="{ color: hpMaxBonus > 0 ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-warning))' }"
-                            >({{ hpMaxBonus > 0 ? '+' : '' }}{{ hpMaxBonus }})</span>
-                        </span>
-                    </div>
-                    <div
-                        v-if="acquiredModifiers.length"
-                        class="d-flex flex-wrap ga-2"
-                    >
-                        <div
-                            v-for="modifier in acquiredModifiers"
-                            :key="modifier.modifierId"
-                            class="adventure-page__modifier-chip"
-                            :class="{ 'adventure-page__modifier-chip--curse': !modifier.isBlessing }"
-                        >
-                            <div class="adventure-page__modifier-chip-label">
-                                {{ modifier.isBlessing ? '祝福' : '詛咒' }}
+                        <div class="adventure-page__loot-stat">
+                            <div class="text-caption text-medium-emphasis">祝福</div>
+                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
+                                x{{ currentRun.blessings.length }}
                             </div>
-                            <div class="adventure-page__modifier-chip-title">
-                                {{ modifier.name }}
-                            </div>
-                            <div
-                                v-if="describeModifierEffect(modifier)"
-                                class="adventure-page__modifier-chip-value font-pixel"
-                            >
-                                {{ describeModifierEffect(modifier) }}
+                        </div>
+                        <div class="adventure-page__loot-stat">
+                            <div class="text-caption text-medium-emphasis">詛咒</div>
+                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
+                                x{{ currentRun.curses.length }}
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- 狀態：目前 HP 與戰鬥數值（祝福/詛咒的詳情改為取得當下以 dialog 呈現，見 GameModifierAcquiredDialog）；
+                     戰鬥數值平時收合，點擊展開按鈕才顯示 -->
+                <div class="adventure-page__box mb-3">
+                    <div class="d-flex align-center justify-space-between">
+                        <span class="text-caption text-medium-emphasis">HP</span>
+                        <div class="d-flex align-center ga-2">
+                            <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-warning));">
+                                {{ displayedPlayerHp }} / {{ currentRun.playerHpMax }}<span
+                                    v-if="hpMaxBonus"
+                                    class="text-caption"
+                                    :style="{ color: hpMaxBonus > 0 ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-warning))' }"
+                                >({{ hpMaxBonus > 0 ? '+' : '' }}{{ hpMaxBonus }})</span>
+                            </span>
+                            <v-icon
+                                :icon="showCombatStats ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+                                size="20"
+                                color="primary"
+                                class="pixel-press"
+                                aria-label="展開戰鬥數值"
+                                @click="showCombatStats = !showCombatStats"
+                            />
+                        </div>
+                    </div>
+                    <template v-if="showCombatStats">
+                        <v-divider class="my-2" />
+                        <div class="d-flex flex-wrap ga-4">
+                            <div
+                                v-for="stat in combatStatEntries"
+                                :key="stat.label"
+                                class="d-flex align-center ga-1"
+                            >
+                                <span class="text-caption text-medium-emphasis">{{ stat.label }}</span>
+                                <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">{{ stat.value }}</span>
+                            </div>
+                        </div>
+                    </template>
                 </div>
 
                 <!-- COMBAT：觸發戰鬥；戰鬥結果在 COMBAT/RESOLUTION 都顯示，直到玩家繼續前進 -->
@@ -516,13 +528,19 @@
             v-model="showLogDialog"
             :entries="runLog"
         />
+
+        <GameModifierAcquiredDialog
+            :modifier="acquiredModifierDialog"
+            :effect-text="acquiredModifierDialog ? describeModifierEffect(acquiredModifierDialog) : ''"
+            @update:modifier="acquiredModifierDialog = $event"
+        />
     </div>
 </template>
 
 <script setup lang="ts">
 import {
     AdventureStateType, NodeType, getStageDisplayName,
-    type FacilitySeverity, type EnemyFaction,
+    type FacilitySeverity, type EnemyFaction, type RunModifier,
 } from '../../shared/types/adventure';
 import { EXP_TABLE } from '../../shared/types/character';
 import { BLESSING_TEMPLATES, CURSE_TEMPLATES } from '../../shared/constants/blessings';
@@ -580,6 +598,12 @@ const {
 const enteredAdventureCold = !checked.value;
 
 const showLogDialog = ref(false);
+const showCombatStats = ref(false);
+
+// 本次戰鬥/事件中剛取得的祝福或詛咒，非 null 時以 dialog 呈現內容（見
+// handleResolveEvent/handleSelectBlessing）；關閉 dialog 後歸零，不做持久顯示，
+// HP panel 不再重覆列出詳情，僅頂端 summary 列的祝福計數保留為持久狀態。
+const acquiredModifierDialog = ref<RunModifier | null>(null);
 const {
     items: permanentItems, fetchInventory, loaded: inventoryLoaded, invalidate: invalidateInventory,
 } = useInventory();
@@ -663,6 +687,20 @@ const acquiredModifiers = computed(() => {
 const hpMaxBonus = computed(() => acquiredModifiers.value.reduce(
     (sum, modifier) => sum + (modifier.statModifiers?.HP_MAX ?? 0), 0,
 ));
+
+// 戰鬥數值 panel：character.stats 已含裝備加成後的最終值（比照
+// characterStage.vue 的顯示邏輯），此處不需再另外疊加 equipmentBonus。
+const combatStatEntries = computed(() => {
+    if (!character.value) return [];
+    const { stats } = character.value;
+    return [
+        { label: '攻擊力', value: `${stats.ATK}` },
+        { label: '防禦力', value: `${stats.DEF}` },
+        { label: '攻速', value: `${stats.actionIntervalSec.toFixed(1)}s` },
+        { label: '爆擊率', value: `${Math.round(stats.critChance * 100)}%` },
+        { label: '閃避率', value: `${Math.round(stats.dodgeChance * 100)}%` },
+    ];
+});
 
 // 單一祝福/詛咒 chip 下方的效果文字，例如 "防禦力 +6" 或 "掉落率 x1.30"。
 const describeModifierEffect = (modifier: (typeof MODIFIER_TEMPLATES)[number]) => {
@@ -824,11 +862,18 @@ const handleHeal = async (itemId: string) => {
 const handleResolveEvent = async (choiceIndex?: number) => {
     if (!character.value) return;
     await resolveEvent(character.value.characterId, choiceIndex);
+    const grantedModifierId = lastEventResult.value?.blessingGranted ?? lastEventResult.value?.curseApplied;
+    if (grantedModifierId) {
+        acquiredModifierDialog.value = MODIFIER_TEMPLATES.find(t => t.modifierId === grantedModifierId) ?? null;
+    }
 };
 
 const handleSelectBlessing = async (blessingId: string) => {
     if (!character.value) return;
-    await selectBlessing(character.value.characterId, blessingId);
+    const success = await selectBlessing(character.value.characterId, blessingId);
+    if (success) {
+        acquiredModifierDialog.value = MODIFIER_TEMPLATES.find(t => t.modifierId === blessingId) ?? null;
+    }
 };
 
 const handleReturnHome = () => {
@@ -955,47 +1000,6 @@ onMounted(() => {
         }
     }
 
-    &__modifier-chip {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 1px;
-        min-width: 64px;
-        max-width: 100%;
-        padding: 4px 8px;
-        text-align: center;
-        color: rgb(var(--v-theme-green));
-        background: rgba(var(--v-theme-green), 0.08);
-        border: 1px solid rgba(var(--v-theme-green), 0.4);
-        border-radius: 3px;
-
-        &--curse {
-            color: rgb(var(--v-theme-warning));
-            background: rgba(255, 82, 82, 0.08);
-            border-color: rgba(255, 82, 82, 0.4);
-        }
-    }
-
-    &__modifier-chip-label {
-        font-size: 9px;
-        opacity: 0.7;
-    }
-
-    &__modifier-chip-title {
-        font-size: 11px;
-        font-weight: 700;
-    }
-
-    &__modifier-chip-value {
-        margin-top: 2px;
-        padding-top: 2px;
-        font-size: 10px;
-        line-height: 1.3;
-        white-space: normal;
-        word-break: keep-all;
-        border-top: 1px dashed rgba(196, 203, 219, 0.2);
-    }
 
     &__item-chip-rarity {
         position: absolute;
