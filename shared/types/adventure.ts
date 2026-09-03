@@ -609,13 +609,12 @@ export function rollFactionType(severityTier: FacilitySeverity, rngValue: number
 
 /**
  * Stage structure configuration (adventure-stage-progression).
- * ASSUMPTION (undocumented elsewhere, see design.md): NODE_COUNT range and
- * FACILITY_THEMES are invented values, freely tunable. FACILITY_THEMES
- * follows docs/worldview.md 第 2 節 table order and may keep growing.
+ * ASSUMPTION (undocumented elsewhere, see design.md): FACILITY_THEMES are
+ * invented values, freely tunable, following docs/worldview.md 第 2 節 table
+ * order and may keep growing. Node-count range is no longer fixed here —
+ * see PROGRESSION_CONFIG/getStageNodeCountRange below.
  */
 export const STAGE_CONFIG = {
-    NODE_COUNT_MIN: 10,
-    NODE_COUNT_MAX: 20,             // inclusive, decisive RNG uniform roll at stage start
     FACILITY_THEMES: [
         '廢棄補給站',
         '廢棄研究所',
@@ -629,6 +628,14 @@ export const STAGE_CONFIG = {
 } as const;
 
 /**
+ * Fallback stageNodeCount for run documents written before
+ * `chapter-progression-scaling` shipped and missing the field (see
+ * AdventureRunRepository.withStageDefaults) — a flat legacy default, not a
+ * recomputed roll.
+ */
+export const STAGE_NODE_COUNT_FALLBACK = 10;
+
+/**
  * The facility theme for a given chapter — cycles through STAGE_CONFIG.FACILITY_THEMES.
  */
 export function getFacilityTheme(chapterIndex: number): string {
@@ -636,47 +643,94 @@ export function getFacilityTheme(chapterIndex: number): string {
 }
 
 /**
- * Chapter/Level hierarchy (chapter-level-structure): a Chapter = one facility
- * theme (STAGE_CONFIG.FACILITY_THEMES), a Level = one run within that
- * chapter. Range indexes line up positionally with FACILITY_THEMES.
- * ASSUMPTION (undocumented elsewhere, see design.md): these ranges are
- * invented values reflecting docs/worldview.md 第 2 節's scale language
- * (小賣店 = quick, 研究設施 = long) — freely tunable.
+ * Chapter-level-count and Stage-node-count scaling (chapter-progression-scaling):
+ * both scale together off one [0,1] progression factor built from (a) the
+ * character's attribute-only combat power relative to the power "expected"
+ * at this chapterIndex, and (b) chapterIndex itself (later chapters skew
+ * larger regardless of relative power).
+ *
+ * Attribute-only power (shared/utils/calculateStats.ts's calculateBaseStats
+ * + calculateCombatPower, no equipment) is used deliberately: these rolls
+ * happen deep in CharacterRepository/AdventureRunRepository as synchronous,
+ * deterministic functions, and equipment-inclusive power would need an async
+ * equipment lookup at every call site — it also can't be gamed by
+ * unequipping right before a roll.
+ *
+ * ASSUMPTION (no design doc backing): every constant below, including
+ * BASE_POWER, is an invented, freely-tunable value.
  */
-export const LEVEL_COUNT_RANGE_BY_FACILITY: readonly { min: number; max: number }[] = [
-    {
-        min: 5, max: 8, 
-    },   // 廢棄補給站
-    {
-        min: 8, max: 12, 
-    },  // 廢棄研究所
-    {
-        min: 6, max: 9, 
-    },   // 廢棄維修廠
-    {
-        min: 6, max: 10, 
-    },  // 崩壞VR體驗館
-    {
-        min: 7, max: 11, 
-    },  // 廢棄工廠
-    {
-        min: 5, max: 8, 
-    },   // 荒廢遊樂場
-    {
-        min: 6, max: 10, 
-    },  // 廢棄百貨公司
-    {
-        min: 3, max: 5, 
-    },   // 無主小賣店
-] as const;
+export const PROGRESSION_CONFIG = {
+    // calculateCombatPower(calculateBaseStats({ STR: 2, AGI: 2, CON: 2, LUCK: 2 }))
+    // — an archetype-average LV1 character with no equipment, used as the
+    // chapterIndex=0 baseline `expectedPower` scales up from.
+    BASE_POWER: 70,
+    POWER_GROWTH_PER_CHAPTER: 0.15,
+    POWER_RATIO_MIN: 0.5,
+    POWER_RATIO_MAX: 2.0,
+    MAX_CHAPTER_FOR_SCALING: 20, // chapterIndex at/after which chapterFactor caps at 1
+    POWER_FACTOR_WEIGHT: 0.7,
+    CHAPTER_FACTOR_WEIGHT: 0.3,
+    LEVEL_COUNT_MIN: {
+        LOW: 3, HIGH: 8,
+    },
+    LEVEL_COUNT_MAX: {
+        LOW: 7, HIGH: 12,
+    },
+    STAGE_NODE_MIN: {
+        LOW: 5, HIGH: 8,
+    },
+    STAGE_NODE_MAX: {
+        LOW: 10, HIGH: 15,
+    },
+} as const;
+
+function lerp(low: number, high: number, factor: number): number {
+    return low + (high - low) * factor;
+}
 
 /**
- * The level-count range for a given chapter — cycles through
- * LEVEL_COUNT_RANGE_BY_FACILITY the same way getFacilityTheme cycles
- * FACILITY_THEMES (same chapterIndex, same modulo).
+ * Combined power+chapter progression factor in [0,1]: 0 = 戰力低/早期章節下限,
+ * 1 = 戰力高/後期章節上限. `characterPower` is attribute-only combat power
+ * (see PROGRESSION_CONFIG doc comment above).
  */
-export function getLevelCountRange(chapterIndex: number): { min: number; max: number } {
-    return LEVEL_COUNT_RANGE_BY_FACILITY[chapterIndex % LEVEL_COUNT_RANGE_BY_FACILITY.length] as { min: number; max: number };
+export function getProgressionFactor(characterPower: number, chapterIndex: number): number {
+    const expectedPower = PROGRESSION_CONFIG.BASE_POWER
+        * (1 + PROGRESSION_CONFIG.POWER_GROWTH_PER_CHAPTER * chapterIndex);
+    const powerRatio = clamp(
+        characterPower / expectedPower,
+        PROGRESSION_CONFIG.POWER_RATIO_MIN,
+        PROGRESSION_CONFIG.POWER_RATIO_MAX,
+    );
+    const powerFactor = (powerRatio - PROGRESSION_CONFIG.POWER_RATIO_MIN)
+        / (PROGRESSION_CONFIG.POWER_RATIO_MAX - PROGRESSION_CONFIG.POWER_RATIO_MIN);
+    const chapterFactor = clamp(chapterIndex / PROGRESSION_CONFIG.MAX_CHAPTER_FOR_SCALING, 0, 1);
+
+    return powerFactor * PROGRESSION_CONFIG.POWER_FACTOR_WEIGHT
+        + chapterFactor * PROGRESSION_CONFIG.CHAPTER_FACTOR_WEIGHT;
+}
+
+/**
+ * The level-count range for a given chapter, scaled by the character's
+ * attribute-only combat power and the chapter's own progression (chapter-progression-scaling).
+ */
+export function getLevelCountRange(characterPower: number, chapterIndex: number): { min: number; max: number } {
+    const factor = getProgressionFactor(characterPower, chapterIndex);
+    return {
+        min: Math.round(lerp(PROGRESSION_CONFIG.LEVEL_COUNT_MIN.LOW, PROGRESSION_CONFIG.LEVEL_COUNT_MIN.HIGH, factor)),
+        max: Math.round(lerp(PROGRESSION_CONFIG.LEVEL_COUNT_MAX.LOW, PROGRESSION_CONFIG.LEVEL_COUNT_MAX.HIGH, factor)),
+    };
+}
+
+/**
+ * The Stage node-count range for a given run, scaled the same way as
+ * getLevelCountRange (chapter-progression-scaling).
+ */
+export function getStageNodeCountRange(characterPower: number, chapterIndex: number): { min: number; max: number } {
+    const factor = getProgressionFactor(characterPower, chapterIndex);
+    return {
+        min: Math.round(lerp(PROGRESSION_CONFIG.STAGE_NODE_MIN.LOW, PROGRESSION_CONFIG.STAGE_NODE_MIN.HIGH, factor)),
+        max: Math.round(lerp(PROGRESSION_CONFIG.STAGE_NODE_MAX.LOW, PROGRESSION_CONFIG.STAGE_NODE_MAX.HIGH, factor)),
+    };
 }
 
 /**
@@ -685,8 +739,8 @@ export function getLevelCountRange(chapterIndex: number): { min: number; max: nu
  * CharacterRepository for the real seed source, mirroring
  * AdventureRunRepository's rollInRange pattern for stageNodeCount).
  */
-export function rollChapterTotalLevels(chapterIndex: number, rngValue: number): number {
-    const range = getLevelCountRange(chapterIndex);
+export function rollChapterTotalLevels(characterPower: number, chapterIndex: number, rngValue: number): number {
+    const range = getLevelCountRange(characterPower, chapterIndex);
     return range.min + Math.floor(rngValue * (range.max - range.min + 1));
 }
 

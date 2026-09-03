@@ -37,7 +37,7 @@ import {
     getEnemyLevel, getStatMultipliers, rollWaveCount, rollEnemyCount,
 } from '../constants/difficulty';
 import {
-    AdventureStateType, AdventureEndReason, NodeType, NODE_CONFIG, STAGE_CONFIG, isCombatNodeType,
+    AdventureStateType, AdventureEndReason, NodeType, NODE_CONFIG, STAGE_NODE_COUNT_FALLBACK, isCombatNodeType,
     type AdventureRun, type LeaderboardUpdater, type ProgressTracker,
     type CombatResolver, type CombatContext, type CombatResolution, type CombatSummary, type CombatLogEntry,
     type EventResult, type SettleSummary, type EnemyPreview, type BlessingEntry,
@@ -182,7 +182,7 @@ function resolveStageFields(run: AdventureRun): StageFields {
     return {
         chapterIndex: run.chapterIndex ?? 0,
         stageNodeIndex: run.stageNodeIndex ?? 0,
-        stageNodeCount: run.stageNodeCount ?? STAGE_CONFIG.NODE_COUNT_MIN,
+        stageNodeCount: run.stageNodeCount ?? STAGE_NODE_COUNT_FALLBACK,
     };
 }
 
@@ -237,6 +237,7 @@ export class AdventureRunService extends BaseService {
             accountId,
             playerHpMax: characterWithStats.stats.HP_MAX,
             chapterIndex: characterWithStats.nextChapterIndex,
+            characterAttributes: characterWithStats.attributes,
         });
     }
 

@@ -11,13 +11,15 @@
 
 import { BaseRepository } from './base.repository';
 import {
-    AdventureStateType, STAGE_CONFIG, rollSeverityTier, rollFactionType, type AdventureRun,
+    AdventureStateType, STAGE_NODE_COUNT_FALLBACK, getStageNodeCountRange, rollSeverityTier, rollFactionType, type AdventureRun,
 } from '../../shared/types/adventure';
 import { adventureRunSchema } from '../../shared/schemas/firestore/adventure.schema';
 import {
     DatabaseError, NotFoundError,
 } from '../../shared/types/errors';
+import type { Attributes } from '../../shared/types/common';
 import { random } from '../services/rng.service';
+import { calculateAttributePower } from '../../shared/utils/calculateStats';
 
 /**
  * Inclusive uniform integer in [min, max] from a single RNG draw in [0, 1).
@@ -40,7 +42,7 @@ function withStageDefaults(run: AdventureRun): AdventureRun {
         ...run,
         chapterIndex: run.chapterIndex ?? 0,
         stageNodeIndex: run.stageNodeIndex ?? 0,
-        stageNodeCount: run.stageNodeCount ?? STAGE_CONFIG.NODE_COUNT_MIN,
+        stageNodeCount: run.stageNodeCount ?? STAGE_NODE_COUNT_FALLBACK,
         expEarned: run.expEarned ?? 0,
         // enemy-factions-and-severity Migration Plan: missing on pre-migration
         // run docs — tolerate as PARTIAL_ACTIVE/GKBOT (equivalent to the
@@ -62,6 +64,7 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
         accountId: string;
         playerHpMax: number;
         chapterIndex: number;
+        characterAttributes: Attributes;
     }): Promise<AdventureRun> {
         try {
             const docRef = this.collection.doc();
@@ -75,8 +78,12 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
 
             // Roll the Stage's node count deterministically from the fresh
             // seed — no existing doc yet, so this can't go through
-            // RngService.next()/consumeRng().
-            const stageNodeCount = rollInRange(random(seed, 0), STAGE_CONFIG.NODE_COUNT_MIN, STAGE_CONFIG.NODE_COUNT_MAX);
+            // RngService.next()/consumeRng(). Range scales by the
+            // character's attribute-power vs. chapter progression
+            // (chapter-progression-scaling, see PROGRESSION_CONFIG).
+            const characterPower = calculateAttributePower(params.characterAttributes);
+            const stageNodeRange = getStageNodeCountRange(characterPower, params.chapterIndex);
+            const stageNodeCount = rollInRange(random(seed, 0), stageNodeRange.min, stageNodeRange.max);
 
             // Facility severity / enemy faction (enemy-factions-and-severity
             // design.md 決策 1): rolled once here, same deterministic-seed

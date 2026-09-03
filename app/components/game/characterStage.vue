@@ -173,7 +173,7 @@
                 </div>
 
                 <!-- 裝備欄位：角色圖像左右各 3 格 -->
-                <div class="character-stage__equip-row my-5">
+                <div class="character-stage__equip-row mt-2">
                     <div class="character-stage__equip-col">
                         <button
                             v-for="slot in EQUIP_SLOTS_LEFT"
@@ -221,6 +221,9 @@
                                 >
                                     {{ character.className }}
                                 </v-chip>
+                            </div>
+                            <div class="font-pixel text-caption character-stage__power-tag">
+                                戰力 {{ combatPower }}
                             </div>
                             <div class="text-body-2 text-medium-emphasis">
                                 {{ character.nickname }}
@@ -323,7 +326,7 @@
 <script setup lang="ts">
 import { getStageDisplayName } from '../../../shared/types/adventure';
 import type { EquipmentSlot } from '../../../shared/types/common';
-import { calculateBaseStats, applyEquipmentStats } from '../../../shared/utils/calculateStats';
+import { calculateBaseStats, applyEquipmentStats, calculateCombatPower } from '../../../shared/utils/calculateStats';
 import {
     EQUIP_SLOTS_LEFT, EQUIP_SLOTS_RIGHT, SLOT_PIXEL_ICON, SLOT_LABEL, RARITY_COLOR, resolvePixelIcon,
     equippedStatValue, equippedStatColor,
@@ -563,6 +566,11 @@ const withEquipmentBonusPercent = (finalValue: number, bonus: number | undefined
     };
 };
 
+const combatPower = computed(() => {
+    if (!character.value) return 0;
+    return calculateCombatPower(character.value.stats);
+});
+
 const statEntries = computed(() => {
     if (!character.value) return [];
     const { stats, equipmentBonus } = character.value;
@@ -637,7 +645,6 @@ watch(character, (value) => {
 
     &__footer {
         flex-shrink: 0;
-        padding-top: 8px;
     }
 
     &__sprite-col {
@@ -663,6 +670,11 @@ watch(character, (value) => {
         background: rgba(10, 12, 16, 0.55) !important;
     }
 
+    &__power-tag {
+        color: #ef8354;
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.85);
+    }
+
     &__sprite-wrap {
         position: relative;
         width: 140px;
@@ -684,7 +696,8 @@ watch(character, (value) => {
         width: 100%;
         margin: 0 auto;
         padding: 16px 10px;
-        border-radius: 8px;
+        border-radius: 2px;
+        border: 1px solid rgba(196, 203, 219, 0.3);
         background-image: url('/images/backgrounds/sewer-camp.gif');
         background-size: cover;
         background-position: center;

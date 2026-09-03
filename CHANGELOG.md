@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 主頁面角色背景
 - 祝福可升等
 - 實作轉盤 UI
+- 新增戰力計算，實作依戰力生成章節、關卡、stage 數量機制
 
 ### Changed
 

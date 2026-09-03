@@ -80,6 +80,48 @@ export function calculateBaseStats(
 }
 
 /**
+ * Combat power: a single number summarizing a character's effective Stats.
+ * Used both for UI display (characterStage.vue) and, via
+ * calculateAttributePower below, as the input to chapter/stage progression
+ * scaling (see PROGRESSION_CONFIG in shared/types/adventure.ts).
+ * ASSUMPTION (no design doc backing): weights are invented, freely tunable.
+ */
+export const COMBAT_POWER_CONFIG = {
+    ATK_WEIGHT: 2,
+    DEF_WEIGHT: 2,
+    HP_MAX_WEIGHT: 0.1,
+    ACTION_SPEED_WEIGHT: 20, // multiplies 1 / actionIntervalSec
+    CRIT_WEIGHT: 30,         // multiplies critChance * critMultiplier
+    DODGE_WEIGHT: 30,        // multiplies dodgeChance
+} as const;
+
+export function calculateCombatPower(stats: Omit<Stats, 'HP_CURRENT'>): number {
+    const {
+        ATK, DEF, HP_MAX, actionIntervalSec, critChance, critMultiplier, dodgeChance,
+    } = stats;
+
+    return Math.round(
+        ATK * COMBAT_POWER_CONFIG.ATK_WEIGHT
+        + DEF * COMBAT_POWER_CONFIG.DEF_WEIGHT
+        + HP_MAX * COMBAT_POWER_CONFIG.HP_MAX_WEIGHT
+        + (1 / actionIntervalSec) * COMBAT_POWER_CONFIG.ACTION_SPEED_WEIGHT
+        + critChance * critMultiplier * COMBAT_POWER_CONFIG.CRIT_WEIGHT
+        + dodgeChance * COMBAT_POWER_CONFIG.DODGE_WEIGHT,
+    );
+}
+
+/**
+ * Attribute-only combat power (no equipment) — the input chapter/stage
+ * progression scaling uses, since those rolls happen deep in
+ * CharacterRepository/AdventureRunRepository as synchronous, deterministic
+ * functions that can't do an async equipment lookup (see PROGRESSION_CONFIG
+ * doc comment in shared/types/adventure.ts).
+ */
+export function calculateAttributePower(attributes: Attributes): number {
+    return calculateCombatPower(calculateBaseStats(attributes));
+}
+
+/**
  * Apply equipment modifiers to base stats
  */
 export function applyEquipmentStats(

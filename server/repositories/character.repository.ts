@@ -19,12 +19,13 @@ import {
     DatabaseError, NotFoundError,
 } from '../../shared/types/errors';
 import {
-    RESOURCE_LIMITS, clamp,
+    RESOURCE_LIMITS, clamp, type Attributes,
 } from '../../shared/types/common';
 import {
     LEGACY_ARCHETYPE_ID, LEGACY_CLASS_NAME, type CharacterArchetype,
 } from '../constants/templates/characterArchetypes';
 import { random } from '../services/rng.service';
+import { calculateAttributePower } from '../../shared/utils/calculateStats';
 
 export const CHARACTER_ROSTER_MAX = 3;
 
@@ -44,8 +45,8 @@ function withNextChapterDefault(character: Character): Character {
  * own id + the chapter index — no persisted seed needed, and stable across
  * repeated calls for the same (characterId, chapterIndex) pair (chapter-level-structure).
  */
-function rollChapterTotalLevelsForCharacter(characterId: string, chapterIndex: number): number {
-    return rollChapterTotalLevels(chapterIndex, random(characterId, chapterIndex));
+function rollChapterTotalLevelsForCharacter(characterId: string, chapterIndex: number, attributes: Attributes): number {
+    return rollChapterTotalLevels(calculateAttributePower(attributes), chapterIndex, random(characterId, chapterIndex));
 }
 
 /**
@@ -60,7 +61,7 @@ function withLevelDefaults(character: Character): Character {
         ...character,
         currentLevelIndex: character.currentLevelIndex ?? 0,
         chapterTotalLevels: character.chapterTotalLevels
-            ?? rollChapterTotalLevelsForCharacter(character.characterId, character.nextChapterIndex),
+            ?? rollChapterTotalLevelsForCharacter(character.characterId, character.nextChapterIndex, character.attributes),
     };
 }
 
@@ -128,7 +129,7 @@ export class CharacterRepository extends BaseRepository<Character> {
 
             nextChapterIndex: 0,
             currentLevelIndex: 0,
-            chapterTotalLevels: rollChapterTotalLevelsForCharacter(characterId, 0),
+            chapterTotalLevels: rollChapterTotalLevelsForCharacter(characterId, 0, archetype.attributes),
 
             nickname: this.generateArchetypeNickname(archetype.className, characterId),
 
@@ -298,7 +299,7 @@ export class CharacterRepository extends BaseRepository<Character> {
                     } else {
                         nextChapterIndex = character.nextChapterIndex + 1;
                         currentLevelIndex = 0;
-                        chapterTotalLevels = rollChapterTotalLevelsForCharacter(characterId, nextChapterIndex);
+                        chapterTotalLevels = rollChapterTotalLevelsForCharacter(characterId, nextChapterIndex, character.attributes);
                         chapterAdvanced = true;
                     }
                 }

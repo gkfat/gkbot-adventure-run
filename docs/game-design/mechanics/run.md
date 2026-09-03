@@ -59,21 +59,21 @@ Run 結束原因（`AdventureEndReason`）：`COMPLETED`（Boss 戰勝利）、`
 
 ## 2. Chapter → Level → Run → Stage 四層階層
 
-對應：`adventure-run-lifecycle/spec.md`「章節與關卡的階層」「Stage 結構與 Boss 節點」；`shared/types/adventure.ts` `STAGE_CONFIG`/`LEVEL_COUNT_RANGE_BY_FACILITY`；敘事層級的骨架見 `docs/worldview.md` 第 6 節。
+對應：`adventure-run-lifecycle/spec.md`「章節與關卡的階層」「Stage 結構與 Boss 節點」；`shared/types/adventure.ts` `STAGE_CONFIG`/`PROGRESSION_CONFIG`；敘事層級的骨架見 `docs/worldview.md` 第 6 節。
 
 | 層級 | 定義 | 對應欄位/型別 |
 |---|---|---|
 | Chapter（章節） | 一個裂域設施主題，依序循環 `STAGE_CONFIG.FACILITY_THEMES`（8 種） | 角色文件 `nextChapterIndex` |
-| Level（關卡） | 章節內第幾趟遠征；章節總關卡數在**角色首次進入該章節時**以決定性 RNG 依設施類型區間 roll 定，同章節內固定不變 | 角色文件 `currentLevelIndex`（0-based）/`chapterTotalLevels` |
+| Level（關卡） | 章節內第幾趟遠征；章節總關卡數在**角色首次進入該章節時**以決定性 RNG、依角色戰力與章節進度動態 roll 定，同章節內固定不變 | 角色文件 `currentLevelIndex`（0-based）/`chapterTotalLevels` |
 | Run（一次遠征） | 現行「一次遠征」概念，對應**章節內的一個關卡**（而非整個設施）；同一章節內的所有 Level 共用同一個設施主題 | `AdventureRun.chapterIndex` |
-| Stage（原稱「節點/Node」） | 一次 Run 內固定 10~20 個 Stage，最後一個 Stage 固定為該關卡的 Boss 戰，打贏即代表這個關卡攻略成功 | `AdventureRun.stageNodeIndex`/`stageNodeCount`；程式碼型別/欄位仍沿用 `NodeType`/`currentNodeData` 等既有命名，僅規格文件對外說法改稱 Stage，行為與程式碼識別字皆未變動 |
+| Stage（原稱「節點/Node」） | 一次 Run 內含數量隨角色戰力與章節進度動態調整的 Stage，最後一個 Stage 固定為該關卡的 Boss 戰，打贏即代表這個關卡攻略成功 | `AdventureRun.stageNodeIndex`/`stageNodeCount`；程式碼型別/欄位仍沿用 `NodeType`/`currentNodeData` 等既有命名，僅規格文件對外說法改稱 Stage，行為與程式碼識別字皆未變動 |
 
 ### 2.1 章節總關卡數（`chapterTotalLevels`）如何決定
 
-- 觸發時機：`nextChapterIndex` 剛遞增（攻略完上一章節）或角色文件初始建立（`nextChapterIndex = 0`）時，系統依新章節對應的設施類型，從「設施類型 → 關卡數區間」對照表（`LEVEL_COUNT_RANGE_BY_FACILITY`）以決定性 RNG roll 出 `chapterTotalLevels`（含頭尾），並將 `currentLevelIndex` 重設為 0。
+- 觸發時機：`nextChapterIndex` 剛遞增（攻略完上一章節）或角色文件初始建立（`nextChapterIndex = 0`）時，系統以決定性 RNG，依「章節/關卡進度縮放」（chapter-progression-scaling，見 3.2 節）算出的區間 roll 出 `chapterTotalLevels`（含頭尾），並將 `currentLevelIndex` 重設為 0。
 - `chapterTotalLevels` 在同一章節內固定不變；同一章節內從關卡 1 推進到關卡 2 時，`chapterIndex`（設施主題）不變，只有 `currentLevelIndex` 遞增。
-- 完整 8 種設施類型的區間值定案於 `LEVEL_COUNT_RANGE_BY_FACILITY` 常數（例如「無主小賣店」對應 3~5、「廢棄研究所」對應 8~12），每種設施類型皆有明確定案的區間，不允許缺漏。
-- 設施主題清單循環到底時（`nextChapterIndex` 超過清單長度），依序循環回第一個設施主題繼續使用，並依循環後對應到的設施類型重新 roll 該章節的 `chapterTotalLevels`。
+- 區間由 `getLevelCountRange(characterPower, chapterIndex)` 動態算出（`PROGRESSION_CONFIG`）：戰力低、章節早期時約 3~7 關；戰力高、章節後期時下限提升到 8~12 關，見 3.2 節公式細節。
+- 設施主題清單循環到底時（`nextChapterIndex` 超過清單長度），依序循環回第一個設施主題繼續使用，`chapterTotalLevels` 仍依當下的戰力與 `chapterIndex`（非循環後 index）重新 roll。
 
 ### 2.2 首頁顯示
 
@@ -81,13 +81,26 @@ Run 結束原因（`AdventureEndReason`）：`COMPLETED`（Boss 戰勝利）、`
 
 ## 3. Stage（節點）層級結構
 
-對應：`adventure-run-lifecycle/spec.md`「Stage 結構與 Boss 節點」「節點生成優先序」；`shared/types/adventure.ts` `STAGE_CONFIG`/`NODE_CONFIG`。
+對應：`adventure-run-lifecycle/spec.md`「Stage 結構與 Boss 節點」「節點生成優先序」；`shared/types/adventure.ts` `STAGE_CONFIG`/`NODE_CONFIG`/`PROGRESSION_CONFIG`。
 
-一次 Run（對應一個 Level）內含 10~20 個 Stage（`STAGE_CONFIG.NODE_COUNT_MIN/MAX`，建立時以決定性 RNG 一次 roll 定，存於 `run.stageNodeCount`）。
+一次 Run（對應一個 Level）內含的 Stage 數量隨角色戰力與章節進度動態調整（見 3.2 節），建立時以決定性 RNG 一次 roll 定，存於 `run.stageNodeCount`。
 
 - `run.chapterIndex`：裂域設施主題索引，對應 `STAGE_CONFIG.FACILITY_THEMES`（依序循環，目前 8 種：廢棄補給站、廢棄研究所、廢棄維修廠、崩壞VR體驗館、廢棄工廠、荒廢遊樂場、廢棄百貨公司、無主小賣店）。
 - `run.stageNodeIndex`：目前 Run 內的 Stage 序號（0-based）。
 - Run 的最後一個 Stage（`stageNodeIndex == stageNodeCount - 1`）SHALL 固定為 `BOSS` combat，不受保底 Rest 或加權隨機影響；打贏即代表這個 Level 攻略成功。
+
+### 3.2 章節/關卡進度縮放（chapter-progression-scaling）
+
+`chapterTotalLevels`（3.1 節）與 `stageNodeCount` 共用同一套動態縮放公式（`PROGRESSION_CONFIG`，`shared/types/adventure.ts`），依角色「戰力」與章節進度共同決定區間，戰力與角色戰力差距越大、章節位置越後面，調整幅度越大：
+
+1. **戰力**：`calculateAttributePower(character.attributes)`，即角色**未含裝備**的基礎屬性換算戰力（與首頁顯示的裝備戰力是不同數字——這裡刻意排除裝備，因為 roll 發生在同步、決定性的 repository 層，無法額外查詢裝備，也避免玩家在 roll 前臨時卸裝備影響難度）。
+2. **章節期望戰力**：`expectedPower = BASE_POWER * (1 + POWER_GROWTH_PER_CHAPTER * chapterIndex)`，`BASE_POWER` 為 LV1、無裝備、屬性平均值角色的戰力基準。
+3. **綜合進度因子** `factor ∈ [0,1]`：由「戰力 / 期望戰力」比值（clamp 至 `[POWER_RATIO_MIN, POWER_RATIO_MAX]` 後正規化）與「`chapterIndex / MAX_CHAPTER_FOR_SCALING`」加權平均（`POWER_FACTOR_WEIGHT`/`CHAPTER_FACTOR_WEIGHT`）而得。
+4. **區間線性插值**：
+   - 關卡數（`getLevelCountRange`）：`factor=0` → 3~7 關；`factor=1` → 8~12 關。
+   - Stage 數（`getStageNodeCountRange`）：`factor=0` → 5~10 Stage；`factor=1` → 8~15 Stage。
+
+> ASSUMPTION（無設計文件佐證）：`PROGRESSION_CONFIG` 內所有常數（`BASE_POWER`、成長率、權重、各區間端點）皆為新發明數值，可自由調整；`calculateCombatPower`/`calculateAttributePower` 的權重公式（`shared/utils/calculateStats.ts`）同樣是新發明、僅供排序/縮放使用，非最終平衡數字。
 
 ### 3.1 節點生成優先序
 
