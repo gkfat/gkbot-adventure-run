@@ -119,7 +119,7 @@ Run 結束原因（`AdventureEndReason`）：`COMPLETED`（Boss 戰勝利）、`
 | BOSS | Run 最後一個 Stage | COMBAT | Boss 戰（含小兵護衛與補位機制，見 `combat.md` 第 6 節），套用 BOSS tier 倍率 |
 | EVENT | 加權隨機命中 | EVENT | 依權重表以決定性 RNG 選出事件模板（HEAL/BLESSING/CURSE/WHEEL/CHOICE，見 `EventType`） |
 | CHOICE | 加權隨機命中 | EVENT | 與 EVENT 節點共用同一套事件解析流程（`eventService.selectEvent`），僅節點類型標籤與加權桶不同 |
-| REST | 保底規則命中 | REST | 可使用藥水回血（見第 5 節），不可在其他狀態使用 |
+| REST | 保底規則命中 | REST | 進入時自動回復固定 `NODE_CONFIG.REST_AUTO_HEAL_PERCENT`（20%）`playerHpMax`（不超過上限），另可使用藥水回血（見第 5 節），不可在其他狀態使用 |
 
 ### 4.1 EVENT 節點內部邏輯
 
@@ -138,7 +138,8 @@ Run 結束原因（`AdventureEndReason`）：`COMPLETED`（Boss 戰勝利）、`
 
 - `RunInventory.items: ItemInstance[]`，上限 50 格（`shared/types/item.ts` 註解）。
 - Run 期間戰鬥/事件掉落的裝備與藥水暫存於 `run.runInventory`，不直接進永久背包。
-- **休息節點用藥**：僅允許在 REST 節點對玩家持有的 `type = POTION` 物品實體執行使用（永久背包或 run 背包皆可指定），依該實體稀有度的 `healPercent` 立即回復 HP（不超過 `playerHpMax`），並消耗（移除）該物品實體；非 REST 狀態或非藥水物品呼叫回傳 400，不異動 HP 或背包。
+- **休息節點自動回血**：`advanceFromExploring` 判定進入 REST 節點時，直接依 `NODE_CONFIG.REST_AUTO_HEAL_PERCENT`（固定 20%）`playerHpMax` 回復 HP（clamp 至 `playerHpMax`，不需消耗任何物品），回血量記錄於該次 `currentNodeData.autoHealAmount` 供前端顯示。
+- **休息節點用藥**：在自動回血之後，仍允許在 REST 節點對玩家持有的 `type = POTION` 物品實體額外執行使用（永久背包或 run 背包皆可指定），依該實體稀有度的 `healPercent` 立即回復 HP（不超過 `playerHpMax`），並消耗（移除）該物品實體；非 REST 狀態或非藥水物品呼叫回傳 400，不異動 HP 或背包。
 - **Run 結束轉移規則**：
   - `endReason = COMPLETED`：run 背包內剩餘物品（裝備＋未使用藥水）轉入永久背包，受永久背包 500 格上限限制；超過上限的部分標記為 `untransferredItemIds`，不可靜默遺失。
   - `endReason = DEAD` / `DISCONNECT`：run 背包內物品一律作廢（不轉入永久背包），計入結算摘要的 `forfeitedItems`。

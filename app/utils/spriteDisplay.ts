@@ -21,3 +21,19 @@ export const breatheFrameUrl = (spriteUrl: string, step: number) => {
     const level = BREATH_LEVEL_SEQUENCE[step] ?? 0;
     return level === 0 ? spriteUrl : spriteUrl.replace(/\.png$/, `-breathe-${level}.png`);
 };
+
+/**
+ * The adventure page shows the character from behind (facing away, into the
+ * facility) rather than the front-facing camp-screen portrait. Back sprites
+ * are static — no breathing frames exist for them yet.
+ */
+export const backSpriteUrl = (spriteUrl: string) => spriteUrl.replace(/\.png$/, '-back.png');
+
+/**
+ * Walk-cycle frames are stored alongside the back sprite as
+ * `{name}-back-walk-{1,2,3}.png` (see useWalkFrame.ts — step 0 has no walk
+ * frame, it's the rest pose from `backSpriteUrl`).
+ */
+export const walkFrameUrl = (backUrl: string, step: number) => (
+    step === 0 ? backUrl : backUrl.replace(/-back\.png$/, `-back-walk-${step}.png`)
+);

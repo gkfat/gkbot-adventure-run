@@ -33,15 +33,15 @@ describe('SELECTABLE_CHARACTER_ARCHETYPES', () => {
     });
 });
 
-describe('CHARACTER_ARCHETYPES (retired archetypes)', () => {
-    it('keeps the 4 retired archetypes as non-selectable so existing characters still resolve', () => {
-        const retired = CHARACTER_ARCHETYPES.filter(a => !a.isSelectable);
-        expect(retired.map(a => a.archetypeId).sort()).toEqual(
+describe('CHARACTER_ARCHETYPES', () => {
+    it('contains only the 5 selectable archetypes (retired archetypes removed)', () => {
+        expect(CHARACTER_ARCHETYPES.map(a => a.archetypeId).sort()).toEqual(
             [
-                'barbarian',
-                'paladin',
-                'rogue',
-                'wanderer',
+                'adventurer',
+                'fighter',
+                'gambler',
+                'scholar',
+                'tinkerer',
             ],
         );
     });

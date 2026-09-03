@@ -73,7 +73,7 @@ export class CharacterService extends BaseService {
 
     /**
      * Create a new character from an archetype. Rejects once the account already
-     * owns CHARACTER_ROSTER_MAX characters, or if the archetypeId is unknown or retired.
+     * owns CHARACTER_ROSTER_MAX characters, or if the archetypeId is unknown.
      */
     async createCharacterFromArchetype(accountId: string, archetypeId: string): Promise<CharacterWithStats> {
         const archetype = getArchetypeById(archetypeId);

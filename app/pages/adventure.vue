@@ -1,5 +1,9 @@
 <template>
-    <div class="fill-height adventure-page pa-3 d-flex flex-column">
+    <div
+        class="fill-height adventure-page pa-3 d-flex flex-column"
+        :class="{ 'adventure-page--walking': walkFrame.isWalking.value }"
+        :style="pageBackgroundStyle"
+    >
         <!-- 讀取中 -->
         <div
             v-if="characterLoading || (runLoading && !checked)"
@@ -188,8 +192,8 @@
                     variant="flat"
                     color="primary"
                     class="text-none"
-                    :loading="runLoading"
-                    @click="handleAdvance"
+                    :loading="runLoading || enteringRun"
+                    @click="handleStartExploring"
                 >
                     進入關卡
                 </SystemBtn>
@@ -206,9 +210,149 @@
             </div>
         </div>
 
+        <!-- 進場走路動畫：點擊「進入關卡」後先演繹一段走路，動畫播完才切換到下方
+             「冒險進行中」畫面顯示第一個節點的內容（見 handleStartExploring）。
+             版面刻意比照下方「冒險進行中」的 scroll／stage／actions 三段式結構
+             （actions 用等高但隱藏的按鈕佔位），讓角色 sprite 落在跟戰鬥開始畫面
+             完全相同的位置，避免動畫播完切換時角色位置跳動。scroll 區塊改成跟下方
+             同一份 summary panel（currentRun 這時已經是 INIT 狀態、有初始值可顯示），
+             不再整段留白，讓玩家一進關卡走路時就先看到關卡進度/累積獎勵（見使用者
+             回報）。 -->
+        <div
+            v-else-if="enteringRun"
+            class="d-flex flex-column fill-height"
+        >
+            <div class="adventure-page__scroll">
+                <div
+                    v-if="currentRun"
+                    class="adventure-page__box mb-3"
+                >
+                    <div class="d-flex align-center justify-space-between">
+                        <span class="font-pixel text-subtitle-1" style="color: rgb(var(--v-theme-green));">
+                            {{ stageHeaderLabel }}
+                        </span>
+                        <div class="d-flex align-center ga-2">
+                            <span class="text-caption text-medium-emphasis">{{ stateLabel }}</span>
+                            <v-icon
+                                icon="mdi-notebook-outline"
+                                size="20"
+                                color="primary"
+                                class="pixel-press"
+                                aria-label="開啟冒險記事本"
+                                @click="showLogDialog = true"
+                            />
+                        </div>
+                    </div>
+
+                    <v-divider class="my-2" />
+                    <div class="d-flex flex-wrap ga-4">
+                        <div class="adventure-page__loot-stat">
+                            <div class="text-caption text-medium-emphasis">EXP</div>
+                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
+                                {{ currentRun.expEarned }}
+                            </div>
+                        </div>
+                        <div class="adventure-page__loot-stat">
+                            <div class="text-caption text-medium-emphasis">金幣</div>
+                            <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
+                                +{{ currentRun.goldEarned }}
+                            </div>
+                        </div>
+                        <div class="adventure-page__loot-stat">
+                            <div class="text-caption text-medium-emphasis">寶石</div>
+                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
+                                +{{ currentRun.gemsEarned }}
+                            </div>
+                        </div>
+                        <div class="adventure-page__loot-stat">
+                            <div class="text-caption text-medium-emphasis">道具</div>
+                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
+                                x{{ currentRun.runInventory.length }}
+                            </div>
+                        </div>
+                        <div class="adventure-page__loot-stat">
+                            <div class="text-caption text-medium-emphasis">祝福</div>
+                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
+                                x{{ currentRun.blessings.length }}
+                            </div>
+                        </div>
+                        <div class="adventure-page__loot-stat">
+                            <div class="text-caption text-medium-emphasis">詛咒</div>
+                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
+                                x{{ currentRun.curses.length }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                v-if="character"
+                class="adventure-page__stage"
+            >
+                <div class="adventure-page__stage-fx-anchor">
+                    <div class="adventure-page__stage-sprite-wrap">
+                        <img
+                            :src="characterSpriteSrc"
+                            alt="角色"
+                            class="adventure-page__stage-sprite"
+                        >
+                    </div>
+                </div>
+                <div class="adventure-page__stage-hp">
+                    <div class="d-flex align-center justify-space-between">
+                        <span class="text-caption text-medium-emphasis">HP</span>
+                        <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-warning));">
+                            {{ Math.round(stageHp.current) }} / {{ stageHp.max }}<span
+                                v-if="hpMaxBonus"
+                                class="text-caption"
+                                :style="{ color: hpMaxBonus > 0 ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-warning))' }"
+                            >({{ hpMaxBonus > 0 ? '+' : '' }}{{ hpMaxBonus }})</span>
+                        </span>
+                    </div>
+                    <div class="adventure-page__stage-hp-bar">
+                        <div
+                            class="adventure-page__stage-hp-bar-fill"
+                            :style="{ width: `${stageHp.percent}%` }"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div
+                class="adventure-page__actions d-flex flex-column ga-2"
+                style="visibility: hidden;"
+            >
+                <SystemBtn
+                    block
+                    variant="flat"
+                    color="primary"
+                    class="text-none"
+                >
+                    開始戰鬥
+                </SystemBtn>
+            </div>
+        </div>
+
         <!-- 冒險進行中 -->
         <template v-else>
-            <div class="adventure-page__scroll">
+            <div class="adventure-page__scroll adventure-page__banner-anchor">
+                <!-- 獲得祝福/遭受詛咒：疊在目前節點內容上的 banner，取代原本的
+                     v-dialog（確認用的「關閉」按鈕在下方 __actions 區塊，見
+                     GameModifierAcquiredBanner）。 -->
+                <GameModifierAcquiredBanner
+                    v-if="acquiredModifierDialog"
+                    :modifier="acquiredModifierDialog"
+                    :effect-text="acquiredModifierDialog ? describeModifierEffect(acquiredModifierDialog) : ''"
+                />
+
+                <!-- 轉盤事件開獎結果：同一套 banner-anchor 疊加慣例，「關閉」按鈕
+                     在下方 __actions（見 wheelResultPending）。 -->
+                <GameWheelResultBanner
+                    v-if="wheelResultPending"
+                    :result="lastEventResult"
+                />
+
                 <div class="adventure-page__box mb-3">
                     <div class="d-flex align-center justify-space-between">
                         <span class="font-pixel text-subtitle-1" style="color: rgb(var(--v-theme-green));">
@@ -269,57 +413,44 @@
                     </div>
                 </div>
 
-                <!-- 狀態：目前 HP 與戰鬥數值（祝福/詛咒的詳情改為取得當下以 dialog 呈現，見 GameModifierAcquiredDialog）；
-                     戰鬥數值平時收合，點擊展開按鈕才顯示 -->
-                <div class="adventure-page__box mb-3">
-                    <div class="d-flex align-center justify-space-between">
-                        <span class="text-caption text-medium-emphasis">HP</span>
-                        <div class="d-flex align-center ga-2">
-                            <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-warning));">
-                                {{ displayedPlayerHp }} / {{ currentRun.playerHpMax }}<span
-                                    v-if="hpMaxBonus"
-                                    class="text-caption"
-                                    :style="{ color: hpMaxBonus > 0 ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-warning))' }"
-                                >({{ hpMaxBonus > 0 ? '+' : '' }}{{ hpMaxBonus }})</span>
-                            </span>
-                            <v-icon
-                                :icon="showCombatStats ? 'mdi-chevron-up' : 'mdi-chevron-down'"
-                                size="20"
-                                color="primary"
-                                class="pixel-press"
-                                aria-label="展開戰鬥數值"
-                                @click="showCombatStats = !showCombatStats"
-                            />
-                        </div>
-                    </div>
-                    <template v-if="showCombatStats">
-                        <v-divider class="my-2" />
-                        <div class="d-flex flex-wrap ga-4">
-                            <div
-                                v-for="stat in combatStatEntries"
-                                :key="stat.label"
-                                class="d-flex align-center ga-1"
-                            >
-                                <span class="text-caption text-medium-emphasis">{{ stat.label }}</span>
-                                <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">{{ stat.value }}</span>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-
-                <!-- COMBAT：觸發戰鬥；戰鬥結果在 COMBAT/RESOLUTION 都顯示，直到玩家繼續前進 -->
-                <div
-                    v-if="currentRun.state === AdventureStateType.COMBAT || (currentRun.state === AdventureStateType.RESOLUTION && lastCombatResult)"
-                    class="adventure-page__box mb-3"
-                >
-                    <template v-if="lastCombatResult">
+                <!-- COMBAT：觸發戰鬥；戰鬥結果在 COMBAT/RESOLUTION 都顯示，直到玩家繼續前進。
+                     玩家本身的顯示（背影/HP/行動條/spark/傷害飄字）已移到頁面下方持久化的
+                     「角色 stage」（見 adventure-page__stage）；戰鬥結算文字改用
+                     GameCombatSummaryBanner 疊在 arena 上呈現（確認用的「關閉」按鈕在下方
+                     __actions 區塊），這裡只放敵方 arena，且進行中戰鬥不需要中間 panel 的
+                     邊框（此時畫面就是戰鬥本身）。 -->
+                <template v-if="currentRun.state === AdventureStateType.COMBAT || (currentRun.state === AdventureStateType.RESOLUTION && lastCombatResult)">
+                    <!-- 戰鬥結束、玩家關掉結算 banner 後會自動推進並播放走路動畫（見下方
+                         RESOLUTION/EXPLORING 的 auto-advance watch），這段期間 lastCombatResult
+                         還沒被下一個節點的回應取代，敵方 panel（此時只剩下已擊敗的敵人）
+                         應隨走路動畫隱藏，不要停留在畫面上（known-issue.md #2）。 -->
+                    <div
+                        v-if="lastCombatResult && !walkFrame.isWalking.value"
+                        class="adventure-page__banner-anchor"
+                    >
                         <GameCombatResultPanel
-                            :result="lastCombatResult"
-                            :player-hp-max="currentRun.playerHpMax"
-                            @playback-done="handleCombatPlaybackDone"
+                            :displayed-banner="displayedBanner"
+                            :enemy-cards="enemyCards"
+                            :faction-type="currentRun.factionType"
+                            :current-node-type="currentRun.currentNodeType"
                         />
-                    </template>
-                    <template v-else>
+                        <GameCombatSummaryBanner
+                            v-if="combatSummaryDialogOpen"
+                            :victory="combatVictory"
+                            :round-count="combatRoundCount"
+                            :exp-gained="combatExpGained"
+                            :gold-dropped="combatGoldDropped"
+                            :gems-dropped="combatGemsDropped"
+                            :dropped-item-names="combatDroppedItemNames"
+                        />
+                    </div>
+                    <!-- lastCombatResult 為空才是「還沒開打」的預備畫面；lastCombatResult
+                         存在但正在播走路動畫（上面 v-if 為 false）代表戰鬥已經結束、正要
+                         離開，不能落到這個 v-else 誤顯示「遭遇敵人，準備戰鬥」。 -->
+                    <div
+                        v-else-if="!lastCombatResult"
+                        class="adventure-page__box mb-3"
+                    >
                         <div
                             v-if="currentRun.currentNodeType === NodeType.BOSS"
                             class="font-pixel text-subtitle-2 mb-2"
@@ -362,10 +493,12 @@
                                 偵測到後續增援，數量不明
                             </div>
                         </div>
-                    </template>
-                </div>
+                    </div>
+                </template>
 
-                <!-- EVENT：顯示事件描述；有 choices 顯示選項，沒有則直接可繼續。結果在 EVENT/RESOLUTION 都顯示，直到玩家繼續前進 -->
+                <!-- EVENT：顯示事件描述；有 choices 顯示選項（留在這裡，因為要對應多個選項按鈕），
+                     沒有 choices 時「繼續」改到下方固定的 __actions 區塊，跟角色 stage 對齊
+                     （見下方 actions 的對應分支）。結果在 EVENT/RESOLUTION 都顯示，直到玩家繼續前進 -->
                 <div
                     v-else-if="currentRun.state === AdventureStateType.EVENT || (currentRun.state === AdventureStateType.RESOLUTION && lastEventResult)"
                     class="adventure-page__box mb-3"
@@ -403,46 +536,7 @@
                                 {{ choice.label }}
                             </SystemBtn>
                         </div>
-                        <SystemBtn
-                            v-else
-                            block
-                            variant="flat"
-                            color="primary"
-                            class="text-none"
-                            :loading="runLoading"
-                            @click="handleResolveEvent()"
-                        >
-                            繼續
-                        </SystemBtn>
                     </template>
-                </div>
-
-                <!-- BLESSING_SELECT：3 選 1 -->
-                <div
-                    v-else-if="currentRun.state === AdventureStateType.BLESSING_SELECT"
-                    class="adventure-page__box mb-3"
-                >
-                    <div class="text-caption text-medium-emphasis mb-2">選擇一個祝福</div>
-                    <div
-                        v-for="candidate in blessingCandidates"
-                        :key="candidate.modifierId"
-                        class="adventure-page__potion-row"
-                    >
-                        <div>
-                            <div class="text-body-2">{{ candidate.name }}</div>
-                            <div class="text-caption text-medium-emphasis">{{ candidate.description }}</div>
-                        </div>
-                        <SystemBtn
-                            variant="outlined"
-                            color="primary"
-                            size="small"
-                            class="text-none"
-                            :loading="runLoading"
-                            @click="handleSelectBlessing(candidate.modifierId)"
-                        >
-                            選擇
-                        </SystemBtn>
-                    </div>
                 </div>
 
                 <!-- REST：可使用藥水 -->
@@ -450,7 +544,16 @@
                     v-else-if="currentRun.state === AdventureStateType.REST"
                     class="adventure-page__box mb-3"
                 >
-                    <div class="text-caption text-medium-emphasis mb-2">休息中，可使用藥水回復生命值</div>
+                    <div class="text-caption text-medium-emphasis mb-2 d-flex align-center ga-1">
+                        <img
+                            src="/images/combat-fx/heal-glow.png"
+                            alt=""
+                            width="18"
+                            height="18"
+                            style="image-rendering: pixelated;"
+                        >
+                        休息中，已自動恢復 {{ restNodeData?.autoHealAmount ?? 0 }} 點生命值，可使用藥水回復更多生命值
+                    </div>
 
                     <div
                         v-if="restPotions.length === 0"
@@ -497,9 +600,120 @@
                 </div>
             </div>
 
+            <!-- 角色 stage：探索與戰鬥共用同一個持久化的大角色顯示區，固定在畫面下方
+                （敵方 arena 在上面的 scroll 區域）。HP 條疊加在角色圖像上，取代原本
+                固定於頁面頂端的獨立 HP 區塊；戰鬥中額外疊加行動條/spark/傷害飄字。 -->
+            <div
+                v-if="character"
+                class="adventure-page__stage"
+            >
+                <div class="adventure-page__stage-fx-anchor">
+                    <img
+                        v-if="acquiredModifierDialog"
+                        :key="acquiredModifierDialog.modifierId"
+                        :src="modifierGlowSrc"
+                        alt=""
+                        class="adventure-page__stage-glow"
+                    >
+                    <div
+                        :key="inCombatStage && playerCardFx ? playerCardFx.key : -1"
+                        class="adventure-page__stage-sprite-wrap"
+                        :class="inCombatStage && playerCardFx ? `adventure-page__stage-sprite-wrap--${playerCardFx.kind}` : ''"
+                    >
+                        <img
+                            :src="characterSpriteSrc"
+                            alt="角色"
+                            class="adventure-page__stage-sprite"
+                            :class="{ 'adventure-page__stage-sprite--dead': inCombatStage && !playerAlive }"
+                        >
+                    </div>
+                    <GameSparkFx
+                        v-if="inCombatStage && playerSpark"
+                        :key="playerSpark.key"
+                        :kind="playerSpark.kind"
+                        class="adventure-page__stage-spark"
+                        :class="`adventure-page__stage-spark--${playerSpark.kind}`"
+                    />
+                    <span
+                        v-if="inCombatStage && playerDamageText"
+                        :key="playerDamageText.key"
+                        class="adventure-page__stage-damage-text"
+                        :class="`adventure-page__stage-damage-text--${playerDamageText.kind}`"
+                    >
+                        <span
+                            v-if="playerDamageText.kind === 'crit'"
+                            class="adventure-page__stage-damage-text-crit-label"
+                        >爆擊</span>
+                        <span>{{ playerDamageText.kind === 'dodge' ? '閃避' : playerDamageText.value }}</span>
+                    </span>
+                </div>
+                <div class="adventure-page__stage-hp">
+                    <div class="d-flex align-center justify-space-between">
+                        <span class="text-caption text-medium-emphasis">HP</span>
+                        <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-warning));">
+                            {{ Math.round(stageHp.current) }} / {{ stageHp.max }}<span
+                                v-if="hpMaxBonus"
+                                class="text-caption"
+                                :style="{ color: hpMaxBonus > 0 ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-warning))' }"
+                            >({{ hpMaxBonus > 0 ? '+' : '' }}{{ hpMaxBonus }})</span>
+                        </span>
+                    </div>
+                    <div class="adventure-page__stage-hp-bar">
+                        <div
+                            class="adventure-page__stage-hp-bar-fill"
+                            :style="{ width: `${stageHp.percent}%` }"
+                        />
+                    </div>
+                    <div
+                        v-if="inCombatStage && playerAlive"
+                        class="adventure-page__stage-gauge"
+                    >
+                        <div
+                            v-if="playerGauge.percent !== null"
+                            class="adventure-page__stage-gauge-fill"
+                            :class="{ 'adventure-page__stage-gauge-fill--paused': playerGauge.paused }"
+                            :style="{ width: `${playerGauge.percent}%` }"
+                        />
+                    </div>
+                </div>
+            </div>
+
             <div class="adventure-page__actions d-flex flex-column ga-2">
                 <SystemBtn
-                    v-if="currentRun.state === AdventureStateType.COMBAT && !lastCombatResult"
+                    v-if="combatSummaryDialogOpen"
+                    block
+                    variant="flat"
+                    color="primary"
+                    class="text-none"
+                    @click="showCombatSummaryDialog = false"
+                >
+                    關閉
+                </SystemBtn>
+
+                <SystemBtn
+                    v-else-if="acquiredModifierDialog"
+                    block
+                    variant="flat"
+                    color="primary"
+                    class="text-none"
+                    @click="acquiredModifierDialog = null"
+                >
+                    關閉
+                </SystemBtn>
+
+                <SystemBtn
+                    v-else-if="wheelResultPending"
+                    block
+                    variant="flat"
+                    color="primary"
+                    class="text-none"
+                    @click="wheelResultPending = false"
+                >
+                    關閉
+                </SystemBtn>
+
+                <SystemBtn
+                    v-else-if="currentRun.state === AdventureStateType.COMBAT && !lastCombatResult"
                     block
                     variant="flat"
                     color="primary"
@@ -511,7 +725,21 @@
                 </SystemBtn>
 
                 <SystemBtn
-                    v-else-if="canAdvanceGenerically && !combatPlaybackPending"
+                    v-else-if="currentRun.state === AdventureStateType.EVENT && !lastEventResult && !eventNodeData?.choices?.length"
+                    block
+                    variant="flat"
+                    color="primary"
+                    class="text-none"
+                    :loading="runLoading"
+                    @click="handleResolveEvent()"
+                >
+                    繼續
+                </SystemBtn>
+
+                <SystemBtn
+                    v-else-if="canAdvanceGenerically
+                        && currentRun.state !== AdventureStateType.RESOLUTION
+                        && currentRun.state !== AdventureStateType.EXPLORING"
                     block
                     variant="flat"
                     color="primary"
@@ -521,6 +749,21 @@
                 >
                     {{ advanceLabel }}
                 </SystemBtn>
+
+                <!-- 上面三個分支都不成立時（例如戰鬥演出播放中、RESOLUTION/EXPLORING
+                     自動推進中），仍用等高但隱藏的按鈕佔位，避免上方角色 stage
+                     （緊貼在 actions 正上方，見 __stage 的 flex: 0 0 auto）因為
+                     actions 高度收合而跳動。 -->
+                <SystemBtn
+                    v-else
+                    block
+                    variant="flat"
+                    color="primary"
+                    class="text-none"
+                    style="visibility: hidden;"
+                >
+                    -
+                </SystemBtn>
             </div>
         </template>
 
@@ -529,25 +772,29 @@
             :entries="runLog"
         />
 
-        <GameModifierAcquiredDialog
-            :modifier="acquiredModifierDialog"
-            :effect-text="acquiredModifierDialog ? describeModifierEffect(acquiredModifierDialog) : ''"
-            @update:modifier="acquiredModifierDialog = $event"
+        <GameBlessingSelectDialog
+            :open="currentRun?.state === AdventureStateType.BLESSING_SELECT"
+            :candidates="blessingCandidatesWithEffect"
+            :loading="runLoading"
+            @select="handleSelectBlessing"
         />
     </div>
 </template>
 
 <script setup lang="ts">
 import {
-    AdventureStateType, NodeType, getStageDisplayName,
+    AdventureStateType, NodeType, EventType, getStageDisplayName,
     type FacilitySeverity, type EnemyFaction, type RunModifier,
 } from '../../shared/types/adventure';
 import { EXP_TABLE } from '../../shared/types/character';
 import { BLESSING_TEMPLATES, CURSE_TEMPLATES } from '../../shared/constants/blessings';
 import type { Stats } from '../../shared/types/common';
 import { describeItem, resolvePixelIcon, RARITY_COLOR, type ItemLike } from '../utils/equipmentDisplay';
-import type { EventNodeData, BlessingNodeData, CombatNodeData } from '../composables/useAdventureRun';
+import type { EventNodeData, BlessingNodeData, CombatNodeData, RestNodeData } from '../composables/useAdventureRun';
 import { pickIntroNarrative, pickTransitionNarrative } from '../constants/adventureNarrative';
+import { backSpriteUrl, walkFrameUrl } from '../utils/spriteDisplay';
+import { getFacilityBackgroundUrl } from '../utils/facilityBackground';
+import { useCombat } from '../composables/useCombat';
 
 definePageMeta({
     middleware: ['auth'],
@@ -598,12 +845,62 @@ const {
 const enteredAdventureCold = !checked.value;
 
 const showLogDialog = ref(false);
-const showCombatStats = ref(false);
+const walkFrame = useWalkFrame();
+const characterSpriteSrc = computed(() => {
+    if (!character.value) return '';
+    const back = backSpriteUrl(character.value.spriteUrl);
+    return walkFrameUrl(back, walkFrame.isWalking.value ? walkFrame.step.value : 0);
+});
+
+// 戰鬥演出狀態集中在這裡（而非 GameCombatResultPanel 內部）：探索與戰鬥共用同一個
+// 「角色 stage」，玩家的 HP/行動條/spark/傷害飄字需要疊加在同一個持久化角色圖像
+// 上，不能只存在戰鬥子元件裡。getResult 在沒有進行中戰鬥時回傳 null，useCombat
+// 內部對此已有保護（見 useCombat.ts）。
+// 進入這場戰鬥當下的實際 HP（見 handleStartCombat）：playerStatus 的動畫起始值
+// 要用這個快照，而不是每次都跟著 currentRun.playerHp 變動——resolveCombat 一
+// 回應，currentRun.playerHp 就已經是戰鬥「結束後」的數字，若動畫起點直接引用
+// currentRun.playerHp 會被這個結束值污染。
+const combatStartHp = ref(0);
+const {
+    displayedBanner,
+    enemyCards,
+    playerAlive,
+    playerStatus,
+    playerGauge,
+    playerCardFx,
+    playerSpark,
+    playerDamageText,
+    playbackDone: combatAnimPlaybackDone,
+} = useCombat(
+    () => lastCombatResult.value,
+    () => currentRun.value?.playerHpMax ?? 0,
+    () => combatStartHp.value,
+);
+const inCombatStage = computed(() => !!lastCombatResult.value);
 
 // 本次戰鬥/事件中剛取得的祝福或詛咒，非 null 時以 dialog 呈現內容（見
 // handleResolveEvent/handleSelectBlessing）；關閉 dialog 後歸零，不做持久顯示，
 // HP panel 不再重覆列出詳情，僅頂端 summary 列的祝福計數保留為持久狀態。
 const acquiredModifierDialog = ref<RunModifier | null>(null);
+// handleResolveEvent/handleSelectBlessing 呼叫 API 到真的設定好 acquiredModifierDialog
+// 之間隔了好幾個 await，這段時間 currentRun 可能已經先變成 RESOLUTION，讓下面的
+// auto-advance watch 有機會搶先觸發、在祝福/詛咒 dialog 顯示前就先播走路動畫
+// （見該兩個 handler 內的用法）。
+const pendingModifierAck = ref(false);
+// 轉盤事件結果需要玩家看過、手動點擊「關閉」才能繼續走路——跟一般事件（結果
+// 顯示完就自動 advance）不同，轉盤是個「開獎」時刻，不能被自動前進蓋過去
+// （見使用者回報）。true 代表結果已經出現、還沒被玩家關掉，同樣要擋下面的
+// auto-advance watch（見 handleResolveEvent 內的用法）。
+const wheelResultPending = ref(false);
+// 取得祝福/詛咒當下疊在角色 sprite 上的光暈特效來源，跟 acquiredModifierDialog
+// 共用同一個值——dialog 一出現，光暈就套用在角色身上，從小到大再淡出消失（見
+// __stage-glow 的 keyframes）。
+const modifierGlowSrc = computed(() => {
+    if (!acquiredModifierDialog.value) return '';
+    return acquiredModifierDialog.value.isBlessing
+        ? '/images/combat-fx/blessing-glow.png'
+        : '/images/combat-fx/curse-glow.png';
+});
 const {
     items: permanentItems, fetchInventory, loaded: inventoryLoaded, invalidate: invalidateInventory,
 } = useInventory();
@@ -611,6 +908,19 @@ const {
 const stageDisplayName = computed(() => {
     if (!currentRun.value) return '';
     return getStageDisplayName(currentRun.value.chapterIndex);
+});
+
+// 設施背景底圖：依 run 固定不變的 severityTier 決定，疊一層暗色漸層確保前景
+// 卡片文字可讀性。沒有進行中的 run（loading/角色列表等畫面）時不套用。
+const pageBackgroundStyle = computed(() => {
+    if (!currentRun.value) return {};
+    const url = getFacilityBackgroundUrl(currentRun.value.severityTier);
+    return {
+        backgroundImage: `linear-gradient(rgba(10, 11, 14, 0.55), rgba(10, 11, 14, 0.8)), url(${url})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center top',
+        backgroundRepeat: 'no-repeat',
+    };
 });
 
 // 開頭畫面的敘述：純前端風味文字，依章節主題挑選，同一關卡（chapterIndex +
@@ -688,20 +998,6 @@ const hpMaxBonus = computed(() => acquiredModifiers.value.reduce(
     (sum, modifier) => sum + (modifier.statModifiers?.HP_MAX ?? 0), 0,
 ));
 
-// 戰鬥數值 panel：character.stats 已含裝備加成後的最終值（比照
-// characterStage.vue 的顯示邏輯），此處不需再另外疊加 equipmentBonus。
-const combatStatEntries = computed(() => {
-    if (!character.value) return [];
-    const { stats } = character.value;
-    return [
-        { label: '攻擊力', value: `${stats.ATK}` },
-        { label: '防禦力', value: `${stats.DEF}` },
-        { label: '攻速', value: `${stats.actionIntervalSec.toFixed(1)}s` },
-        { label: '爆擊率', value: `${Math.round(stats.critChance * 100)}%` },
-        { label: '閃避率', value: `${Math.round(stats.dodgeChance * 100)}%` },
-    ];
-});
-
 // 單一祝福/詛咒 chip 下方的效果文字，例如 "防禦力 +6" 或 "掉落率 x1.30"。
 const describeModifierEffect = (modifier: (typeof MODIFIER_TEMPLATES)[number]) => {
     const parts = Object.entries(modifier.statModifiers ?? {}).map(([key, value]) => {
@@ -730,35 +1026,94 @@ const combatNodeData = computed(() => (
 
 const settlementIsSuccess = computed(() => lastSettlement.value?.endReason === 'COMPLETED');
 
-// 戰鬥結果的 log 演繹（GameCombatResultPanel）播完前，不能顯示「繼續前進」，
-// 避免玩家在還沒看完戰鬥過程時就跳過結算。lastCombatResult 換成新的一場戰鬥時
-// 重新歸零，等對應的 playback-done 事件再次觸發才放行。
+// GameCombatResultPanel 現在是純渲染元件（不再自己呼叫 useCombat），結算文字用
+// 的欄位從 lastCombatResult.summary 直接取出當 props 傳下去。
+const combatVictory = computed(() => lastCombatResult.value?.summary.victory ?? false);
+const combatRoundCount = computed(() => lastCombatResult.value?.summary.roundCount ?? 0);
+const combatExpGained = computed(() => lastCombatResult.value?.summary.expGained ?? 0);
+const combatGoldDropped = computed(() => lastCombatResult.value?.summary.goldDropped ?? 0);
+const combatGemsDropped = computed(() => lastCombatResult.value?.summary.gemsDropped ?? 0);
+const combatDroppedItemNames = computed(() => (
+    lastCombatResult.value?.summary.itemsDropped.map(item => describeItem(item).name) ?? []
+));
+
+// 戰鬥結果的 log 演繹（stage 上的 playerGauge/playerSpark 等）播完前，不能顯示
+// 「繼續前進」，避免玩家在還沒看完戰鬥過程時就跳過結算。lastCombatResult 換成
+// 新的一場戰鬥時重新歸零，等 useCombat 的 playbackDone 再次變 true 才放行；播完的
+// 同一刻也跳出戰鬥結算 dialog（見 GameCombatSummaryDialog）。
 const combatPlaybackDone = ref(false);
+const showCombatSummaryDialog = ref(false);
+// 保險起見，dialog 實際開關再疊一層 lastCombatResult 存在與否的判斷——
+// showCombatSummaryDialog 只代表「玩家還沒關掉」，避免結果被清空（換下一個
+// 節點）但這個旗標還沒同步回 false 的極短暫視窗裡，顯示出資料全是預設值
+// （戰鬥失敗／回合0）的殘影 dialog。
+const combatSummaryDialogOpen = computed(() => showCombatSummaryDialog.value && !!lastCombatResult.value);
 watch(lastCombatResult, () => {
     combatPlaybackDone.value = false;
+    showCombatSummaryDialog.value = false;
 });
-const handleCombatPlaybackDone = async () => {
+watch(combatAnimPlaybackDone, (done) => {
+    if (!done) return;
     combatPlaybackDone.value = true;
+    showCombatSummaryDialog.value = true;
     commitCombatLog();
-    await commitPendingSettlement();
-};
+});
+
+// 戰敗時 startCombat 已經把結算存進 pendingSettlement（見 useAdventureRun），
+// 但要等玩家親手關掉戰鬥結算 dialog 才能真的套用（設成 lastSettlement）—
+// 否則畫面會在 dialog 還開著時就先切到「冒險失敗」結算頁，兩者疊在一起
+// （known-issue.md #issue，戰鬥失敗需關閉 dialog 後才進入冒險失敗畫面）。
+watch(showCombatSummaryDialog, async (open, wasOpen) => {
+    if (wasOpen && !open) {
+        await commitPendingSettlement();
+    }
+});
 const combatPlaybackPending = computed(() => (
     currentRun.value?.state === AdventureStateType.RESOLUTION
     && !!lastCombatResult.value
     && !combatPlaybackDone.value
 ));
 
-// startCombat() 的回應會立刻把 currentRun 更新成戰鬥「結束後」的狀態（含
-// playerHp），但 GameCombatResultPanel 這時才剛開始逐格演繹戰鬥過程。上方狀態
-// panel 若直接綁 currentRun.playerHp 會讓 HP 在演繹開始的當下就瞬間跳到終局
-// 數值，所以演繹播放期間先顯示戰鬥開始前記下的 HP，播放完成後才切換成
-// currentRun 的最新值。
-const preCombatPlayerHp = ref<number | null>(null);
-const displayedPlayerHp = computed(() => {
-    if (combatPlaybackPending.value && preCombatPlayerHp.value !== null) {
-        return preCombatPlayerHp.value;
+// RESOLUTION（戰鬥/事件/祝福/休息都已解決，純粹要走到下一節點）與 EXPLORING
+// （單純推進到下一個節點，尚未遇到需要玩家選擇的內容）都不需要玩家自己點擊，
+// 直接演繹走路動畫並自動推進；有戰鬥結算 dialog 要看的話，等玩家關掉 dialog
+// 才觸發（不能搶在玩家讀完結算前就跳走）。取得祝福/詛咒的 acquiredModifierDialog
+// 同理：dialog 還開著時不能先播走路動畫（known-issue.md #3）。轉盤事件結果
+// （wheelResultPending）也是同一套邏輯：開獎結果要等玩家自己點「關閉」才能
+// 繼續走路，不能被自動 advance 蓋過去（見使用者回報）。INIT「開始探索」、
+// REST「結束休息」仍維持手動點擊，因為這兩個是玩家主動決定「現在要做這件事」的
+// 時機點。
+watch(() => (
+    (currentRun.value?.state === AdventureStateType.RESOLUTION
+        || currentRun.value?.state === AdventureStateType.EXPLORING)
+    && !combatPlaybackPending.value
+    && !combatSummaryDialogOpen.value
+    && !acquiredModifierDialog.value
+    && !wheelResultPending.value
+    && !pendingModifierAck.value
+    && !runLoading.value
+), (ready) => {
+    if (ready) handleAdvance();
+});
+
+// Stage 上的 HP 顯示：有進行中的戰鬥演出時，直接沿用 useCombat 的 playerStatus
+// （已經是逐格套用 combatLog 算出的即時 HP，本身就是動畫來源，不需要再另外凍結
+// 一份「戰鬥開始前」快照）；沒有戰鬥時退回 currentRun 的伺服器端真值。
+const stageHp = computed(() => {
+    if (lastCombatResult.value) {
+        return {
+            current: playerStatus.value.hpCurrent,
+            max: playerStatus.value.hpMax,
+            percent: playerStatus.value.hpPercent,
+        };
     }
-    return currentRun.value?.playerHp ?? 0;
+    const current = currentRun.value?.playerHp ?? 0;
+    const max = currentRun.value?.playerHpMax ?? 0;
+    return {
+        current,
+        max,
+        percent: max > 0 ? Math.max(0, Math.min(100, (current / max) * 100)) : 0,
+    };
 });
 
 // 結算頁的 EXP 進度條動畫：掛載後才把目標值設進去，讓 v-progress-linear 內建的
@@ -810,11 +1165,27 @@ const eventNodeData = computed(() => (
         : null
 ));
 
+const restNodeData = computed(() => (
+    currentRun.value?.state === AdventureStateType.REST
+        ? currentRun.value.currentNodeData as RestNodeData
+        : null
+));
+
 const blessingCandidates = computed(() => (
     currentRun.value?.state === AdventureStateType.BLESSING_SELECT
         ? (currentRun.value.currentNodeData as BlessingNodeData)?.candidates ?? []
         : []
 ));
+
+// 祝福選擇 dialog 要顯示效果數值（例如「防禦力 +6」），用 modifierId 查回完整
+// 模板（含 statModifiers）算出效果文字，沿用既有 describeModifierEffect。
+const blessingCandidatesWithEffect = computed(() => blessingCandidates.value.map((candidate) => {
+    const template = MODIFIER_TEMPLATES.find(t => t.modifierId === candidate.modifierId);
+    return {
+        ...candidate,
+        effectText: template ? describeModifierEffect(template) : '',
+    };
+}));
 
 const advanceLabel = computed(() => {
     switch (currentRun.value?.state) {
@@ -833,9 +1204,32 @@ const restPotions = computed<(ItemLike & { itemId: string })[]>(() => {
     return [...runPotions, ...permanentPotions] as (ItemLike & { itemId: string })[];
 });
 
+// 走路動畫是純視覺演出，跟 advance() 的 API 回應各自獨立（見
+// adventure-run-presentation spec）：點擊當下立刻開始播放固定長度的走路節拍，
+// 不等待、也不阻塞 API 回應；API 提早回應時畫面一樣正常切換到新節點狀態。
+const WALK_BEAT_MS = 1500;
 const handleAdvance = async () => {
     if (!character.value) return;
+    walkFrame.start();
+    setTimeout(walkFrame.stop, WALK_BEAT_MS);
     await advance(character.value.characterId);
+};
+
+// 開頭畫面的「進入關卡」：跟一般的 handleAdvance 不同，這裡要先把走路動畫完整
+// 播完，畫面才切換到「冒險進行中」顯示第一個節點的內容（見 enteringRun 那個
+// v-else-if 分支）——用 Promise.all 讓動畫節拍與 advance() API 併行，兩者都
+// 完成才收尾，而不是像其他 handleAdvance 呼叫點那樣讓動畫與畫面更新各自獨立。
+const enteringRun = ref(false);
+const handleStartExploring = async () => {
+    if (!character.value) return;
+    enteringRun.value = true;
+    walkFrame.start();
+    await Promise.all([
+        new Promise(resolve => setTimeout(resolve, WALK_BEAT_MS)),
+        advance(character.value.characterId),
+    ]);
+    walkFrame.stop();
+    enteringRun.value = false;
 };
 
 // 開頭畫面的「撤退」：這趟遠征還沒真正開始就放棄，比照既有放棄機制結算
@@ -847,8 +1241,8 @@ const handleRetreat = async () => {
 };
 
 const handleStartCombat = async () => {
-    if (!character.value || !currentRun.value) return;
-    preCombatPlayerHp.value = currentRun.value.playerHp;
+    if (!character.value) return;
+    combatStartHp.value = currentRun.value?.playerHp ?? 0;
     await startCombat(character.value.characterId);
 };
 
@@ -861,19 +1255,30 @@ const handleHeal = async (itemId: string) => {
 
 const handleResolveEvent = async (choiceIndex?: number) => {
     if (!character.value) return;
+    // resolveEvent() 內部的 fetchCurrent 會先把 currentRun 更新成 RESOLUTION，
+    // 這個 reactive 變化跟下面才要設定的 acquiredModifierDialog 中間隔了好幾個
+    // await/microtask，auto-advance watch 有機會搶先在 acquiredModifierDialog
+    // 設定好之前就先跑起來、播走路動畫。pendingModifierAck 在呼叫 API 前就同步
+    // 設成 true 堵住這個時間差，等 dialog 內容真的設定好才清掉（見下方 watch）。
+    pendingModifierAck.value = true;
     await resolveEvent(character.value.characterId, choiceIndex);
     const grantedModifierId = lastEventResult.value?.blessingGranted ?? lastEventResult.value?.curseApplied;
     if (grantedModifierId) {
         acquiredModifierDialog.value = MODIFIER_TEMPLATES.find(t => t.modifierId === grantedModifierId) ?? null;
+    } else if (lastEventResult.value?.eventType === EventType.WHEEL) {
+        wheelResultPending.value = true;
     }
+    pendingModifierAck.value = false;
 };
 
 const handleSelectBlessing = async (blessingId: string) => {
     if (!character.value) return;
+    pendingModifierAck.value = true;
     const success = await selectBlessing(character.value.characterId, blessingId);
     if (success) {
         acquiredModifierDialog.value = MODIFIER_TEMPLATES.find(t => t.modifierId === blessingId) ?? null;
     }
+    pendingModifierAck.value = false;
 };
 
 const handleReturnHome = () => {
@@ -904,6 +1309,14 @@ onMounted(() => {
     width: 100%;
     overflow-y: auto;
 
+    // 點擊推進時，背景底圖跟著輕微位移，呈現「正在往前移動」的錯覺，跟角色
+    // 走路動畫（characterSpriteSrc）同一個 WALK_BEAT_MS 節拍。CSS animation
+    // 對 background-position 的效果會蓋過 inline style 算出的固定值，動畫
+    // 播完後自動還原成 pageBackgroundStyle 原本的置中位置。
+    &--walking {
+        animation: adventure-page-bg-drift 1.5s ease-in-out;
+    }
+
     &__scroll {
         flex: 1 1 auto;
         min-height: 0;
@@ -912,6 +1325,12 @@ onMounted(() => {
 
     &__actions {
         flex: 0 0 auto;
+    }
+
+    // GameCombatSummaryBanner／GameModifierAcquiredBanner 疊在內容上的定位錨點
+    // （banner 本身 position: absolute; inset: 0）。
+    &__banner-anchor {
+        position: relative;
     }
 
     &__box {
@@ -929,6 +1348,182 @@ onMounted(() => {
 
         &--forfeited {
             border-color: rgba(255, 82, 82, 0.4);
+        }
+    }
+
+    // 角色 stage：探索與戰鬥共用的持久化大角色顯示區，固定在畫面下方、敵方
+    // arena 之下（見 known-issue.md 冒險 UI 改版 + 使用者後續調整）。HP 條疊在
+    // 角色圖像上，取代原本的獨立 HP 區塊；戰鬥中額外疊加行動條/spark/傷害飄字，
+    // 動畫/樣式沿用 combatResultPanel.vue 同一套手刻 keyframes 慣例。
+    // flex: 0 0 auto（而非 1 1 auto）讓 stage 高度只取決於自身內容，緊貼在
+    // __actions 正上方；上面的 __scroll 是唯一會撐開的區塊，藉此讓角色 sprite
+    // 不論 scroll 內容多寡都固定在同一個畫面位置（見進場走路動畫的版面比照）。
+    &__stage {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0 12px;
+    }
+
+    // fx-anchor：spark／傷害飄字獨立掛在這一層（跟 sprite-wrap 是兄弟節點，不是
+    // 子節點），避免 sprite-wrap 因為自己的 :key（cardFx 出手/閃避動畫）重新掛載時
+    // 把還在播放中的 spark／飄字一併拆掉重建，導致同一個效果在原本的動畫還沒播完
+    // 時被重新掛載、看起來像是重播了一次（見使用者回報：首次受擊 effect 跳兩/三次）。
+    &__stage-fx-anchor {
+        position: relative;
+        width: 160px;
+        aspect-ratio: 1;
+    }
+
+    &__stage-sprite-wrap {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+
+        &--attack {
+            animation: adventure-page-stage-lunge 0.3s ease-out;
+        }
+
+        &--dodge {
+            animation: adventure-page-stage-dodge 0.38s ease-out;
+        }
+    }
+
+    &__stage-sprite {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        image-rendering: pixelated;
+        filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+        transition: opacity 0.2s ease;
+
+        &--dead {
+            opacity: 0.4;
+        }
+    }
+
+    // 取得祝福/詛咒時疊在角色身後的光暈：z-index 刻意低於 sprite-wrap（見上方
+    // z-index: 1），讓光暈只在角色剪影周圍露出、被角色不透明的身體部位擋住，讀起來
+    // 像是「光暈罩在角色身上」而不是蓋在角色前面的貼圖。從小到大再淡出消失，一次性
+    // 播放，:key 用 modifierId 讓每次取得新的祝福/詛咒都能重新播放。
+    &__stage-glow {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        z-index: 0;
+        width: 150%;
+        height: 150%;
+        transform: translate(-50%, -50%) scale(0.2);
+        image-rendering: pixelated;
+        pointer-events: none;
+        opacity: 0;
+        animation: adventure-page-stage-glow-pulse 1.6s ease-out forwards;
+    }
+
+    // z-index 明確蓋過 sprite-wrap（見上方 z-index: 1），確保角色被攻擊時受擊
+    // 特效疊在角色圖像「前面」而不是被身體擋住（見使用者回報：加入光暈後受擊
+    // slash 特效被角色本身蓋住看不到）。
+    &__stage-spark {
+        position: absolute;
+        top: 45%;
+        left: 50%;
+        z-index: 2;
+        width: 96px;
+        height: 96px;
+        transform: translate(-50%, -50%) scale(0.3);
+        image-rendering: pixelated;
+        pointer-events: none;
+        animation: adventure-page-stage-spark-pop 0.45s ease-out forwards;
+
+        &--crit {
+            width: 130px;
+            height: 130px;
+            filter: drop-shadow(0 0 6px rgba(255, 140, 0, 0.7));
+        }
+    }
+
+    &__stage-damage-text {
+        position: absolute;
+        z-index: 2;
+        top: 10%;
+        left: 50%;
+        transform: translate(-50%, 0);
+        font-weight: 700;
+        font-size: 20px;
+        color: #fff;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+        pointer-events: none;
+        white-space: nowrap;
+        animation: adventure-page-stage-damage-text-float 0.7s ease-out forwards;
+
+        &--crit {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+            font-size: 28px;
+            color: rgb(var(--v-theme-warning));
+        }
+
+        &--dodge {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+    }
+
+    &__stage-damage-text-crit-label {
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+    }
+
+    &__stage-hp {
+        width: 100%;
+        max-width: 220px;
+    }
+
+    &__stage-hp-bar {
+        margin-top: 4px;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+    }
+
+    &__stage-hp-bar-fill {
+        height: 100%;
+        background: rgb(var(--v-theme-warning));
+        transition: width 0.3s ease;
+    }
+
+    // 攻速充能條，樣式比照 combatResultPanel.vue 的 &__gauge（電池格底紋 +
+    // JS 逐幀算好寬度寫入，見 useCombat 的 gaugeAt）。
+    &__stage-gauge {
+        width: 100%;
+        margin-top: 4px;
+        height: 4px;
+        border-radius: 2px;
+        overflow: hidden;
+        background-color: rgba(255, 255, 255, 0.08);
+        background-image: repeating-linear-gradient(
+            to right,
+            transparent 0,
+            transparent calc(10% - 1px),
+            rgba(0, 0, 0, 0.4) calc(10% - 1px),
+            rgba(0, 0, 0, 0.4) 10%
+        );
+    }
+
+    &__stage-gauge-fill {
+        height: 100%;
+        background-color: #fff;
+        transition: width 0.1s linear;
+
+        &--paused {
+            background-color: rgba(255, 255, 255, 0.4);
         }
     }
 
@@ -1025,6 +1620,99 @@ onMounted(() => {
     }
     100% {
         transform: scale(1);
+    }
+}
+
+@keyframes adventure-page-bg-drift {
+    0% {
+        background-position: center top;
+    }
+    50% {
+        background-position: 54% top;
+    }
+    100% {
+        background-position: center top;
+    }
+}
+
+// 出手：角色向敵方（畫面上方）撲出去再彈回來，跟 combatResultPanel.vue 的
+// &__unit-inner--attack 是同一套演出語言，只是這裡永遠是「往上」（--fx-dir
+// 寫死，stage 上只有玩家自己，不需要像 combatResultPanel 那樣依 row 切換方向）。
+@keyframes adventure-page-stage-lunge {
+    0% {
+        transform: translateY(0);
+    }
+    45% {
+        transform: translateY(-10px);
+    }
+    100% {
+        transform: translateY(0);
+    }
+}
+
+@keyframes adventure-page-stage-dodge {
+    0% {
+        transform: translateX(0);
+    }
+    30% {
+        transform: translateX(14px);
+    }
+    65% {
+        transform: translateX(-5px);
+    }
+    100% {
+        transform: translateX(0);
+    }
+}
+
+@keyframes adventure-page-stage-glow-pulse {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.2);
+    }
+    35% {
+        opacity: 0.9;
+        transform: translate(-50%, -50%) scale(1.15);
+    }
+    60% {
+        opacity: 0.85;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.05);
+    }
+}
+
+@keyframes adventure-page-stage-spark-pop {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.3);
+    }
+    25% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.15);
+    }
+    45% {
+        transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes adventure-page-stage-damage-text-float {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 0);
+    }
+    20% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -28px);
     }
 }
 </style>

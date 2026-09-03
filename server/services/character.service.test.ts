@@ -102,14 +102,6 @@ describe('CharacterService.createCharacterFromArchetype', () => {
         equipItemMock.mockReset();
     });
 
-    it('rejects a retired archetype', async () => {
-        listByAccountIdMock.mockResolvedValue([]);
-        const service = new CharacterService();
-
-        await expect(service.createCharacterFromArchetype('account-1', 'barbarian')).rejects.toThrow('Unknown archetype');
-        expect(createCharacterFromArchetypeMock).not.toHaveBeenCalled();
-    });
-
     it('rejects an unknown archetypeId', async () => {
         listByAccountIdMock.mockResolvedValue([]);
         const service = new CharacterService();

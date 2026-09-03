@@ -572,8 +572,14 @@ export class AdventureRunService extends BaseService {
         };
 
         if (nodeType === NodeType.REST) {
+            const hpCurrent = clamp(
+                run.playerHp + Math.round(run.playerHpMax * (NODE_CONFIG.REST_AUTO_HEAL_PERCENT / 100)),
+                0,
+                run.playerHpMax,
+            );
             patch.state = AdventureStateType.REST;
-            patch.currentNodeData = FieldValue.delete();
+            patch.playerHp = hpCurrent;
+            patch.currentNodeData = { autoHealAmount: hpCurrent - run.playerHp };
         } else if (nodeType === NodeType.EVENT || nodeType === NodeType.CHOICE) {
             const template = await this.eventService.selectEvent(run.runId);
             patch.state = AdventureStateType.EVENT;

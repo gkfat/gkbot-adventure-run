@@ -213,8 +213,26 @@ describe('AdventureRunService.advance — node generation priority', () => {
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
             state: AdventureStateType.REST,
             currentNodeType: NodeType.REST,
+            playerHp: 100, // already at playerHpMax — auto-heal clamps, no overheal
+            currentNodeData: { autoHealAmount: 0 },
         }));
         expect(result.run.state).toBe(AdventureStateType.REST);
+    });
+
+    it('auto-heals a fixed % of playerHpMax when entering a Rest node, clamped to playerHpMax', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            step: 5, lastRestStep: 0, playerHp: 50, playerHpMax: 100,
+        }));
+
+        const service = new AdventureRunService();
+        const result = await service.advance('account-1', 'char-1');
+
+        // NODE_CONFIG.REST_AUTO_HEAL_PERCENT = 20% of 100 = 20
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            playerHp: 70,
+            currentNodeData: { autoHealAmount: 20 },
+        }));
+        expect(result.run.playerHp).toBe(70);
     });
 
     it('produces a Strong Elite combat node on step % 9 == 0 when the rest guarantee has not triggered', async () => {

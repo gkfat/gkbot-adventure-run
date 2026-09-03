@@ -118,6 +118,11 @@ type StartCombatResponse = {
     data: CombatApiResult;
 };
 
+// Shape of `currentNodeData` while state=REST (set by advanceFromExploring).
+export type RestNodeData = {
+    autoHealAmount: number;
+};
+
 // Shape of `currentNodeData` while state=EVENT (set by advanceFromExploring).
 export type EventNodeData = {
     eventTemplateId: string;
@@ -237,6 +242,7 @@ export const useAdventureRun = () => {
      * 開始新的冒險。若角色已有進行中的 run（409），視同成功並直接改抓現有 run。
      */
     const start = async (characterId: string): Promise<boolean> => {
+        if (loading.value) return false;
         loading.value = true;
         error.value = null;
         // Starting a new run makes any previously shown settlement (e.g.
@@ -265,6 +271,7 @@ export const useAdventureRun = () => {
      * 推進 run 的狀態機一步（EXPLORING 決定下一節點、REST 結束休息...）。
      */
     const advance = async (characterId: string): Promise<boolean> => {
+        if (loading.value) return false;
         loading.value = true;
         error.value = null;
 
@@ -295,6 +302,7 @@ export const useAdventureRun = () => {
      * 在休息節點使用藥水（永久背包或本次冒險掉落皆可）。
      */
     const useHealingItem = async (characterId: string, itemId: string): Promise<boolean> => {
+        if (loading.value) return false;
         loading.value = true;
         error.value = null;
 
@@ -319,6 +327,7 @@ export const useAdventureRun = () => {
      * 觸發目前 COMBAT 節點的戰鬥，取得 combatLog 與結算摘要。
      */
     const startCombat = async (characterId: string): Promise<boolean> => {
+        if (loading.value) return false;
         loading.value = true;
         error.value = null;
 
@@ -357,6 +366,7 @@ export const useAdventureRun = () => {
      * 解決目前 EVENT 節點（若有 choices 需帶 choiceIndex）。
      */
     const resolveEvent = async (characterId: string, choiceIndex?: number): Promise<boolean> => {
+        if (loading.value) return false;
         loading.value = true;
         error.value = null;
 
@@ -382,6 +392,7 @@ export const useAdventureRun = () => {
      * 從目前 BLESSING_SELECT 候選中選擇一個。
      */
     const selectBlessing = async (characterId: string, blessingId: string): Promise<boolean> => {
+        if (loading.value) return false;
         loading.value = true;
         error.value = null;
 
@@ -444,6 +455,7 @@ export const useAdventureRun = () => {
      * （直接載入/重新整理瀏覽器）時的自動放棄（known-issue.md #8）。
      */
     const abandon = async (characterId: string): Promise<boolean> => {
+        if (loading.value) return false;
         loading.value = true;
         error.value = null;
 

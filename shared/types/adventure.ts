@@ -444,6 +444,10 @@ export const NODE_CONFIG = {
     // ASSUMPTION (undocumented elsewhere): blessingPoints needed before a
     // BLESSING_SELECT is triggered at the next RESOLUTION checkpoint.
     BLESSING_POINTS_THRESHOLD: 3,
+
+    // Fixed % of playerHpMax auto-restored when entering a REST node, before
+    // any potion use (known-issue.md todo #4).
+    REST_AUTO_HEAL_PERCENT: 20,
 } as const;
 
 /**

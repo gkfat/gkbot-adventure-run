@@ -10,7 +10,7 @@ export type CharacterArchetype = {
     className: string;
     attributes: Attributes;
     spriteUrl: string;
-    /** Whether this archetype can be picked when creating a new character. Retired archetypes stay here (isSelectable: false) so existing characters can still resolve their className/spriteUrl. */
+    /** Whether this archetype can be picked when creating a new character. */
     isSelectable: boolean;
 };
 
@@ -59,42 +59,6 @@ export const CHARACTER_ARCHETYPES: readonly CharacterArchetype[] = [
         },
         spriteUrl: '/images/archetypes/gambler.png',
         isSelectable: true,
-    },
-    {
-        archetypeId: 'barbarian',
-        className: '野蠻人',
-        attributes: {
-            STR: 3, AGI: 1, CON: 3, LUCK: 1,
-        },
-        spriteUrl: '/images/archetypes/barbarian.png',
-        isSelectable: false,
-    },
-    {
-        archetypeId: 'rogue',
-        className: '盜賊',
-        attributes: {
-            STR: 1, AGI: 5, CON: 1, LUCK: 1,
-        },
-        spriteUrl: '/images/archetypes/rogue.png',
-        isSelectable: false,
-    },
-    {
-        archetypeId: 'paladin',
-        className: '聖騎士',
-        attributes: {
-            STR: 2, AGI: 1, CON: 4, LUCK: 1,
-        },
-        spriteUrl: '/images/archetypes/paladin.png',
-        isSelectable: false,
-    },
-    {
-        archetypeId: 'wanderer',
-        className: '流浪者',
-        attributes: {
-            STR: 1, AGI: 2, CON: 1, LUCK: 4,
-        },
-        spriteUrl: '/images/archetypes/wanderer.png',
-        isSelectable: false,
     },
 ] as const;
 
