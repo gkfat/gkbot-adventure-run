@@ -1,10 +1,4 @@
-# blessings-and-curses
-
-## Purpose
-
-冒險 run 內的 Blessing/Curse（RunModifier）：戰鬥累積點數觸發 BLESSING_SELECT 三選一，效果僅在本次 run 有效。
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: 祝福點數累積與選擇
 系統 SHALL 依 combat-engine 已實作的規則累積 `blessingPoints`（每場戰鬥勝利依節點 tier 給予固定點數），達 adventure-run-core 已定義的門檻時觸發 BLESSING_SELECT 狀態並提供 3 選 1 候選。候選 SHALL 只從「玩家目前未滿等級（Lv3）」的 Blessing 家族中產生，並依各家族的 `rarity`（COMMON/RARE/EPIC）加權抽選，rarity 越高被抽中的機率隨角色 LUCK 提升；每個候選 SHALL 帶著本次若被選中要授予/升級到的等級（未擁有該家族 → Lv1，已擁有 LvN 且 N < 3 → LvN+1）。選擇後的 Blessing 僅在本次 run 有效。
@@ -28,10 +22,3 @@
 #### Scenario: 選擇不存在的候選
 - **WHEN** 玩家送出的 `blessingId` 不在本次候選清單中
 - **THEN** 系統回傳 400，不修改 run 狀態
-
-### Requirement: Blessing/Curse 僅限本次 run 有效
-系統 SHALL 確保所有 Blessing 與 Curse 效果在 run 結束（ENDED）時全部失效，不得影響下一次 run。
-
-#### Scenario: Run 結束後 modifier 清空
-- **WHEN** 一個 run 進入 ENDED
-- **THEN** 該 run 的所有生效中 RunModifier 不會被帶到玩家下一次開始的新 run
