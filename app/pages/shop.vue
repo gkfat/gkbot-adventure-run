@@ -1,6 +1,6 @@
 <template>
     <div class="fill-height shop-page pa-3">
-        <!-- 分頁：金幣商店 / 紅寶石商店 -->
+        <!-- 分頁：金幣商店 / 寶石商店 -->
         <div class="d-flex ga-2 mb-3">
             <SystemBtn
                 v-for="option in TAB_OPTIONS"
@@ -144,7 +144,7 @@ useHead({
 
 const TAB_OPTIONS: { key: ShopType; label: string }[] = [
     { key: 'GOLD', label: '金幣商店' },
-    { key: 'GEMS', label: '紅寶石商店' },
+    { key: 'GEMS', label: '寶石商店' },
 ];
 
 const activeTab = ref<ShopType>('GOLD');

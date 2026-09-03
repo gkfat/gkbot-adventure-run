@@ -30,7 +30,7 @@
                 class="font-pixel text-subtitle-1 mb-4"
                 :style="{ color: settlementIsSuccess ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-warning))' }"
             >
-                {{ settlementIsSuccess ? '遠征成功' : '冒險失敗' }}
+                {{ settlementIsSuccess ? '探索完成' : '探索失敗' }}
             </div>
 
             <div

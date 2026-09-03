@@ -350,7 +350,7 @@ const breathStep = useIdleBreathingFrame();
 const justStarting = ref(false);
 
 const adventureCtaLabel = computed(() => {
-    if (!justStarting.value && hasActiveRun.value && currentRun.value) return '繼續冒險';
+    if (!justStarting.value && hasActiveRun.value && currentRun.value) return '繼續探索';
     return '開始探索';
 });
 
