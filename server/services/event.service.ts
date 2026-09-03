@@ -85,12 +85,14 @@ export class EventService extends BaseService implements EventResolver {
 
     private async resolveBlessing(run: AdventureRun, template: EventTemplate): Promise<EventResult> {
         const character = await this.characterService.getCharacterWithStats(run.accountId, run.characterId);
-        const [granted] = await this.blessingService.generateCandidates(run.runId, character.attributes.LUCK);
+        const [granted] = await this.blessingService.generateCandidates(run.runId, character.attributes.LUCK, run.blessings);
         return {
             eventId: template.id,
             type: template.type,
             description: template.description,
-            blessingGranted: granted?.modifierId,
+            blessingGranted: granted ? {
+                modifierId: granted.modifierId, level: granted.level,
+            } : undefined,
         };
     }
 

@@ -26,7 +26,10 @@ import {
 } from './combat.service';
 import { EventService } from './event.service';
 import { BlessingService } from './blessing.service';
-import { findModifierTemplate } from '../../shared/constants/blessings';
+import {
+    findCurseTemplate, blessingLevelEffect,
+} from '../../shared/constants/blessings';
+import type { BlessingCandidate } from '../../shared/constants/blessings';
 import {
     NoopLeaderboardUpdater, NoopProgressTracker,
 } from './adventure-run-stubs';
@@ -37,7 +40,7 @@ import {
     AdventureStateType, AdventureEndReason, NodeType, NODE_CONFIG, STAGE_CONFIG, isCombatNodeType,
     type AdventureRun, type LeaderboardUpdater, type ProgressTracker,
     type CombatResolver, type CombatContext, type CombatResolution, type CombatSummary, type CombatLogEntry,
-    type EventResult, type RunModifier, type SettleSummary, type EnemyPreview,
+    type EventResult, type SettleSummary, type EnemyPreview, type BlessingEntry,
     disambiguateEnemyNames,
 } from '../../shared/types/adventure';
 import type { Character } from '../../shared/types/character';
@@ -69,10 +72,7 @@ export function stripSeed(run: AdventureRun): Omit<AdventureRun, 'seed'> {
  * Gaining max HP tops current HP up to the new max; losing it clamps current
  * HP down so it never exceeds the new (lower) max.
  */
-function applyHpMaxModifier(
-    modifierId: string | undefined, hpMax: number, hp: number,
-): { hpMax: number; hp: number } {
-    const delta = modifierId ? findModifierTemplate(modifierId)?.statModifiers?.HP_MAX : undefined;
+function applyHpMaxDelta(delta: number | undefined, hpMax: number, hp: number): { hpMax: number; hp: number } {
     if (!delta) return {
         hpMax, hp,
     };
@@ -80,6 +80,58 @@ function applyHpMaxModifier(
     return {
         hpMax: newHpMax,
         hp: delta > 0 ? newHpMax : clamp(hp, 0, newHpMax),
+    };
+}
+
+/** Curse `HP_MAX` delta — curses stay flat/id-only (blessing-leveling Non-Goal). */
+function applyCurseHpMaxModifier(
+    modifierId: string | undefined, hpMax: number, hp: number,
+): { hpMax: number; hp: number } {
+    return applyHpMaxDelta(modifierId ? findCurseTemplate(modifierId)?.statModifiers?.HP_MAX : undefined, hpMax, hp);
+}
+
+/**
+ * Blessing `HP_MAX` delta on new-grant/upgrade: the delta is between the
+ * family's previous level's effect (0 if not owned yet) and its new level's
+ * effect — an upgrade "取代舊等級效果，不新增一筆" (design.md Decision 5), so
+ * the run's denormalized `playerHpMax` must move by the incremental amount,
+ * not the new level's full value (which would double-count what Lv1..N-1
+ * already applied) — see design.md Open Questions.
+ */
+function applyBlessingHpMaxDelta(
+    modifierId: string, previousLevel: number, newLevel: number, hpMax: number, hp: number,
+): { hpMax: number; hp: number } {
+    const previousHpMax = blessingLevelEffect(modifierId, previousLevel)?.statModifiers?.HP_MAX ?? 0;
+    const nextHpMax = blessingLevelEffect(modifierId, newLevel)?.statModifiers?.HP_MAX ?? 0;
+    return applyHpMaxDelta(nextHpMax - previousHpMax, hpMax, hp);
+}
+
+/**
+ * Upsert a granted/upgraded Blessing into `run.blessings` (new family -> Lv1
+ * entry; already-owned family -> replace its level) and apply the resulting
+ * `playerHpMax`/`playerHp` delta — shared by `resolveEvent`'s BLESSING
+ * outcome and `selectBlessing` (design.md Decision 5).
+ */
+function upsertGrantedBlessing(
+    run: Pick<AdventureRun, 'blessings' | 'playerHpMax' | 'playerHp'>,
+    granted: { modifierId: string; level: number },
+): { blessings: BlessingEntry[]; hpMax: number; hp: number } {
+    const existingIndex = run.blessings.findIndex(entry => entry.modifierId === granted.modifierId);
+    const previousLevel = existingIndex >= 0 ? (run.blessings[existingIndex] as BlessingEntry).level : 0;
+    const blessings = existingIndex >= 0
+        ? run.blessings.map((entry, index) => (index === existingIndex ? {
+            modifierId: entry.modifierId, level: granted.level,
+        } : entry))
+        : [
+            ...run.blessings, {
+                modifierId: granted.modifierId, level: granted.level,
+            },
+        ];
+    const {
+        hpMax, hp,
+    } = applyBlessingHpMaxDelta(granted.modifierId, previousLevel, granted.level, run.playerHpMax, run.playerHp);
+    return {
+        blessings, hpMax, hp,
     };
 }
 
@@ -439,16 +491,18 @@ export class AdventureRunService extends BaseService {
             patch.runInventory = [...run.runInventory, ...result.itemsGained].slice(0, RESOURCE_LIMITS.INVENTORY_RUN_MAX);
         }
         if (result.blessingGranted) {
-            patch.blessings = [...run.blessings, result.blessingGranted];
-            ({
-                hpMax, hp, 
-            } = applyHpMaxModifier(result.blessingGranted, hpMax, hp));
+            const upserted = upsertGrantedBlessing({
+                blessings: run.blessings, playerHpMax: hpMax, playerHp: hp,
+            }, result.blessingGranted);
+            patch.blessings = upserted.blessings;
+            hpMax = upserted.hpMax;
+            hp = upserted.hp;
         }
         if (result.curseApplied) {
             patch.curses = [...run.curses, result.curseApplied];
             ({
-                hpMax, hp, 
-            } = applyHpMaxModifier(result.curseApplied, hpMax, hp));
+                hpMax, hp,
+            } = applyCurseHpMaxModifier(result.curseApplied, hpMax, hp));
         }
         if (hpMax !== run.playerHpMax) patch.playerHpMax = hpMax;
         if (hp !== run.playerHp) patch.playerHp = hp;
@@ -464,7 +518,7 @@ export class AdventureRunService extends BaseService {
      * BLESSING_SELECT -> EXPLORING is a direct edge (ALLOWED_TRANSITIONS),
      * there is no separate RESOLUTION checkpoint after picking.
      */
-    async selectBlessing(accountId: string, characterId: string, blessingId: string): Promise<RunModifier> {
+    async selectBlessing(accountId: string, characterId: string, blessingId: string): Promise<BlessingCandidate> {
         await this.requireOwnedCharacter(accountId, characterId);
         const run = await this.requireActiveRun(characterId);
 
@@ -472,7 +526,7 @@ export class AdventureRunService extends BaseService {
             throw new BusinessLogicError('Can only select a blessing at a BLESSING_SELECT node');
         }
 
-        const nodeData = run.currentNodeData as { candidates?: RunModifier[] } | undefined;
+        const nodeData = run.currentNodeData as { candidates?: BlessingCandidate[] } | undefined;
         const chosen = nodeData?.candidates?.find(candidate => candidate.modifierId === blessingId);
         if (!chosen) {
             throw new ValidationError('blessingId is not among the current candidates');
@@ -483,13 +537,13 @@ export class AdventureRunService extends BaseService {
         // non-Boss node — plain stageNodeIndex advance.
         const { stageNodeIndex } = resolveStageFields(run);
         const {
-            hpMax, hp, 
-        } = applyHpMaxModifier(chosen.modifierId, run.playerHpMax, run.playerHp);
+            blessings, hpMax, hp,
+        } = upsertGrantedBlessing(run, chosen);
         await this.runRepo.saveCheckpoint(run.runId, {
             state: AdventureStateType.EXPLORING,
             step: run.step + 1,
             stageNodeIndex: stageNodeIndex + 1,
-            blessings: [...run.blessings, chosen.modifierId],
+            blessings,
             blessingPoints: 0,
             playerHpMax: hpMax,
             playerHp: hp,
@@ -726,7 +780,9 @@ export class AdventureRunService extends BaseService {
 
         if (run.blessingPoints >= NODE_CONFIG.BLESSING_POINTS_THRESHOLD) {
             const character = await this.characterRepo.getByIdOrThrow(run.characterId, 'character');
-            const candidates = await this.blessingService.generateCandidates(run.runId, character.attributes.LUCK);
+            const candidates = await this.blessingService.generateCandidates(
+                run.runId, character.attributes.LUCK, run.blessings,
+            );
 
             const updated = await this.runRepo.saveCheckpoint(run.runId, {
                 state: AdventureStateType.BLESSING_SELECT,

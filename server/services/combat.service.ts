@@ -31,7 +31,9 @@ import { generateItemInstance } from './item.service';
 import {
     getItemTemplate, ITEM_TEMPLATES,
 } from '../constants/templates';
-import { MODIFIER_TEMPLATES_BY_ID } from '../../shared/constants/blessings';
+import {
+    findCurseTemplate, resolveBlessingModifier,
+} from '../../shared/constants/blessings';
 import { ItemType } from '../../shared/types/item';
 import type { ItemInstance } from '../../shared/types/item';
 import {
@@ -108,16 +110,22 @@ export function combinedDropRateMultiplier(modifiers: RunModifier[]): number {
 }
 
 /**
- * Resolve a run's granted Blessing/Curse id arrays (`run.blessings`/
- * `run.curses`) into their concrete `RunModifier` objects via the shared
- * template table. An id with no matching template is skipped rather than
- * thrown — it should not be possible to grant an unknown id, but combat must
- * not fail to resolve over stale/unrecognized data.
+ * Resolve a run's granted Blessings/Curses (`run.blessings`/`run.curses`)
+ * into their concrete `RunModifier` objects. Blessings are level-aware
+ * (resolved via `resolveBlessingModifier` against the family's current
+ * level — blessing-leveling/design.md Decision 4); Curses stay flat, id-only
+ * lookups. An entry with no matching template is skipped rather than thrown —
+ * it should not be possible to grant an unknown id, but combat must not fail
+ * to resolve over stale/unrecognized data.
  */
 export function resolveActiveModifiers(run: Pick<AdventureRun, 'blessings' | 'curses'>): RunModifier[] {
-    return [...run.blessings, ...run.curses]
-        .map(modifierId => MODIFIER_TEMPLATES_BY_ID[modifierId])
+    const blessingModifiers = run.blessings
+        .map(entry => resolveBlessingModifier(entry))
         .filter((modifier): modifier is RunModifier => modifier !== undefined);
+    const curseModifiers = run.curses
+        .map(modifierId => findCurseTemplate(modifierId))
+        .filter((modifier): modifier is RunModifier => modifier !== undefined);
+    return [...blessingModifiers, ...curseModifiers];
 }
 
 /**

@@ -1,16 +1,19 @@
 /**
- * Blessing candidate generation — 3-pick weighted toward MAJOR tier as LUCK
- * increases (events-and-blessings/design.md's "候選生成" decision).
+ * Blessing candidate generation — candidates are drawn only from families the
+ * character hasn't maxed out (Lv3), weighted toward higher rarity as LUCK
+ * increases (blessing-leveling/design.md Decision 3).
  */
 
 import { BaseService } from './base.service';
 import { RngService } from './rng.service';
 import {
-    BLESSING_TEMPLATES, majorTierChance, type BlessingTemplate,
+    BLESSING_TEMPLATES, rarityWeights, pickWeightedRarity,
+    type BlessingTemplate, type BlessingCandidate,
 } from '../../shared/constants/blessings';
-import type { RunModifier } from '../../shared/types/adventure';
+import type { BlessingEntry } from '../../shared/types/adventure';
 
 const CANDIDATE_COUNT = 3;
+const MAX_LEVEL = 3;
 
 export class BlessingService extends BaseService {
     protected serviceName = 'blessing';
@@ -22,37 +25,52 @@ export class BlessingService extends BaseService {
     }
 
     /**
-     * Pick 3 distinct Blessing candidates. Every RNG draw goes through
-     * RngService (design.md Goal: all randomness auditable via seed+rngIndex).
-     *
-     * Falls back to the other tier when the preferred tier's pool is already
-     * exhausted (BLESSING_TEMPLATES only has 2 MINOR/3 MAJOR entries right
-     * now) — without this, a run of same-tier rolls could loop forever
-     * trying to draw from an empty pool.
+     * Pick up to 3 distinct Blessing family candidates, each carrying the
+     * level it would grant/upgrade to if chosen. Families already at Lv3 are
+     * excluded entirely — if fewer than 3 families remain eligible, fewer
+     * candidates are returned (never throws/hangs).
      */
-    async generateCandidates(runId: string, luck: number): Promise<RunModifier[]> {
-        const chosen: BlessingTemplate[] = [];
-        const majorChance = majorTierChance(luck);
+    async generateCandidates(
+        runId: string, luck: number, ownedBlessings: BlessingEntry[],
+    ): Promise<BlessingCandidate[]> {
+        const ownedLevelByFamily = new Map(ownedBlessings.map(entry => [entry.modifierId, entry.level]));
+        const eligible = BLESSING_TEMPLATES
+            .map(template => ({
+                template, ownedLevel: ownedLevelByFamily.get(template.modifierId) ?? 0,
+            }))
+            .filter(({ ownedLevel }) => ownedLevel < MAX_LEVEL);
 
-        while (chosen.length < CANDIDATE_COUNT) {
-            const tierRoll = await this.rngService.next(runId);
-            const preferredTier = tierRoll < majorChance ? 'MAJOR' : 'MINOR';
+        const targetCount = Math.min(CANDIDATE_COUNT, eligible.length);
+        const weights = rarityWeights(luck);
+        const chosen: { template: BlessingTemplate; nextLevel: number }[] = [];
 
-            const remaining = BLESSING_TEMPLATES.filter(
-                template => !chosen.some(c => c.modifierId === template.modifierId),
+        while (chosen.length < targetCount) {
+            const remaining = eligible.filter(
+                candidate => !chosen.some(c => c.template.modifierId === candidate.template.modifierId),
             );
-            const preferredPool = remaining.filter(template => template.tier === preferredTier);
+
+            const rarityRoll = await this.rngService.next(runId);
+            const preferredRarity = pickWeightedRarity(weights, rarityRoll);
+            const preferredPool = remaining.filter(candidate => candidate.template.rarity === preferredRarity);
             const pool = preferredPool.length > 0 ? preferredPool : remaining;
 
             const pickRoll = await this.rngService.next(runId);
-            const picked = pool[Math.floor(pickRoll * pool.length)] as BlessingTemplate;
-            chosen.push(picked);
+            const picked = pool[Math.floor(pickRoll * pool.length)] as { template: BlessingTemplate; ownedLevel: number };
+            chosen.push({
+                template: picked.template, nextLevel: picked.ownedLevel + 1,
+            });
         }
 
-        return chosen.map((template) => {
-            const modifier: Partial<BlessingTemplate> = { ...template };
-            delete modifier.tier;
-            return modifier as RunModifier;
-        });
+        return chosen.map(({
+            template, nextLevel, 
+        }) => ({
+            modifierId: template.modifierId,
+            name: template.name,
+            description: template.description,
+            isBlessing: true,
+            rarity: template.rarity,
+            level: nextLevel,
+            ...template.levels[nextLevel - 1],
+        }));
     }
 }

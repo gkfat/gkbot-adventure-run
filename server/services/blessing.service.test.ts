@@ -19,30 +19,71 @@ beforeEach(() => {
 });
 
 describe('BlessingService.generateCandidates', () => {
-    it('returns 3 distinct candidates with no `tier` field leaking into the RunModifier', async () => {
+    it('returns 3 distinct candidates, each at level 1, when nothing is owned', async () => {
         const service = new BlessingService();
-        const candidates = await service.generateCandidates('run-1', 0);
+        const candidates = await service.generateCandidates('run-1', 0, []);
 
         expect(candidates).toHaveLength(3);
         expect(new Set(candidates.map(c => c.modifierId)).size).toBe(3);
         for (const candidate of candidates) {
-            expect(candidate).not.toHaveProperty('tier');
+            expect(candidate.level).toBe(1);
         }
     });
 
-    it('falls back to the other tier instead of looping forever when the preferred tier is exhausted', async () => {
-        // roll >= majorChance picks MINOR; there are only 2 MINOR templates,
-        // and the default mock always returns 0.99 (>= majorChance) — so a
-        // naive implementation would try to draw a 3rd MINOR forever once
-        // both are chosen. generateCandidates must fall back to MAJOR instead
-        // of hanging (this exact case previously caused an OOM crash).
+    it('excludes families already at Lv3 and offers the next level for partially-owned families', async () => {
         const service = new BlessingService();
-        const candidates = await service.generateCandidates('run-1', 0);
+        const [maxed, partial] = BLESSING_TEMPLATES;
+        const candidates = await service.generateCandidates('run-1', 0, [
+            {
+                modifierId: maxed!.modifierId, level: 3, 
+            }, {
+                modifierId: partial!.modifierId, level: 1, 
+            },
+        ]);
 
-        const minorIds = new Set(
-            BLESSING_TEMPLATES.filter(t => t.tier === 'MINOR').map(t => t.modifierId),
-        );
-        const majorPicks = candidates.filter(c => !minorIds.has(c.modifierId));
-        expect(majorPicks.length).toBeGreaterThan(0);
+        expect(candidates.some(c => c.modifierId === maxed!.modifierId)).toBe(false);
+        const partialCandidate = candidates.find(c => c.modifierId === partial!.modifierId);
+        if (partialCandidate) {
+            expect(partialCandidate.level).toBe(2);
+        }
+    });
+
+    it('returns fewer than 3 candidates (not hang) when only a few families remain eligible', async () => {
+        const service = new BlessingService();
+        const maxedOut = BLESSING_TEMPLATES.slice(0, BLESSING_TEMPLATES.length - 2)
+            .map(t => ({
+                modifierId: t.modifierId, level: 3,
+            }));
+        const candidates = await service.generateCandidates('run-1', 0, maxedOut);
+
+        expect(candidates.length).toBe(2);
+    });
+
+    it('returns no candidates when every family is already at Lv3', async () => {
+        const service = new BlessingService();
+        const allMaxed = BLESSING_TEMPLATES.map(t => ({
+            modifierId: t.modifierId, level: 3,
+        }));
+        const candidates = await service.generateCandidates('run-1', 0, allMaxed);
+
+        expect(candidates).toHaveLength(0);
+    });
+
+    it('falls back to the remaining pool instead of looping forever when the preferred rarity is exhausted', async () => {
+        // The default mock always returns 0.99 (>= any rarity threshold) so
+        // every draw prefers COMMON — once all COMMON families are chosen, a
+        // naive implementation would try to draw a non-existent 4th COMMON
+        // forever. generateCandidates must fall back to the remaining pool.
+        const service = new BlessingService();
+        const commonCount = BLESSING_TEMPLATES.filter(t => t.rarity === 'COMMON').length;
+        const candidates = await service.generateCandidates('run-1', 0, []);
+
+        expect(candidates).toHaveLength(3);
+        if (commonCount < 3) {
+            const commonIds = new Set(
+                BLESSING_TEMPLATES.filter(t => t.rarity === 'COMMON').map(t => t.modifierId),
+            );
+            expect(candidates.some(c => !commonIds.has(c.modifierId))).toBe(true);
+        }
     });
 });

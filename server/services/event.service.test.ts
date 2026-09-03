@@ -94,11 +94,17 @@ describe('EventService.resolve', () => {
 
     it('BLESSING: grants the first generated candidate', async () => {
         getCharacterWithStatsMock.mockResolvedValue({ attributes: { LUCK: 5 } });
-        generateCandidatesMock.mockResolvedValue([{ modifierId: 'blessing_atk_boost' }]);
+        generateCandidatesMock.mockResolvedValue([
+            {
+                modifierId: 'blessing_atk_boost', level: 1, 
+            },
+        ]);
         const service = new EventService();
         const run = baseRun({ currentNodeData: { eventTemplateId: 'research_terminal' } });
         const result = await service.resolve(run);
-        expect(result.blessingGranted).toBe('blessing_atk_boost');
+        expect(result.blessingGranted).toEqual({
+            modifierId: 'blessing_atk_boost', level: 1, 
+        });
     });
 
     describe('WHEEL', () => {

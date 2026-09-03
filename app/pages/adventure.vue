@@ -794,7 +794,7 @@ import {
     type FacilitySeverity, type EnemyFaction, type RunModifier,
 } from '../../shared/types/adventure';
 import { EXP_TABLE } from '../../shared/types/character';
-import { BLESSING_TEMPLATES, CURSE_TEMPLATES } from '../../shared/constants/blessings';
+import { findCurseTemplate, resolveBlessingModifier } from '../../shared/constants/blessings';
 import type { Stats } from '../../shared/types/common';
 import { describeItem, resolvePixelIcon, RARITY_COLOR, type ItemLike } from '../utils/equipmentDisplay';
 import type { EventNodeData, BlessingNodeData, CombatNodeData, RestNodeData } from '../composables/useAdventureRun';
@@ -985,18 +985,25 @@ const STAT_LABEL: Partial<Record<keyof Stats, string>> = {
     DEF: '防禦力',
     HP_MAX: '生命上限',
     actionIntervalSec: '攻擊間隔',
+    critChance: '暴擊率',
+    critMultiplier: '暴擊倍率',
+    dodgeChance: '閃避率',
 };
 
-const MODIFIER_TEMPLATES = [...BLESSING_TEMPLATES, ...CURSE_TEMPLATES];
+// 以百分比顯示的 stat（值本身是 0~1 的小數），效果文字要轉成 "+3%" 而非 "+0.03"。
+const PERCENT_STATS: (keyof Stats)[] = ['critChance', 'dodgeChance'];
 
-// 本次冒險已獲得的祝福/詛咒清單（原始 modifierId 對應回模板取名稱與正負屬性），
+// 本次冒險已獲得的祝福/詛咒清單（祝福依目前等級展開對應數值，詛咒維持扁平查表），
 // 供下方狀態 panel 逐一列成小 chip。
-const acquiredModifiers = computed(() => {
+const acquiredModifiers = computed((): RunModifier[] => {
     if (!currentRun.value) return [];
-    const modifierIds = [...currentRun.value.blessings, ...currentRun.value.curses];
-    return modifierIds
-        .map(modifierId => MODIFIER_TEMPLATES.find(t => t.modifierId === modifierId))
-        .filter(t => t !== undefined);
+    const blessingModifiers = currentRun.value.blessings
+        .map(entry => resolveBlessingModifier(entry))
+        .filter((modifier): modifier is RunModifier => modifier !== undefined);
+    const curseModifiers = currentRun.value.curses
+        .map(modifierId => findCurseTemplate(modifierId))
+        .filter((modifier): modifier is RunModifier => modifier !== undefined);
+    return [...blessingModifiers, ...curseModifiers];
 });
 
 // 祝福/詛咒對生命上限的總加成，顯示在 HP 上限旁邊，例如 "171(+40)"。
@@ -1005,12 +1012,18 @@ const hpMaxBonus = computed(() => acquiredModifiers.value.reduce(
 ));
 
 // 單一祝福/詛咒 chip 下方的效果文字，例如 "防禦力 +6" 或 "掉落率 x1.30"。
-const describeModifierEffect = (modifier: (typeof MODIFIER_TEMPLATES)[number]) => {
+const describeModifierEffect = (modifier: Pick<RunModifier, 'statModifiers' | 'dropRateMultiplier'>) => {
     const parts = Object.entries(modifier.statModifiers ?? {}).map(([key, value]) => {
         const label = STAT_LABEL[key as keyof Stats] ?? key;
+        if (PERCENT_STATS.includes(key as keyof Stats)) {
+            return `${label} ${value! > 0 ? '+' : ''}${Math.round(value! * 100)}%`;
+        }
         return `${label} ${value! > 0 ? '+' : ''}${value}`;
     });
-    if (modifier.dropRateMultiplier) parts.push(`掉落率 x${modifier.dropRateMultiplier.toFixed(2)}`);
+    if (modifier.dropRateMultiplier) {
+        const percent = Math.round((modifier.dropRateMultiplier - 1) * 100);
+        parts.push(`掉落率 ${percent > 0 ? '+' : ''}${percent}%`);
+    }
     return parts.join('、');
 };
 
@@ -1189,15 +1202,12 @@ const blessingCandidates = computed(() => (
         : []
 ));
 
-// 祝福選擇 dialog 要顯示效果數值（例如「防禦力 +6」），用 modifierId 查回完整
-// 模板（含 statModifiers）算出效果文字，沿用既有 describeModifierEffect。
-const blessingCandidatesWithEffect = computed(() => blessingCandidates.value.map((candidate) => {
-    const template = MODIFIER_TEMPLATES.find(t => t.modifierId === candidate.modifierId);
-    return {
-        ...candidate,
-        effectText: template ? describeModifierEffect(template) : '',
-    };
-}));
+// 祝福選擇 dialog 要顯示效果數值（例如「防禦力 +6」）——候選本身已經帶著本次
+// 要給的等級所展開的 statModifiers/dropRateMultiplier，沿用既有 describeModifierEffect。
+const blessingCandidatesWithEffect = computed(() => blessingCandidates.value.map(candidate => ({
+    ...candidate,
+    effectText: describeModifierEffect(candidate),
+})));
 
 const advanceLabel = computed(() => {
     switch (currentRun.value?.state) {
@@ -1274,9 +1284,12 @@ const handleResolveEvent = async (choiceIndex?: number) => {
     // 設成 true 堵住這個時間差，等 dialog 內容真的設定好才清掉（見下方 watch）。
     pendingModifierAck.value = true;
     await resolveEvent(character.value.characterId, choiceIndex);
-    const grantedModifierId = lastEventResult.value?.blessingGranted ?? lastEventResult.value?.curseApplied;
-    if (grantedModifierId) {
-        acquiredModifierDialog.value = MODIFIER_TEMPLATES.find(t => t.modifierId === grantedModifierId) ?? null;
+    const grantedBlessing = lastEventResult.value?.blessingGranted;
+    const grantedCurseId = lastEventResult.value?.curseApplied;
+    if (grantedBlessing) {
+        acquiredModifierDialog.value = resolveBlessingModifier(grantedBlessing) ?? null;
+    } else if (grantedCurseId) {
+        acquiredModifierDialog.value = findCurseTemplate(grantedCurseId) ?? null;
     } else if (lastEventResult.value?.eventType === EventType.WHEEL) {
         wheelResultPending.value = true;
     }
@@ -1288,7 +1301,8 @@ const handleSelectBlessing = async (blessingId: string) => {
     pendingModifierAck.value = true;
     const success = await selectBlessing(character.value.characterId, blessingId);
     if (success) {
-        acquiredModifierDialog.value = MODIFIER_TEMPLATES.find(t => t.modifierId === blessingId) ?? null;
+        const entry = currentRun.value?.blessings.find(b => b.modifierId === blessingId);
+        acquiredModifierDialog.value = entry ? resolveBlessingModifier(entry) ?? null : null;
     }
     pendingModifierAck.value = false;
 };

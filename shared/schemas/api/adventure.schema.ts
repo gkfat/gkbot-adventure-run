@@ -7,7 +7,7 @@ import {
     AdventureStateType, NodeType, 
 } from '../../types';
 import {
-    adventureRunSchema, combatSummarySchema, settleSummarySchema,
+    adventureRunSchema, combatSummarySchema, settleSummarySchema, blessingEntrySchema,
 } from '../firestore/adventure.schema';
 import { itemInstanceSchema } from '../firestore/item.schema';
 
@@ -141,7 +141,7 @@ export const resolveEventResponseSchema = z.object({
         eventType: z.string(),
         description: z.string(),
         hpHealed: z.number().optional(),
-        blessingGranted: z.string().optional(),
+        blessingGranted: blessingEntrySchema.optional(),
         curseApplied: z.string().optional(),
         goldGained: z.number().optional(),
         gemsGained: z.number().optional(),
@@ -156,6 +156,12 @@ export const selectBlessingRequestSchema = z.object({
     characterId: z.string(), blessingId: z.string(),
 }).strict();
 
+export const blessingRaritySchema = z.enum([
+    'COMMON',
+    'RARE',
+    'EPIC',
+]);
+
 export const selectBlessingResponseSchema = z.object({
     success: z.boolean(),
     data: z.object({
@@ -163,6 +169,8 @@ export const selectBlessingResponseSchema = z.object({
             modifierId: z.string(),
             name: z.string(),
             description: z.string(),
+            rarity: blessingRaritySchema,
+            level: z.number().int().min(1).max(3),
         }),
     }),
 });

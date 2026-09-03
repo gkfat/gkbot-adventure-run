@@ -20,6 +20,15 @@ export const facilitySeveritySchema = z.enum([
 export const enemyFactionSchema = z.enum(['GKBOT', 'HUMAN']);
 
 /**
+ * An owned Blessing family + its level (1~3) — see
+ * shared/types/adventure.ts BlessingEntry (blessing-leveling).
+ */
+export const blessingEntrySchema = z.object({
+    modifierId: z.string(),
+    level: z.number().int().min(1).max(3),
+}).strict();
+
+/**
  * Combat summary schema (stored in run)
  */
 export const combatSummarySchema = z.object({
@@ -113,7 +122,7 @@ export const adventureRunSchema = z.object({
     playerHpMax: z.number().min(1),
   
     // Run-only modifiers
-    blessings: z.array(z.string()),
+    blessings: z.array(blessingEntrySchema),
     curses: z.array(z.string()),
     blessingPoints: z.number().int().min(0),
   

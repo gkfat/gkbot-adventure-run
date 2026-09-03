@@ -1,7 +1,8 @@
 import type {
     AdventureStateType, AdventureEndReason, NodeType, CombatSummary, CombatLogEntry, EnemyPreview,
-    FacilitySeverity, EnemyFaction,
+    FacilitySeverity, EnemyFaction, BlessingEntry, RunModifier,
 } from '../../shared/types/adventure';
+import type { BlessingRarity } from '../../shared/constants/blessings';
 import type { Rarity } from '../../shared/types/common';
 import type { ItemInstance } from '../../shared/types/item';
 
@@ -45,7 +46,7 @@ export type AdventureRunView = {
     playerHp: number;
     playerHpMax: number;
     blessingPoints: number;
-    blessings: string[];
+    blessings: BlessingEntry[];
     curses: string[];
     runInventory: AdventureRunItem[];
     expEarned: number;
@@ -131,11 +132,15 @@ export type EventNodeData = {
     choices?: { label: string }[];
 };
 
-// Shape of `currentNodeData` while state=BLESSING_SELECT.
-export type BlessingCandidate = {
+// Shape of `currentNodeData` while state=BLESSING_SELECT — each candidate
+// already carries the rarity + level it would grant/upgrade to if picked
+// (blessing-leveling/design.md Decision 3).
+export type BlessingCandidate = Pick<RunModifier, 'statModifiers' | 'dropRateMultiplier'> & {
     modifierId: string;
     name: string;
     description: string;
+    rarity: BlessingRarity;
+    level: number;
 };
 export type BlessingNodeData = {
     candidates: BlessingCandidate[];
@@ -146,7 +151,7 @@ export type EventOutcome = {
     eventType: string;
     description: string;
     hpHealed?: number;
-    blessingGranted?: string;
+    blessingGranted?: BlessingEntry;
     curseApplied?: string;
     goldGained?: number;
     gemsGained?: number;

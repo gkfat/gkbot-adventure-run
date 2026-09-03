@@ -168,10 +168,10 @@ export type EventResult = {
   eventId: string;
   type: EventType;
   description: string;
-  
+
   // Outcomes
   hpHealed?: number;
-  blessingGranted?: string;
+  blessingGranted?: BlessingEntry;
   curseApplied?: string;
   goldGained?: number;
   gemsGained?: number;
@@ -280,6 +280,16 @@ export type SettleSummary = {
 };
 
 /**
+ * A single owned Blessing family entry on a run — `modifierId` identifies the
+ * family, `level` (1~3) is how far it's been upgraded (blessing-leveling).
+ * Curses stay flat (`AdventureRun.curses: string[]`) — unaffected.
+ */
+export type BlessingEntry = {
+  modifierId: string;
+  level: number;
+};
+
+/**
  * Run modifier (blessings/curses)
  */
 export type RunModifier = {
@@ -346,7 +356,7 @@ export type AdventureRun = {
   playerHpMax: number;
   
   // Run-only modifiers
-  blessings: string[];        // Blessing modifier IDs
+  blessings: BlessingEntry[]; // Owned Blessing families + their level (blessing-leveling)
   curses: string[];           // Curse modifier IDs
   blessingPoints: number;     // Accumulated points for next blessing
   

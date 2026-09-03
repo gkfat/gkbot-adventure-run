@@ -2,7 +2,7 @@ import {
     describe, it, expect, vi, beforeEach,
 } from 'vitest';
 import {
-    CombatService, computeDamage, applyModifiers, combinedDropRateMultiplier,
+    CombatService, computeDamage, applyModifiers, combinedDropRateMultiplier, resolveActiveModifiers,
 } from './combat.service';
 import { getStatMultipliers } from '../constants/difficulty';
 import {
@@ -62,6 +62,47 @@ describe('combinedDropRateMultiplier', () => {
 
     it('multiplies across all active modifiers', () => {
         expect(combinedDropRateMultiplier([blessing, blessing])).toBe(2.25);
+    });
+});
+
+describe('resolveActiveModifiers (blessing-leveling)', () => {
+    it('resolves a Blessing family to the effect for its current level', () => {
+        const lv1 = resolveActiveModifiers({
+            blessings: [
+                {
+                    modifierId: 'blessing_atk_boost', level: 1, 
+                },
+            ], curses: [],
+        });
+        const lv3 = resolveActiveModifiers({
+            blessings: [
+                {
+                    modifierId: 'blessing_atk_boost', level: 3, 
+                },
+            ], curses: [],
+        });
+
+        expect(lv1[0]?.statModifiers?.ATK).toBeDefined();
+        expect(lv3[0]?.statModifiers?.ATK).toBeGreaterThan(lv1[0]?.statModifiers?.ATK as number);
+    });
+
+    it('resolves flat Curses unaffected by level', () => {
+        const modifiers = resolveActiveModifiers({
+            blessings: [], curses: ['curse_signal_noise'],
+        });
+        expect(modifiers).toHaveLength(1);
+        expect(modifiers[0]?.statModifiers?.ATK).toBeLessThan(0);
+    });
+
+    it('skips an unknown modifierId instead of throwing', () => {
+        const modifiers = resolveActiveModifiers({
+            blessings: [
+                {
+                    modifierId: 'not_a_real_blessing', level: 1, 
+                },
+            ], curses: ['not_a_real_curse'],
+        });
+        expect(modifiers).toHaveLength(0);
     });
 });
 
@@ -488,7 +529,15 @@ describe('CombatService.resolve', () => {
 
             const service = new CombatService();
             const baselineResult = await service.resolve(baseRun({ blessings: [] }), context);
-            const boostedResult = await service.resolve(baseRun({ blessings: ['blessing_speed'] }), context);
+            const boostedResult = await service.resolve(
+                baseRun({
+                    blessings: [
+                        {
+                            modifierId: 'blessing_speed', level: 1, 
+                        },
+                    ], 
+                }), context,
+            );
 
             expect(baselineResult.enemies[0]?.hpMax).toBeGreaterThan(500); // sanity: enemy never actually dies within MAX_ROUNDS
             expect(playerAttackCount(boostedResult.combatLog)).toBeGreaterThan(playerAttackCount(baselineResult.combatLog));

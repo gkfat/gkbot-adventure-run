@@ -775,6 +775,74 @@ describe('AdventureRunService.resolveEvent', () => {
         expect(result.hpHealed).toBe(20);
     });
 
+    it('grants a new Blessing family at Lv1 and applies its HP_MAX delta', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.EVENT,
+            playerHp: 100,
+            playerHpMax: 100,
+            blessings: [],
+            currentNodeData: { eventTemplateId: 'research_terminal' },
+        }));
+        eventResolveMock.mockResolvedValue({
+            eventId: 'research_terminal',
+            type: 'BLESSING',
+            description: 'flavor',
+            blessingGranted: {
+                modifierId: 'blessing_hp_boost', level: 1, 
+            },
+        });
+
+        const service = new AdventureRunService();
+        await service.resolveEvent('account-1', 'char-1');
+
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            blessings: [
+                {
+                    modifierId: 'blessing_hp_boost', level: 1, 
+                },
+            ],
+            playerHpMax: 140,
+            playerHp: 140,
+        }));
+    });
+
+    it('upgrades an already-owned Blessing family in place instead of adding a second entry', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.EVENT,
+            playerHp: 140,
+            playerHpMax: 140,
+            blessings: [
+                {
+                    modifierId: 'blessing_hp_boost', level: 1, 
+                },
+            ],
+            currentNodeData: { eventTemplateId: 'research_terminal' },
+        }));
+        eventResolveMock.mockResolvedValue({
+            eventId: 'research_terminal',
+            type: 'BLESSING',
+            description: 'flavor',
+            blessingGranted: {
+                modifierId: 'blessing_hp_boost', level: 2, 
+            },
+        });
+
+        const service = new AdventureRunService();
+        await service.resolveEvent('account-1', 'char-1');
+
+        // Lv1 HP_MAX=40 already applied; Lv2 HP_MAX=80 — only the +40 delta
+        // should be added, not the full Lv2 value again.
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            blessings: [
+                {
+                    modifierId: 'blessing_hp_boost', level: 2, 
+                },
+            ],
+            playerHpMax: 180,
+            playerHp: 180,
+        }));
+    });
+
     it('forwards choiceIndex to eventService.resolve', async () => {
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
             state: AdventureStateType.EVENT,
@@ -800,15 +868,21 @@ describe('AdventureRunService.advanceFromResolution — BLESSING_SELECT candidat
             characterId: 'char-1', attributes: { LUCK: 7 }, 
         });
         generateCandidatesMock.mockResolvedValue([
-            { modifierId: 'blessing_atk_boost' },
-            { modifierId: 'blessing_def_boost' },
-            { modifierId: 'blessing_hp_boost' },
+            {
+                modifierId: 'blessing_atk_boost', level: 1, 
+            },
+            {
+                modifierId: 'blessing_def_boost', level: 1, 
+            },
+            {
+                modifierId: 'blessing_hp_boost', level: 1, 
+            },
         ]);
 
         const service = new AdventureRunService();
         await service.advance('account-1', 'char-1');
 
-        expect(generateCandidatesMock).toHaveBeenCalledWith('run-1', 7);
+        expect(generateCandidatesMock).toHaveBeenCalledWith('run-1', 7, []);
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
             state: AdventureStateType.BLESSING_SELECT,
             currentNodeData: { candidates: expect.any(Array) },
@@ -883,9 +957,9 @@ describe('AdventureRunService.selectBlessing', () => {
             currentNodeData: {
                 candidates: [
                     {
-                        modifierId: 'blessing_atk_boost', name: 'x', description: 'y', 
+                        modifierId: 'blessing_atk_boost', name: 'x', description: 'y', rarity: 'COMMON', level: 1,
                     },
-                ], 
+                ],
             },
         }));
 
@@ -902,7 +976,7 @@ describe('AdventureRunService.selectBlessing', () => {
             currentNodeData: {
                 candidates: [
                     {
-                        modifierId: 'blessing_atk_boost', name: '戰鬥意志', description: 'desc', isBlessing: true,
+                        modifierId: 'blessing_atk_boost', name: '戰鬥意志', description: 'desc', isBlessing: true, rarity: 'COMMON', level: 1,
                     },
                 ],
             },
@@ -915,8 +989,44 @@ describe('AdventureRunService.selectBlessing', () => {
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
             state: AdventureStateType.EXPLORING,
             step: 5,
-            blessings: ['blessing_atk_boost'],
+            blessings: [
+                {
+                    modifierId: 'blessing_atk_boost', level: 1, 
+                },
+            ],
             blessingPoints: 0,
+        }));
+    });
+
+    it('upgrades an already-owned family in place instead of adding a second entry', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.BLESSING_SELECT,
+            step: 4,
+            blessings: [
+                {
+                    modifierId: 'blessing_atk_boost', level: 1, 
+                },
+            ],
+            blessingPoints: 3,
+            currentNodeData: {
+                candidates: [
+                    {
+                        modifierId: 'blessing_atk_boost', name: '戰鬥意志', description: 'desc', isBlessing: true, rarity: 'COMMON', level: 2, statModifiers: { ATK: 16 },
+                    },
+                ],
+            },
+        }));
+
+        const service = new AdventureRunService();
+        const chosen = await service.selectBlessing('account-1', 'char-1', 'blessing_atk_boost');
+
+        expect(chosen.level).toBe(2);
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+            blessings: [
+                {
+                    modifierId: 'blessing_atk_boost', level: 2, 
+                },
+            ], 
         }));
     });
 });

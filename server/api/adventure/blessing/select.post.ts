@@ -48,6 +48,8 @@ export default defineEventHandler(async (event) => {
                     modifierId: blessing.modifierId,
                     name: blessing.name,
                     description: blessing.description,
+                    rarity: blessing.rarity,
+                    level: blessing.level,
                 },
             },
         };
