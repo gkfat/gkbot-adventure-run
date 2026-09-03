@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 實作商店功能
 - 主頁面角色背景
 - 祝福可升等
+- 實作轉盤 UI
 
 ### Changed
 

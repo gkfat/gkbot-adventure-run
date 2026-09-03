@@ -112,4 +112,5 @@ export const WHEEL_GEMS_CHANCE = 0.03;
 export const WHEEL_GEMS_MIN = 1;
 export const WHEEL_GEMS_MAX = 5;
 export const WHEEL_GOLD_CHANCE = 0.67; // cumulative window after gems: [0.03, 0.70)
+export const WHEEL_ITEM_CHANCE = 0.15; // cumulative window after gold: [0.70, 0.85); remainder [0.85, 1.0) is no-win
 export const WHEEL_RISK_CURSE_CHANCE = 0.5; // 'sealed_crate' choice's RISK failure odds

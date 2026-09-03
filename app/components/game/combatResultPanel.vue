@@ -53,7 +53,7 @@
                                 <span class="text-caption combat-result-panel__unit-name">{{ enemy.name }}</span>
                             </div>
                             <div class="text-caption text-medium-emphasis combat-result-panel__unit-hp-text">
-                                {{ enemy.alive ? `${enemy.hpCurrent} / ${enemy.hpMax}` : '已擊敗' }}
+                                {{ enemy.alive ? `${Math.round(enemy.hpCurrent)} / ${enemy.hpMax}` : '已擊敗' }}
                             </div>
                             <div class="combat-result-panel__hp-bar">
                                 <div

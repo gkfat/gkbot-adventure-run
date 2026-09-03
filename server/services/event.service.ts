@@ -15,7 +15,7 @@ import { CURSE_TEMPLATES } from '../../shared/constants/blessings';
 import { generateItemInstance } from './item.service';
 import {
     EVENT_TEMPLATES, pickEventTemplate, type EventTemplate,
-    WHEEL_GEMS_CHANCE, WHEEL_GEMS_MIN, WHEEL_GEMS_MAX, WHEEL_GOLD_CHANCE, WHEEL_RISK_CURSE_CHANCE,
+    WHEEL_GEMS_CHANCE, WHEEL_GEMS_MIN, WHEEL_GEMS_MAX, WHEEL_GOLD_CHANCE, WHEEL_ITEM_CHANCE, WHEEL_RISK_CURSE_CHANCE,
     getItemTemplate, ITEM_TEMPLATES,
 } from '../constants/templates';
 import {
@@ -122,18 +122,25 @@ export class EventService extends BaseService implements EventResolver {
             };
         }
 
-        const pickRoll = await this.rngService.next(run.runId);
-        const templateId = EQUIPMENT_TEMPLATE_IDS[Math.floor(pickRoll * EQUIPMENT_TEMPLATE_IDS.length)] as string;
-        const itemsGained: ItemInstance[] = getItemTemplate(templateId)
-            ? [
-                {
-                    ...generateItemInstance(templateId, { source: ItemSource.EVENT }), characterId: run.characterId,
-                },
-            ]
-            : [];
+        if (roll < WHEEL_GEMS_CHANCE + WHEEL_GOLD_CHANCE + WHEEL_ITEM_CHANCE) {
+            const pickRoll = await this.rngService.next(run.runId);
+            const templateId = EQUIPMENT_TEMPLATE_IDS[Math.floor(pickRoll * EQUIPMENT_TEMPLATE_IDS.length)] as string;
+            const itemsGained: ItemInstance[] = getItemTemplate(templateId)
+                ? [
+                    {
+                        ...generateItemInstance(templateId, { source: ItemSource.EVENT }), characterId: run.characterId,
+                    },
+                ]
+                : [];
 
+            return {
+                eventId: template.id, type: template.type, description: template.description, itemsGained,
+            };
+        }
+
+        // remainder [gems + gold + item, 1.0) chance: no reward
         return {
-            eventId: template.id, type: template.type, description: template.description, itemsGained,
+            eventId: template.id, type: template.type, description: template.description,
         };
     }
 

@@ -84,7 +84,7 @@
                 :loading="sellLoading"
                 @click="handleSell(item)"
             >
-                販售(+{{ item.sellPriceGold }}金幣)
+                出售(+{{ item.sellPriceGold }}金幣)
             </SystemBtn>
 
             <SystemBtn

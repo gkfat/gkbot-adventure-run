@@ -127,13 +127,23 @@ describe('EventService.resolve', () => {
             expect(result.goldGained).toBe(15); // 5 + step*2
         });
 
-        it('item branch when roll >= 0.70', async () => {
-            rollQueue = [0.9, 0.1];
+        it('item branch when 0.70 <= roll < 0.85', async () => {
+            rollQueue = [0.75, 0.1];
             const service = new EventService();
             const run = baseRun({ currentNodeData: { eventTemplateId: 'vr_roulette' } });
             const result = await service.resolve(run);
             expect(result.itemsGained).toHaveLength(1);
             expect(result.itemsGained?.[0]?.characterId).toBe('char-1');
+        });
+
+        it('no-win branch when roll >= 0.85', async () => {
+            rollQueue = [0.9];
+            const service = new EventService();
+            const run = baseRun({ currentNodeData: { eventTemplateId: 'vr_roulette' } });
+            const result = await service.resolve(run);
+            expect(result.goldGained).toBeUndefined();
+            expect(result.gemsGained).toBeUndefined();
+            expect(result.itemsGained).toBeUndefined();
         });
     });
 

@@ -351,6 +351,7 @@
                 <GameWheelResultBanner
                     v-if="wheelResultPending"
                     :result="lastEventResult"
+                    :started="wheelSpinStarted"
                 />
 
                 <div class="adventure-page__box mb-3">
@@ -709,6 +710,17 @@
                 </SystemBtn>
 
                 <SystemBtn
+                    v-else-if="wheelResultPending && !wheelSpinStarted"
+                    block
+                    variant="flat"
+                    color="primary"
+                    class="text-none"
+                    @click="wheelSpinStarted = true"
+                >
+                    開始轉盤
+                </SystemBtn>
+
+                <SystemBtn
                     v-else-if="wheelResultPending"
                     block
                     variant="flat"
@@ -898,6 +910,9 @@ const pendingModifierAck = ref(false);
 // （見使用者回報）。true 代表結果已經出現、還沒被玩家關掉，同樣要擋下面的
 // auto-advance watch（見 handleResolveEvent 內的用法）。
 const wheelResultPending = ref(false);
+// 轉盤是否已經開始轉動——玩家要主動點下面的「開始轉盤」才會觸發
+// GameWheelResultBanner 內的旋轉動畫，見該元件的 started prop。
+const wheelSpinStarted = ref(false);
 // 取得祝福/詛咒當下疊在角色 sprite 上的光暈特效來源，跟 acquiredModifierDialog
 // 共用同一個值——dialog 一出現，光暈就套用在角色身上，從小到大再淡出消失（見
 // __stage-glow 的 keyframes）。
@@ -990,8 +1005,10 @@ const STAT_LABEL: Partial<Record<keyof Stats, string>> = {
     dodgeChance: '閃避率',
 };
 
-// 以百分比顯示的 stat（值本身是 0~1 的小數），效果文字要轉成 "+3%" 而非 "+0.03"。
-const PERCENT_STATS: (keyof Stats)[] = ['critChance', 'dodgeChance'];
+// 以百分比顯示的 stat，效果文字要轉成 "+3%" 而非 "+0.03"：critChance/dodgeChance
+// 本身是 0~1 的機率小數，critMultiplier 則是暴擊倍率的加成量（如 +0.1 代表倍率
+// +10 個百分點），三者都用同一套「乘以 100 取整數」的百分比呈現。
+const PERCENT_STATS: (keyof Stats)[] = ['critChance', 'dodgeChance', 'critMultiplier'];
 
 // 本次冒險已獲得的祝福/詛咒清單（祝福依目前等級展開對應數值，詛咒維持扁平查表），
 // 供下方狀態 panel 逐一列成小 chip。
@@ -1292,6 +1309,7 @@ const handleResolveEvent = async (choiceIndex?: number) => {
         acquiredModifierDialog.value = findCurseTemplate(grantedCurseId) ?? null;
     } else if (lastEventResult.value?.eventType === EventType.WHEEL) {
         wheelResultPending.value = true;
+        wheelSpinStarted.value = false;
     }
     pendingModifierAck.value = false;
 };
@@ -1399,7 +1417,7 @@ onMounted(() => {
     // 時被重新掛載、看起來像是重播了一次（見使用者回報：首次受擊 effect 跳兩/三次）。
     &__stage-fx-anchor {
         position: relative;
-        width: 120px;
+        height: 150px;
         aspect-ratio: 1;
     }
 
