@@ -123,9 +123,15 @@ export const useCharacter = () => {
     };
 
     /**
-     * 選定一個角色，記住選擇並載入其完整資料
+     * 選定一個角色，記住選擇並載入其完整資料。
+     * 若切換到不同角色，需重置背包／商店快取，避免沿用前一個角色的殘留資料。
      */
     const selectCharacter = async (characterId: string) => {
+        if (selectedCharacterId.value !== characterId) {
+            useInventory().reset();
+            useShop().reset();
+        }
+
         selectedCharacterId.value = characterId;
         const accountId = user.value?.uid;
         if (accountId) localStorage.setItem(storageKey(accountId), characterId);
