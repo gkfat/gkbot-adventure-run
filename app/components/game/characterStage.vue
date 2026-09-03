@@ -209,7 +209,7 @@
                     <div class="character-stage__sprite-col">
                         <div class="character-stage__sprite-header">
                             <div class="d-flex align-center ga-2">
-                                <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-green));">
+                                <span class="font-pixel text-caption character-stage__lv-tag">
                                     LV {{ character.level }}
                                 </span>
                                 <v-chip
@@ -217,7 +217,7 @@
                                     size="x-small"
                                     color="primary"
                                     variant="outlined"
-                                    class="font-pixel"
+                                    class="font-pixel character-stage__class-chip"
                                 >
                                     {{ character.className }}
                                 </v-chip>
@@ -401,9 +401,9 @@ const slotLabel = (slot: EquipmentSlot, item: ReturnType<typeof equippedItem>) =
 const slotStyle = (slot: EquipmentSlot) => {
     const item = equippedItem(slot);
     if (!item) {
-        return { borderColor: 'rgba(196, 203, 219, 0.25)', background: 'rgba(196, 203, 219, 0.08)' };
+        return { borderColor: 'rgba(196, 203, 219, 0.25)', background: '#14171c' };
     }
-    return { borderColor: RARITY_COLOR[item.rarity], background: 'rgba(196, 203, 219, 0.04)' };
+    return { borderColor: RARITY_COLOR[item.rarity], background: '#14171c' };
 };
 
 // Show the equipped item's own picture when the slot is filled, otherwise
@@ -654,6 +654,15 @@ watch(character, (value) => {
         gap: 2px;
     }
 
+    &__lv-tag {
+        color: #ffd166;
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.85);
+    }
+
+    &__class-chip {
+        background: rgba(10, 12, 16, 0.55) !important;
+    }
+
     &__sprite-wrap {
         position: relative;
         width: 140px;
@@ -663,6 +672,7 @@ watch(character, (value) => {
     &__sprite {
         position: relative;
         z-index: 1;
+        margin-left: 36px;
         image-rendering: pixelated;
         filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
     }
@@ -672,8 +682,13 @@ watch(character, (value) => {
         align-items: center;
         justify-content: space-between;
         width: 100%;
-        max-width: 280px;
         margin: 0 auto;
+        padding: 16px 10px;
+        border-radius: 8px;
+        background-image: url('/images/backgrounds/sewer-camp.gif');
+        background-size: cover;
+        background-position: center;
+        image-rendering: pixelated;
     }
 
     &__equip-col {
@@ -820,7 +835,7 @@ watch(character, (value) => {
     padding: 0;
     border: 2px solid rgba(196, 203, 219, 0.25);
     border-radius: 6px;
-    background: rgba(196, 203, 219, 0.04);
+    background: #14171c;
     color: rgb(var(--v-theme-primary));
     cursor: pointer;
 

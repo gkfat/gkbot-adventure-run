@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 裝備系統新增稀有度設計
 - 實作選擇角色初始裝備與刪除角色功能
 - 實作商店功能
+- 主頁面角色背景
 
 ### Changed
 
