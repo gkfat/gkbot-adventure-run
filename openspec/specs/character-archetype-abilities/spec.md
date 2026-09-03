@@ -19,7 +19,3 @@
 #### Scenario: 查表取得職業特色定義
 - **WHEN** 任一消費端系統（events/items/adventure-run/combat）需要判斷某職業是否具備特定類型的特色機制
 - **THEN** 可用 `archetypeId` 查得唯一一筆 `ArchetypeAbility`，並依 `trigger` 值分支處理，不需要額外硬編碼職業與機制的對應關係
-
-#### Scenario: 已停用舊職業沒有對應特色機制
-- **WHEN** 查詢已停用（retired）的舊職業（`barbarian`/`rogue`/`paladin`/`wanderer`）的 `ArchetypeAbility`
-- **THEN** 系統回傳查無資料（舊職業不具備任何新版核心特色機制），不影響其角色既有的 attributes/stats 運作
