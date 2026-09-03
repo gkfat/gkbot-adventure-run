@@ -126,7 +126,7 @@ Run 結束原因（`AdventureEndReason`）：`COMPLETED`（Boss 戰勝利）、`
 - 進入 EVENT 節點時，系統依權重表以決定性 RNG 選出一個事件模板。
 - 若事件模板帶有 `choices`：等待玩家呼叫 `POST /api/adventure/event/resolve`（帶 `choiceIndex`），依該 choice 的 cost/reward/risk 計算結果；缺少或不存在的 `choiceIndex` 回傳 400。
 - 若事件模板沒有 `choices`（例如單純補血事件）：系統立即計算結果並進入 RESOLUTION。
-- **事件轉盤（WHEEL）**：支援依既定機率發放物品、gems（3% 機率 1~5 顆）或金幣。
+- **事件轉盤（WHEEL）**：依既定機率發放 gems（3% 機率 1~5 顆）、金幣（67%）、物品（15%），或無任何獎勵（15%）。
 
 ### 4.2 戰鬥節點的敵人數量/波次
 

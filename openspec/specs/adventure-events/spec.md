@@ -18,8 +18,12 @@
 - **THEN** `POST /api/adventure/event/resolve` 需要 `choiceIndex` 參數；缺少或不存在的 choiceIndex 回傳 400
 
 ### Requirement: 事件轉盤
-系統 SHALL 支援轉盤類型的事件結果，可依既定機率發放物品、gems（3% 機率 1~5 顆）或金幣。
+系統 SHALL 支援轉盤類型的事件結果，可依既定機率發放 gems（3% 機率 1~5 顆）、金幣（67% 機率）、物品（15% 機率），或無任何獎勵（15% 機率）。
 
 #### Scenario: 轉盤命中 gems
 - **WHEN** 玩家觸發轉盤，且本次 RNG 判定命中 gems 掉落
 - **THEN** 系統依 1~5 的範圍 roll 出 gems 數量並加進 run 的 earnedGems
+
+#### Scenario: 轉盤未中獎
+- **WHEN** 玩家觸發轉盤，且本次 RNG 判定落在無獎勵區間（累積機率 [0.85, 1.0)）
+- **THEN** 系統回傳不含 goldGained/gemsGained/itemsGained 的事件結果，不發放任何獎勵

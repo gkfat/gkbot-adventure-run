@@ -66,11 +66,11 @@
 ### 3.2 事件掉落（`ItemSource.EVENT`）— `server/services/event.service.ts` `resolveWheel()`
 
 - 僅「輪盤（WHEEL）」事件類型可能掉裝備，其餘事件類型（HEAL/BLESSING/CURSE/CHOICE）不會透過 `generateItemInstance` 產生物品。
-- 輪盤結果是三選一的機率分岔（先後判定，依序扣除機率區間）：
-  1. `WHEEL_GEMS_CHANCE`：獲得寶石（數量介於 `WHEEL_GEMS_MIN`–`WHEEL_GEMS_MAX`）
-  2. 其次 `WHEEL_GOLD_CHANCE`：獲得金幣（`5 + run.step * 2`，隨 run 進度增加，`design.md` 標註為 ASSUMPTION）
-  3. 剩餘機率：均勻隨機挑一個裝備模板生成一件裝備（`maxRarity` 未設限，五稀有度皆可能 roll 到，含 L）
-- `WHEEL_GEMS_CHANCE`/`WHEEL_GOLD_CHANCE` 實際數值定義在 `server/constants/events.ts`，未在本次調查範圍內展開列出——如需精確數值請直接查該檔案。
+- 輪盤結果是四選一的機率分岔（先後判定，依序扣除機率區間，定義在 `server/constants/templates/events.ts`）：
+  1. `WHEEL_GEMS_CHANCE`（3%）：獲得寶石（數量介於 `WHEEL_GEMS_MIN`–`WHEEL_GEMS_MAX`，即 1–5）
+  2. 其次 `WHEEL_GOLD_CHANCE`（67%，累積區間 [0.03, 0.70)）：獲得金幣（`5 + run.step * 2`，隨 run 進度增加，`design.md` 標註為 ASSUMPTION）
+  3. 其次 `WHEEL_ITEM_CHANCE`（15%，累積區間 [0.70, 0.85)）：均勻隨機挑一個裝備模板生成一件裝備（`maxRarity` 未設限，五稀有度皆可能 roll 到，含 L）
+  4. 剩餘機率（15%，累積區間 [0.85, 1.0)）：無任何獎勵（`EventResult` 不含 goldGained/gemsGained/itemsGained）
 - 觸發時機：只有玩家進入 WHEEL 類型節點並呼叫 `resolve()` 時才會判定一次，非每次冒險必經。
 
 ### 3.3 商店（`ItemSource.SHOP`）
