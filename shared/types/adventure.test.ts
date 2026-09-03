@@ -110,20 +110,40 @@ describe('getProgressionFactor', () => {
 describe('getLevelCountRange / getStageNodeCountRange', () => {
     it('returns the low-end range for a weak character in an early chapter', () => {
         const power = PROGRESSION_CONFIG.BASE_POWER * PROGRESSION_CONFIG.POWER_RATIO_MIN;
-        expect(getLevelCountRange(power, 0)).toEqual({ min: 3, max: 7 });
-        expect(getStageNodeCountRange(power, 0)).toEqual({ min: 5, max: 10 });
+        expect(getLevelCountRange(power, 0)).toEqual({
+            min: 3, max: 7, 
+        });
+        expect(getStageNodeCountRange(power, 0)).toEqual({
+            min: 5, max: 10, 
+        });
     });
 
     it('returns the high-end range for a strong character deep into progression', () => {
         const power = PROGRESSION_CONFIG.BASE_POWER * PROGRESSION_CONFIG.POWER_RATIO_MAX
             * (1 + PROGRESSION_CONFIG.POWER_GROWTH_PER_CHAPTER * PROGRESSION_CONFIG.MAX_CHAPTER_FOR_SCALING);
-        expect(getLevelCountRange(power, PROGRESSION_CONFIG.MAX_CHAPTER_FOR_SCALING)).toEqual({ min: 8, max: 12 });
-        expect(getStageNodeCountRange(power, PROGRESSION_CONFIG.MAX_CHAPTER_FOR_SCALING)).toEqual({ min: 8, max: 15 });
+        expect(getLevelCountRange(power, PROGRESSION_CONFIG.MAX_CHAPTER_FOR_SCALING)).toEqual({
+            min: 8, max: 12, 
+        });
+        expect(getStageNodeCountRange(power, PROGRESSION_CONFIG.MAX_CHAPTER_FOR_SCALING)).toEqual({
+            min: 8, max: 15, 
+        });
     });
 
     it('always keeps min <= max across the full factor range', () => {
-        for (const chapterIndex of [0, 3, 10, 20, 40]) {
-            for (const powerMultiplier of [0.1, 0.5, 1, 2, 5]) {
+        for (const chapterIndex of [
+            0,
+            3,
+            10,
+            20,
+            40,
+        ]) {
+            for (const powerMultiplier of [
+                0.1,
+                0.5,
+                1,
+                2,
+                5,
+            ]) {
                 const power = PROGRESSION_CONFIG.BASE_POWER * powerMultiplier;
                 const levelRange = getLevelCountRange(power, chapterIndex);
                 const stageRange = getStageNodeCountRange(power, chapterIndex);
@@ -138,7 +158,13 @@ describe('rollChapterTotalLevels', () => {
     it('stays within the resolved range across the full rngValue span', () => {
         const power = PROGRESSION_CONFIG.BASE_POWER;
         const range = getLevelCountRange(power, 5);
-        for (const rngValue of [0, 0.25, 0.5, 0.75, 0.999]) {
+        for (const rngValue of [
+            0,
+            0.25,
+            0.5,
+            0.75,
+            0.999,
+        ]) {
             const rolled = rollChapterTotalLevels(power, 5, rngValue);
             expect(rolled).toBeGreaterThanOrEqual(range.min);
             expect(rolled).toBeLessThanOrEqual(range.max);

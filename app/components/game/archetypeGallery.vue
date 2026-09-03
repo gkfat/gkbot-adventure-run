@@ -119,7 +119,7 @@
             block
             size="large"
             color="green"
-            class="text-none mt-4 flex-grow-0 archetype-gallery__confirm-btn"
+            class="text-none mt-auto flex-grow-0 archetype-gallery__confirm-btn"
             :loading="loading"
             @click="handleConfirm"
         >

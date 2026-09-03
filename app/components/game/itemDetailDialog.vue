@@ -32,7 +32,7 @@
                 </div>
                 <div>
                     <div
-                        class="font-pixel text-subtitle-1"
+                        class="font-pixel item-detail__title"
                         :style="{ color: RARITY_COLOR[item.rarity] }"
                     >
                         {{ detailInfo?.name }}
@@ -264,6 +264,15 @@ defineExpose({
         position: absolute;
         top: 16px;
         right: 16px;
+    }
+
+    // 品名可能混雜英數字（走 font-pixel，字元較寬），縮小字級並保留右側空間，
+    // 避免與 __slot-label 重疊
+    &__title {
+        padding-right: 48px;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        word-break: break-word;
     }
 
     &__equipped-tag {

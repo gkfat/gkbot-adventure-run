@@ -304,9 +304,8 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     &__unit-name {
         display: block;
         max-width: 100%;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        white-space: normal;
+        word-break: break-word;
     }
 
     &__unit-hp-text {

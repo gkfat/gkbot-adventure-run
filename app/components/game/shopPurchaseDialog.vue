@@ -7,6 +7,13 @@
             v-if="slot"
             class="item-detail pa-4"
         >
+            <div
+                v-if="slot.item.equipSlot"
+                class="item-detail__slot-label text-caption text-medium-emphasis font-pixel"
+            >
+                {{ SLOT_LABEL[slot.item.equipSlot] }}
+            </div>
+
             <div class="d-flex align-center ga-3 mb-3">
                 <div
                     class="pixel-slot pixel-slot--item pixel-slot--detail"
@@ -25,7 +32,7 @@
                 </div>
                 <div>
                     <div
-                        class="font-pixel text-subtitle-1"
+                        class="font-pixel item-detail__title"
                         :style="{ color: RARITY_COLOR[slot.item.rarity] }"
                     >
                         {{ detailInfo?.name }}
@@ -90,7 +97,7 @@
 
 <script setup lang="ts">
 import {
-    RARITY_COLOR, resolvePixelIcon, describeItem,
+    RARITY_COLOR, SLOT_LABEL, resolvePixelIcon, describeItem,
 } from '../../utils/equipmentDisplay';
 import type { ShopSlot, ShopType } from '../../composables/useShop';
 
@@ -196,7 +203,23 @@ defineExpose({
 }
 
 .item-detail {
+    position: relative;
     background: rgb(var(--v-theme-background));
     border: 1px solid rgba(196, 203, 219, 0.15);
+
+    &__slot-label {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+    }
+
+    // 品名可能混雜英數字（走 font-pixel，字元較寬），縮小字級並保留右側空間，
+    // 避免與 __slot-label 重疊
+    &__title {
+        padding-right: 48px;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        word-break: break-word;
+    }
 }
 </style>
