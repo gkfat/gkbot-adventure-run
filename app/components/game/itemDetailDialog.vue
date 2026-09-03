@@ -7,6 +7,13 @@
             v-if="item"
             class="item-detail pa-4"
         >
+            <div
+                v-if="item.equipSlot"
+                class="item-detail__slot-label text-caption text-medium-emphasis font-pixel"
+            >
+                {{ SLOT_LABEL[item.equipSlot] }}
+            </div>
+
             <div class="d-flex align-center ga-3 mb-3">
                 <div
                     class="pixel-slot pixel-slot--item pixel-slot--detail"
@@ -111,7 +118,7 @@
 
 <script setup lang="ts">
 import {
-    RARITY_COLOR, resolvePixelIcon, describeItem, pickTargetSlot, type ItemLike,
+    RARITY_COLOR, SLOT_LABEL, resolvePixelIcon, describeItem, pickTargetSlot, type ItemLike,
 } from '../../utils/equipmentDisplay';
 import type { EquipmentSlot } from '../../../shared/types/common';
 
@@ -249,8 +256,15 @@ defineExpose({
 }
 
 .item-detail {
+    position: relative;
     background: rgb(var(--v-theme-background));
     border: 1px solid rgba(196, 203, 219, 0.15);
+
+    &__slot-label {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+    }
 
     &__equipped-tag {
         display: inline-flex;
