@@ -799,7 +799,7 @@ import type { Stats } from '../../shared/types/common';
 import { describeItem, resolvePixelIcon, RARITY_COLOR, type ItemLike } from '../utils/equipmentDisplay';
 import type { EventNodeData, BlessingNodeData, CombatNodeData, RestNodeData } from '../composables/useAdventureRun';
 import { pickIntroNarrative, pickTransitionNarrative } from '../constants/adventureNarrative';
-import { backSpriteUrl, walkFrameUrl } from '../utils/spriteDisplay';
+import { backSpriteUrl } from '../utils/spriteDisplay';
 import { getFacilityBackgroundUrl } from '../utils/facilityBackground';
 import { getEnemyAvatarTier, getEnemyPortraitUrl } from '../utils/enemyAvatar';
 import { useCombat } from '../composables/useCombat';
@@ -854,11 +854,9 @@ const enteredAdventureCold = !checked.value;
 
 const showLogDialog = ref(false);
 const walkFrame = useWalkFrame();
-const characterSpriteSrc = computed(() => {
-    if (!character.value) return '';
-    const back = backSpriteUrl(character.value.spriteUrl);
-    return walkFrameUrl(back, walkFrame.isWalking.value ? walkFrame.step.value : 0);
-});
+const characterSpriteSrc = computed(() => (
+    character.value ? backSpriteUrl(character.value.spriteUrl) : ''
+));
 
 // 戰鬥演出狀態集中在這裡（而非 GameCombatResultPanel 內部）：探索與戰鬥共用同一個
 // 「角色 stage」，玩家的 HP/行動條/spark/傷害飄字需要疊加在同一個持久化角色圖像
@@ -1323,9 +1321,9 @@ onMounted(() => {
     width: 100%;
     overflow-y: auto;
 
-    // 點擊推進時，背景底圖跟著輕微位移，呈現「正在往前移動」的錯覺，跟角色
-    // 走路動畫（characterSpriteSrc）同一個 WALK_BEAT_MS 節拍。CSS animation
-    // 對 background-position 的效果會蓋過 inline style 算出的固定值，動畫
+    // 點擊推進時，背景底圖跟著輕微位移，呈現「正在往前移動」的錯覺，跟
+    // walkFrame.isWalking 同一個 WALK_BEAT_MS 節拍。CSS animation 對
+    // background-position 的效果會蓋過 inline style 算出的固定值，動畫
     // 播完後自動還原成 pageBackgroundStyle 原本的置中位置。
     &--walking {
         animation: adventure-page-bg-drift 1.5s ease-in-out;

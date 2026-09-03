@@ -1,6 +1,6 @@
 <template>
     <img
-        :src="type === 'GOLD' ? '/images/icons/gold.svg' : '/images/icons/ruby.svg'"
+        :src="type === 'GOLD' ? '/images/pixel-icons/gold.svg' : '/images/pixel-icons/ruby.svg'"
         :width="size"
         :height="size"
         :alt="type === 'GOLD' ? '金幣' : '寶石'"
