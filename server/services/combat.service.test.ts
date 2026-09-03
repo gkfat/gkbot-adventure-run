@@ -43,6 +43,16 @@ describe('applyModifiers', () => {
         expect(result.DEF).toBe(baseStats.DEF);
         expect(result.HP_MAX).toBe(baseStats.HP_MAX);
     });
+
+    it('applies a speed blessing\'s actionIntervalSec delta (lower is faster)', () => {
+        const speedBlessing: RunModifier = {
+            modifierId: 'blessing_speed', name: '過載超頻', description: '', isBlessing: true, statModifiers: { actionIntervalSec: -0.3 },
+        };
+
+        const result = applyModifiers(baseStats, [speedBlessing]);
+
+        expect(result.actionIntervalSec).toBeCloseTo(baseStats.actionIntervalSec - 0.3);
+    });
 });
 
 describe('combinedDropRateMultiplier', () => {
@@ -450,6 +460,38 @@ describe('CombatService.resolve', () => {
             const bossTierHp = Math.round(bossArchetype.baseHp * getStatMultipliers(enemyLevel, 'BOSS').hp);
             expect(result.enemies[0]?.hpMax).toBe(expectedHp);
             expect(result.enemies[0]?.hpMax).not.toBe(bossTierHp);
+        });
+    });
+
+    // Confirms blessing_speed (actionIntervalSec: -0.3) isn't just stored on
+    // the run but actually reaches the combat loop's nextAttackAt scheduling
+    // and increases how often the player acts (see applyModifiers/resolve()).
+    describe('blessing_speed affects the combat loop, not just stored stats', () => {
+        it('increases the player\'s share of actions in the simulated fight when granted', async () => {
+            // Both sides deal exactly 1 floor damage per hit (huge mismatched
+            // ATK/DEF) against a high HP pool, so neither side dies before the
+            // MAX_ROUNDS safety cap — every run below performs the same total
+            // number of actions (500), isolating the player/enemy action split
+            // to actionIntervalSec alone.
+            getCharacterWithStatsMock.mockResolvedValue({
+                nickname: 'Tester',
+                attributes: { LUCK: 0 },
+                stats: {
+                    ATK: 1, DEF: 100000, HP_MAX: 100000, actionIntervalSec: 2, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+                },
+            });
+            const context: CombatContext = {
+                enemyLevel: 1000, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+            };
+            const playerAttackCount = (log: CombatLogEntry[]) => log
+                .filter(entry => entry.actorId === 'player' && entry.action !== 'DEATH').length;
+
+            const service = new CombatService();
+            const baselineResult = await service.resolve(baseRun({ blessings: [] }), context);
+            const boostedResult = await service.resolve(baseRun({ blessings: ['blessing_speed'] }), context);
+
+            expect(baselineResult.enemies[0]?.hpMax).toBeGreaterThan(500); // sanity: enemy never actually dies within MAX_ROUNDS
+            expect(playerAttackCount(boostedResult.combatLog)).toBeGreaterThan(playerAttackCount(baselineResult.combatLog));
         });
     });
 
