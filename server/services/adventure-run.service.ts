@@ -629,6 +629,7 @@ export class AdventureRunService extends BaseService {
             const archetype = mobArchetypes[archetypeIndex] as typeof mobArchetypes[number];
             firstWaveEnemies.push({
                 archetypeIndex,
+                archetypeSlug: archetype.slug,
                 name: archetype.name,
                 description: archetype.description,
                 level: enemyLevel,
@@ -680,6 +681,7 @@ export class AdventureRunService extends BaseService {
         const firstWaveEnemies: EnemyPreview[] = [
             {
                 archetypeIndex,
+                archetypeSlug: archetype.slug,
                 name: archetype.name,
                 description: archetype.description,
                 level: enemyLevel,
@@ -690,6 +692,7 @@ export class AdventureRunService extends BaseService {
         for (let i = 0; i < (archetype.bossMinionCount ?? 0); i++) {
             firstWaveEnemies.push({
                 archetypeIndex,
+                archetypeSlug: archetype.slug,
                 name: archetype.name,
                 description: archetype.description,
                 level: enemyLevel,

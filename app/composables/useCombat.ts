@@ -83,6 +83,7 @@ export type EnemyCardView = {
     hpMax: number;
     hpCurrent: number;
     isBoss: boolean;
+    archetypeSlug?: string;
     alive: boolean;
     hpPercent: number;
     tierLabel: string;
@@ -465,6 +466,7 @@ export function useCombat(
                     hpMax: enemy.hpMax,
                     hpCurrent: enemy.hpMax,
                     isBoss: enemy.isBoss,
+                    archetypeSlug: enemy.archetypeSlug,
                     alive: true,
                 },
             ]));

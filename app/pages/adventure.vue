@@ -468,22 +468,29 @@
                             <div
                                 v-for="(enemy, index) in combatNodeData.firstWaveEnemies"
                                 :key="index"
-                                class="adventure-page__enemy-row"
+                                class="adventure-page__enemy-row d-flex align-center ga-2"
                             >
-                                <div class="d-flex align-center justify-space-between">
-                                    <span class="text-body-2">
-                                        <span
-                                            class="font-pixel text-caption adventure-page__enemy-tier"
-                                            :style="{ color: enemyTierColor(combatNodeData.tier, enemy.isBoss) }"
-                                        >
-                                            {{ enemyTierLabel(combatNodeData.tier, enemy.isBoss) }}
+                                <img
+                                    :src="enemyPreviewAvatarSrc(combatNodeData.tier, enemy.isBoss, enemy.archetypeSlug)"
+                                    alt=""
+                                    class="adventure-page__enemy-preview-avatar"
+                                >
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-center justify-space-between">
+                                        <span class="text-body-2">
+                                            <span
+                                                class="font-pixel text-caption adventure-page__enemy-tier"
+                                                :style="{ color: enemyTierColor(combatNodeData.tier, enemy.isBoss) }"
+                                            >
+                                                {{ enemyTierLabel(combatNodeData.tier, enemy.isBoss) }}
+                                            </span>
+                                            {{ enemy.name }}
                                         </span>
-                                        {{ enemy.name }}
-                                    </span>
-                                    <span class="text-caption text-medium-emphasis">HP {{ enemy.hp }}</span>
-                                </div>
-                                <div class="text-caption text-medium-emphasis">
-                                    {{ enemy.description }}
+                                        <span class="text-caption text-medium-emphasis">HP {{ enemy.hp }}</span>
+                                    </div>
+                                    <div class="text-caption text-medium-emphasis">
+                                        {{ enemy.description }}
+                                    </div>
                                 </div>
                             </div>
                             <div
@@ -794,6 +801,7 @@ import type { EventNodeData, BlessingNodeData, CombatNodeData, RestNodeData } fr
 import { pickIntroNarrative, pickTransitionNarrative } from '../constants/adventureNarrative';
 import { backSpriteUrl, walkFrameUrl } from '../utils/spriteDisplay';
 import { getFacilityBackgroundUrl } from '../utils/facilityBackground';
+import { getEnemyAvatarTier, getEnemyPortraitUrl } from '../utils/enemyAvatar';
 import { useCombat } from '../composables/useCombat';
 
 definePageMeta({
@@ -1016,6 +1024,12 @@ const enemyTierLabel = (tier: NodeType, isBoss: boolean) => (
 
 const enemyTierColor = (tier: NodeType, isBoss: boolean) => (
     tier === NodeType.BOSS && !isBoss ? 'rgb(var(--v-theme-primary))' : TIER_COLOR[tier]
+);
+
+// 戰前遭遇預覽的頭像：與 combatResultPanel 同一套 archetype 專屬圖優先、
+// faction+tier fallback 規則（enemy-portrait-resolution）。
+const enemyPreviewAvatarSrc = (tier: NodeType, isBoss: boolean, archetypeSlug?: string) => (
+    getEnemyPortraitUrl(archetypeSlug, currentRun.value?.factionType ?? 'GKBOT', getEnemyAvatarTier(isBoss, tier))
 );
 
 const combatNodeData = computed(() => (
@@ -1373,7 +1387,7 @@ onMounted(() => {
     // 時被重新掛載、看起來像是重播了一次（見使用者回報：首次受擊 effect 跳兩/三次）。
     &__stage-fx-anchor {
         position: relative;
-        width: 160px;
+        width: 120px;
         aspect-ratio: 1;
     }
 
@@ -1560,6 +1574,15 @@ onMounted(() => {
 
     &__enemy-tier {
         margin-right: 4px;
+    }
+
+    // 戰前遭遇預覽的敵人頭像：與 combatResultPanel__avatar 同一套像素圖來源
+    // (enemy-portrait-resolution)，這裡固定成小方塊搭配文字列表。
+    &__enemy-preview-avatar {
+        width: 40px;
+        height: 40px;
+        flex-shrink: 0;
+        image-rendering: pixelated;
     }
 
     &__settlement {

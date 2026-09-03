@@ -150,6 +150,9 @@ type CombatUnit = {
     // node's boss slot (index 0) — used to pick the guaranteed-drop unit
     // (computeRewards) and whether reinforcement can trigger (resolve()).
     archetypeIndex: number;
+    // Stable EnemyArchetype.slug (enemy-portrait-resolution), carried through
+    // to CombatResult.enemies[] for frontend portrait lookup.
+    archetypeSlug: string;
     isBoss: boolean;
     canReinforce: boolean;
 };
@@ -198,6 +201,7 @@ export class CombatService extends BaseService implements CombatResolver {
             dodgeChance: modifiedStats.dodgeChance,
             nextAttackAt: 0,
             archetypeIndex: -1,
+            archetypeSlug: '',
             isBoss: false,
             canReinforce: false,
         };
@@ -286,7 +290,7 @@ export class CombatService extends BaseService implements CombatResolver {
             playerHpRemaining: Math.max(0, player.hp),
             ...rewards,
             enemies: disambiguateEnemyNames(encountered).map(enemy => ({
-                enemyId: enemy.id, name: enemy.name, level: enemy.level as number, hpMax: enemy.hpMax, isBoss: enemy.isBoss,
+                enemyId: enemy.id, name: enemy.name, level: enemy.level as number, hpMax: enemy.hpMax, isBoss: enemy.isBoss, archetypeSlug: enemy.archetypeSlug,
             })),
             combatLog,
             finalRngIndex: cursor.index,
@@ -369,6 +373,7 @@ export class CombatService extends BaseService implements CombatResolver {
             nextAttackAt: 0,
             level: enemyLevel,
             archetypeIndex,
+            archetypeSlug: archetype.slug,
             isBoss,
             canReinforce: isBoss ? (archetype.canReinforce ?? false) : false,
         };

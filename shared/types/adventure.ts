@@ -118,6 +118,11 @@ export type CombatResult = {
   // combatLog plays back — see combat-log-sequential-playback.
   enemies: Array<{
     enemyId: string; name: string; level: number; hpMax: number; isBoss: boolean;
+    // Stable EnemyArchetype.slug (enemy-portrait-resolution), for archetype
+    // portrait lookup. Optional in schema only to tolerate historical
+    // lastCombatSummary docs written before this field existed — newly
+    // produced combat results always populate it (design.md D4).
+    archetypeSlug?: string;
   }>;
 };
 
@@ -180,6 +185,9 @@ export type EventResult = {
  */
 export type EnemyPreview = {
   archetypeIndex: number;
+  // Stable EnemyArchetype.slug (enemy-portrait-resolution), for archetype
+  // portrait lookup — same slug carried on CombatResult.enemies[].
+  archetypeSlug: string;
   name: string;
   description: string;
   level: number;

@@ -401,6 +401,21 @@ describe('CombatService.resolve', () => {
             expect(bossResult.enemies[0]?.name).toBe(GKBOT_BOSS_ARCHETYPES[1]?.name);
         });
 
+        it('carries archetypeSlug through to each enemy result, matching the resolved archetype (enemy-portrait-resolution)', async () => {
+            const service = new CombatService();
+            const run = baseRun({ factionType: 'HUMAN' });
+
+            const combatResult = await service.resolve(run, {
+                enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [3],
+            });
+            expect(combatResult.enemies[0]?.archetypeSlug).toBe(HUMAN_ARCHETYPES[3]?.slug);
+
+            const bossResult = await service.resolve(run, {
+                enemyLevel: 1, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [1],
+            });
+            expect(bossResult.enemies[0]?.archetypeSlug).toBe(HUMAN_BOSS_ARCHETYPES[1]?.slug);
+        });
+
         it('factionType=HUMAN draws normal combat from HUMAN_ARCHETYPES and Boss from HUMAN_BOSS_ARCHETYPES, never a GkBot archetype', async () => {
             const service = new CombatService();
             const run = baseRun({ factionType: 'HUMAN' });

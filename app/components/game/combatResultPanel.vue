@@ -38,7 +38,7 @@
                             :class="enemy.cardFx ? `combat-result-panel__unit-inner--${enemy.cardFx.kind}` : ''"
                         >
                             <img
-                                :src="enemyAvatarSrc(enemy.isBoss)"
+                                :src="enemyAvatarSrc(enemy.isBoss, enemy.archetypeSlug)"
                                 alt=""
                                 class="combat-result-panel__avatar"
                             >
@@ -101,7 +101,7 @@
 
 <script setup lang="ts">
 import type { WaveBanner, EnemyCardView } from '../../composables/useCombat';
-import { getEnemyAvatarTier, getEnemyAvatarUrl } from '../../utils/enemyAvatar';
+import { getEnemyAvatarTier, getEnemyPortraitUrl } from '../../utils/enemyAvatar';
 import type { EnemyFaction, NodeType } from '../../../shared/types/adventure';
 
 const props = defineProps<{
@@ -111,8 +111,8 @@ const props = defineProps<{
     currentNodeType?: NodeType;
 }>();
 
-const enemyAvatarSrc = (isBoss: boolean) => (
-    getEnemyAvatarUrl(props.factionType, getEnemyAvatarTier(isBoss, props.currentNodeType))
+const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
+    getEnemyPortraitUrl(archetypeSlug, props.factionType, getEnemyAvatarTier(isBoss, props.currentNodeType))
 );
 </script>
 

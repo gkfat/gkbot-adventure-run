@@ -56,3 +56,29 @@ describe('EnemyArchetype LUK overrides', () => {
         }
     });
 });
+
+// enemy-portrait-resolution: every archetype's slug is the portrait filename
+// key, so it must be non-empty, kebab-case, and unique across all 32 entries.
+describe('EnemyArchetype slug (enemy-portrait-resolution)', () => {
+    const allArchetypes = [
+        ...ENEMY_ARCHETYPES,
+        ...HUMAN_ARCHETYPES,
+        ...GKBOT_BOSS_ARCHETYPES,
+        ...HUMAN_BOSS_ARCHETYPES,
+    ];
+
+    it('has exactly 32 archetypes', () => {
+        expect(allArchetypes.length).toBe(32);
+    });
+
+    it('gives every archetype a non-empty kebab-case slug', () => {
+        for (const archetype of allArchetypes) {
+            expect(archetype.slug).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+        }
+    });
+
+    it('has no duplicate slugs across all archetypes', () => {
+        const slugs = allArchetypes.map(archetype => archetype.slug);
+        expect(new Set(slugs).size).toBe(slugs.length);
+    });
+});

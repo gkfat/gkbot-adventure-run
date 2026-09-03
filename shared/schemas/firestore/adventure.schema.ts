@@ -41,6 +41,10 @@ export const combatSummarySchema = z.object({
         level: z.number().int().min(1),
         hpMax: z.number().int().min(1),
         isBoss: z.boolean(),
+        // Optional to tolerate historical lastCombatSummary docs written
+        // before this field existed (design.md D4); newly written combat
+        // results always populate it.
+        archetypeSlug: z.string().optional(),
     })),
     completedAt: z.number(),
 }).strict();

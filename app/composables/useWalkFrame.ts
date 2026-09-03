@@ -1,4 +1,5 @@
-export const WALK_FRAME_COUNT = 3;
+import { WALK_FRAME_COUNT } from '../utils/spriteDisplay';
+
 const FRAME_DURATION_MS = 150;
 
 /**
