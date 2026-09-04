@@ -453,60 +453,24 @@
                     </template>
                     <!-- lastCombatResult 為空才是「還沒開打」的預備畫面；lastCombatResult
                          存在但正在播走路動畫（上面 v-if 為 false）代表戰鬥已經結束、正要
-                         離開，不能落到這個 v-else 誤顯示「遭遇敵人，準備戰鬥」。 -->
+                         離開，不能落到這個 v-else 誤顯示「遭遇敵人」。進場流程由
+                         combatIntroPhase 驅動（見 script runCombatIntro）：先播一段
+                         「遭遇敵人」banner，banner 結束後不再列出敵人清單，直接自動
+                         開戰，玩家不需再點擊按鈕。 -->
                     <div
-                        v-else-if="!lastCombatResult"
-                        class="adventure-page__box mb-3"
+                        v-else-if="combatIntroPhase === 'banner'"
+                        class="adventure-page__box adventure-page__encounter-banner mb-3"
                     >
                         <div
                             v-if="currentRun.currentNodeType === NodeType.BOSS"
-                            class="font-pixel text-subtitle-2 mb-2"
+                            class="font-pixel text-subtitle-2 mb-1"
                             style="color: rgb(var(--v-theme-warning));"
                         >
                             ⚠ BOSS 戰
                         </div>
-                        <div class="text-body-2 text-medium-emphasis text-center mb-2">
-                            {{ currentRun.currentNodeType === NodeType.BOSS ? '關卡頭目現身，準備迎戰' : '遭遇敵人，準備戰鬥' }}
-                        </div>
-                        <div
-                            v-if="combatNodeData"
-                            class="d-flex flex-column ga-2"
-                        >
-                            <div
-                                v-for="(enemy, index) in combatNodeData.firstWaveEnemies"
-                                :key="index"
-                                class="adventure-page__enemy-row d-flex align-center ga-2"
-                            >
-                                <img
-                                    :src="enemyPreviewAvatarSrc(combatNodeData.tier, enemy.isBoss, enemy.archetypeSlug)"
-                                    alt=""
-                                    class="adventure-page__enemy-preview-avatar"
-                                >
-                                <div class="flex-grow-1">
-                                    <div class="d-flex align-center justify-space-between">
-                                        <span class="text-body-2">
-                                            <span
-                                                class="font-pixel text-caption adventure-page__enemy-tier"
-                                                :style="{ color: enemyTierColor(combatNodeData.tier, enemy.isBoss) }"
-                                            >
-                                                {{ enemyTierLabel(combatNodeData.tier, enemy.isBoss) }}
-                                            </span>
-                                            {{ enemy.name }}
-                                        </span>
-                                        <span class="text-caption text-medium-emphasis">HP {{ enemy.hp }}</span>
-                                    </div>
-                                    <div class="text-caption text-medium-emphasis">
-                                        {{ enemy.description }}
-                                    </div>
-                                </div>
-                            </div>
-                            <div
-                                v-if="combatNodeData.waveCount > 1"
-                                class="text-caption text-medium-emphasis text-center mt-1"
-                            >
-                                偵測到後續增援，數量不明
-                            </div>
-                        </div>
+                        <span class="font-pixel adventure-page__encounter-banner-text">
+                            {{ currentRun.currentNodeType === NodeType.BOSS ? '頭目現身' : '遭遇敵人' }}
+                        </span>
                     </div>
                 </template>
 
@@ -797,16 +761,19 @@
                     選擇
                 </SystemBtn>
 
+                <!-- 進入 COMBAT 節點後改為自動開戰（見 runCombatIntro），不再需要玩家
+                     手動點擊「開始戰鬥」；僅在自動重試次數用盡後才顯示這顆「重試」
+                     按鈕，讓玩家可以手動重新觸發 startCombat。 -->
                 <SystemBtn
-                    v-else-if="currentRun.state === AdventureStateType.COMBAT && !lastCombatResult"
+                    v-else-if="combatIntroFailed"
                     block
                     variant="flat"
                     color="primary"
                     class="text-none"
                     :loading="runLoading"
-                    @click="handleStartCombat"
+                    @click="handleRetryCombat"
                 >
-                    開始戰鬥
+                    重試
                 </SystemBtn>
 
                 <SystemBtn
@@ -875,11 +842,10 @@ import { EXP_TABLE } from '../../shared/types/character';
 import { findCurseTemplate, resolveBlessingModifier } from '../../shared/constants/blessings';
 import type { Stats } from '../../shared/types/common';
 import { describeItem, resolvePixelIcon, RARITY_COLOR, type ItemLike } from '../utils/equipmentDisplay';
-import type { EventNodeData, BlessingNodeData, CombatNodeData, RestNodeData } from '../composables/useAdventureRun';
+import type { EventNodeData, BlessingNodeData, RestNodeData } from '../composables/useAdventureRun';
 import { pickIntroNarrative, pickTransitionNarrative, REST_NARRATIVE } from '../constants/adventureNarrative';
 import { backSpriteUrl } from '../utils/spriteDisplay';
 import { FACILITY_SEVERITY_TINT, getFacilityBackgroundUrl } from '../utils/facilityBackground';
-import { getEnemyAvatarTier, getEnemyPortraitUrl } from '../utils/enemyAvatar';
 import { useCombat } from '../composables/useCombat';
 
 definePageMeta({
@@ -891,26 +857,6 @@ useHead({
     title: '冒險',
     meta: [{ name: 'description', content: 'GkBot Adventure Run 冒險進行畫面' }],
 });
-
-const TIER_LABEL: Record<NodeType, string> = {
-    [NodeType.COMBAT]: '普通',
-    [NodeType.ELITE]: '菁英',
-    [NodeType.STRONG_ELITE]: '強敵',
-    [NodeType.BOSS]: '頭目',
-    [NodeType.EVENT]: '',
-    [NodeType.REST]: '',
-    [NodeType.CHOICE]: '',
-};
-
-const TIER_COLOR: Record<NodeType, string> = {
-    [NodeType.COMBAT]: 'rgb(var(--v-theme-primary))',
-    [NodeType.ELITE]: 'rgb(var(--v-theme-green))',
-    [NodeType.STRONG_ELITE]: '#c084fc',
-    [NodeType.BOSS]: 'rgb(var(--v-theme-warning))',
-    [NodeType.EVENT]: 'rgb(var(--v-theme-primary))',
-    [NodeType.REST]: 'rgb(var(--v-theme-primary))',
-    [NodeType.CHOICE]: 'rgb(var(--v-theme-primary))',
-};
 
 const {
     character, loading: characterLoading, fetchCharacter,
@@ -1144,28 +1090,6 @@ const describeModifierEffect = (modifier: Pick<RunModifier, 'statModifiers' | 'd
     return parts.join('、');
 };
 
-// BOSS 節點的隨行小兵與頭目共用同一個節點 tier（BOSS），標籤需依 enemy.isBoss
-// 逐一判斷，其餘 tier（普通/菁英/強敵）維持整節點統一標籤。
-const enemyTierLabel = (tier: NodeType, isBoss: boolean) => (
-    tier === NodeType.BOSS ? (isBoss ? '頭目' : '小兵') : TIER_LABEL[tier]
-);
-
-const enemyTierColor = (tier: NodeType, isBoss: boolean) => (
-    tier === NodeType.BOSS && !isBoss ? 'rgb(var(--v-theme-primary))' : TIER_COLOR[tier]
-);
-
-// 戰前遭遇預覽的頭像：與 combatResultPanel 同一套 archetype 專屬圖優先、
-// faction+tier fallback 規則（enemy-portrait-resolution）。
-const enemyPreviewAvatarSrc = (tier: NodeType, isBoss: boolean, archetypeSlug?: string) => (
-    getEnemyPortraitUrl(archetypeSlug, currentRun.value?.factionType ?? 'GKBOT', getEnemyAvatarTier(isBoss, tier))
-);
-
-const combatNodeData = computed(() => (
-    currentRun.value?.state === AdventureStateType.COMBAT
-        ? currentRun.value.currentNodeData as CombatNodeData
-        : null
-));
-
 const settlementIsSuccess = computed(() => lastSettlement.value?.endReason === 'COMPLETED');
 
 // GameCombatResultPanel 現在是純渲染元件（不再自己呼叫 useCombat），結算文字用
@@ -1383,10 +1307,79 @@ const handleRetreat = async () => {
 };
 
 const handleStartCombat = async () => {
-    if (!character.value) return;
+    if (!character.value) return false;
     combatStartHp.value = currentRun.value?.playerHp ?? 0;
-    await startCombat(character.value.characterId);
+    return await startCombat(character.value.characterId);
 };
+
+// 進入 COMBAT 節點的自動進場流程：先播「遭遇敵人」banner，banner 結束後不再
+// 顯示敵人清單，直接自動呼叫 startCombat（不需玩家點擊按鈕），成功後
+// lastCombatResult 被設定，畫面自然切到 GameCombatResultPanel、播放既有的
+// 「戰鬥開始」banner（useCombat.ts 的 displayedBanner）。
+const COMBAT_ENCOUNTER_BANNER_MS = 1400;
+const COMBAT_AUTO_RETRY_DELAY_MS = 1500;
+const COMBAT_AUTO_RETRY_MAX = 3;
+
+type CombatIntroPhase = 'banner';
+const combatIntroPhase = ref<CombatIntroPhase | null>(null);
+// 記錄目前這個節點（runId + stageNodeIndex）是否已經開始播放進場流程，避免
+// reactive 更新造成重複觸發；換到下一個 COMBAT 節點時 key 會改變而重新觸發。
+const combatIntroKey = ref<string | null>(null);
+const combatAutoRetryCount = ref(0);
+
+let combatIntroTimer: ReturnType<typeof setTimeout> | undefined;
+let combatIntroCancelled = false;
+const wait = (ms: number) => new Promise<void>((resolve) => {
+    combatIntroTimer = setTimeout(resolve, ms);
+});
+
+const attemptAutoStartCombat = async () => {
+    if (combatIntroCancelled || !character.value) return;
+    const ok = await handleStartCombat();
+    if (combatIntroCancelled || ok) return;
+    combatAutoRetryCount.value += 1;
+    if (combatAutoRetryCount.value >= COMBAT_AUTO_RETRY_MAX) return;
+    await wait(COMBAT_AUTO_RETRY_DELAY_MS);
+    if (combatIntroCancelled) return;
+    await attemptAutoStartCombat();
+};
+
+const runCombatIntro = async () => {
+    combatIntroPhase.value = 'banner';
+    await wait(COMBAT_ENCOUNTER_BANNER_MS);
+    if (combatIntroCancelled) return;
+    combatIntroPhase.value = null;
+    await attemptAutoStartCombat();
+};
+
+watch(() => (
+    currentRun.value && currentRun.value.state === AdventureStateType.COMBAT && !lastCombatResult.value
+        ? `${currentRun.value.runId}:${currentRun.value.stageNodeIndex}`
+        : null
+), (key) => {
+    if (!key || key === combatIntroKey.value) return;
+    combatIntroKey.value = key;
+    combatAutoRetryCount.value = 0;
+    runCombatIntro();
+}, { immediate: true });
+
+// 自動重試次數用盡後才需要玩家手動重試（見上面 attemptAutoStartCombat）。
+const combatIntroFailed = computed(() => (
+    currentRun.value?.state === AdventureStateType.COMBAT
+    && !lastCombatResult.value
+    && combatIntroPhase.value === null
+    && combatAutoRetryCount.value >= COMBAT_AUTO_RETRY_MAX
+));
+
+const handleRetryCombat = async () => {
+    combatAutoRetryCount.value = 0;
+    await attemptAutoStartCombat();
+};
+
+onUnmounted(() => {
+    combatIntroCancelled = true;
+    if (combatIntroTimer) clearTimeout(combatIntroTimer);
+});
 
 const handleHeal = async (itemId: string) => {
     if (!character.value) return;
@@ -1705,25 +1698,25 @@ onMounted(() => {
         }
     }
 
-    &__enemy-row {
-        padding: 6px 0;
-
-        &:not(:last-child) {
-            border-bottom: 1px solid rgba(196, 203, 219, 0.1);
-        }
+    // 進入 COMBAT 節點的「遭遇敵人」進場 banner：跟 combatResultPanel 的
+    // wave-banner 同一套視覺語彙（置中大字 + 進場淡入），但這裡是戰鬥開始前、
+    // 尚未有 combatLog 可驅動時間軸，改用固定時長的 setTimeout（見 script
+    // runCombatIntro），故獨立寫一份簡化樣式，不共用 combatResultPanel 的
+    // scoped style。
+    &__encounter-banner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 64px;
+        text-align: center;
+        animation: adventure-page-encounter-banner-in 0.2s ease-out;
     }
 
-    &__enemy-tier {
-        margin-right: 4px;
-    }
-
-    // 戰前遭遇預覽的敵人頭像：與 combatResultPanel__avatar 同一套像素圖來源
-    // (enemy-portrait-resolution)，這裡固定成小方塊搭配文字列表。
-    &__enemy-preview-avatar {
-        width: 40px;
-        height: 40px;
-        flex-shrink: 0;
-        image-rendering: pixelated;
+    &__encounter-banner-text {
+        font-size: 20px;
+        letter-spacing: 4px;
+        color: rgb(var(--v-theme-warning));
     }
 
     &__settlement {
@@ -1796,6 +1789,17 @@ onMounted(() => {
     }
     100% {
         background-position: center top;
+    }
+}
+
+@keyframes adventure-page-encounter-banner-in {
+    0% {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 

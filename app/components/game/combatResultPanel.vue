@@ -193,7 +193,7 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
 
     &__unit {
         flex-shrink: 0;
-        width: 92px;
+        width: 72px;
         transition: opacity 0.2s ease;
 
         &--dead {
