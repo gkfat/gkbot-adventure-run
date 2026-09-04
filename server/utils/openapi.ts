@@ -69,6 +69,8 @@ import {
     purchaseItemResponseSchema,
 } from '../../shared/schemas/api/shop.schema';
 
+import { getBestiaryResponseSchema } from '../../shared/schemas/api/bestiary.schema';
+
 // Extend Zod with OpenAPI methods
 extendZodWithOpenApi(z);
 
@@ -574,6 +576,29 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             },
             409: {
                 description: 'Shop slot already sold',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}/bestiary',
+        description: 'Get the full enemy archetype bestiary for a character (must belong to the caller), each entry flagged with whether the character has encountered it; name/description/portraitUrl are only included for encountered entries',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Bestiary retrieved',
+                content: { 'application/json': { schema: getBestiaryResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
         },

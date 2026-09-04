@@ -37,19 +37,40 @@
 
             <v-divider />
 
-            <div class="pa-4">
-                <SystemBtn
-                    v-if="character"
-                    block
-                    color="primary"
-                    variant="flat"
-                    class="text-none"
-                    prepend-icon="mdi-account-switch-outline"
-                    @click="handleSwitchCharacter"
-                >
-                    切換角色
-                </SystemBtn>
-            </div>
+            <v-row
+                v-if="character"
+                dense
+                class="pa-4 ma-0"
+            >
+                <v-col cols="4">
+                    <SystemBtn
+                        block
+                        stacked
+                        size="small"
+                        color="primary"
+                        variant="flat"
+                        class="text-none account-drawer__square-btn"
+                        @click="handleSwitchCharacter"
+                    >
+                        <v-icon class="mb-2">mdi-account-switch-outline</v-icon>
+                        切換角色
+                    </SystemBtn>
+                </v-col>
+                <v-col cols="4">
+                    <SystemBtn
+                        block
+                        stacked
+                        size="small"
+                        color="primary"
+                        variant="flat"
+                        class="text-none account-drawer__square-btn"
+                        @click="bestiaryOpen = true"
+                    >
+                        <v-icon class="mb-2">mdi-book-open-page-variant-outline</v-icon>
+                        圖鑑
+                    </SystemBtn>
+                </v-col>
+            </v-row>
 
             <v-spacer />
 
@@ -68,12 +89,16 @@
                 </SystemBtn>
             </div>
         </div>
+
+        <GameCommonBestiaryDialog v-model="bestiaryOpen" />
     </v-navigation-drawer>
 </template>
 
 <script setup lang="ts">
 defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
+
+const bestiaryOpen = ref(false);
 
 const { user, signOut, loading } = useAuth();
 const { character, clearSelection, reset: resetCharacter } = useCharacter();
@@ -92,3 +117,20 @@ const handleSwitchCharacter = () => {
     navigateTo('/main');
 };
 </script>
+
+<style scoped lang="scss">
+// 正方形 pixel 風格按鈕：icon 在第一列置中，文字在第二列置中（v-btn 的 stacked
+// 版面本身就是 icon 在上、文字在下，這裡只需固定成正方形並讓兩列都水平置中）。
+.account-drawer__square-btn {
+    width: 100%;
+    aspect-ratio: 1;
+    height: auto;
+    min-width: 0;
+    padding: 0 !important;
+
+    :deep(.v-btn__content) {
+        font-size: 13px;
+        white-space: nowrap;
+    }
+}
+</style>

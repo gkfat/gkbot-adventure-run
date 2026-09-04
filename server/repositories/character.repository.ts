@@ -78,8 +78,21 @@ function withTalentDefaults(character: Character): Character {
     };
 }
 
+/**
+ * Backfill `encounteredArchetypeSlugs`/`defeatedArchetypeCounts` for character
+ * documents written before `enemy-bestiary` shipped — same "不做資料回填"
+ * tolerance pattern as withTalentDefaults.
+ */
+function withBestiaryDefaults(character: Character): Character {
+    return {
+        ...character,
+        encounteredArchetypeSlugs: character.encounteredArchetypeSlugs ?? [],
+        defeatedArchetypeCounts: character.defeatedArchetypeCounts ?? {},
+    };
+}
+
 function withCharacterDefaults(character: Character): Character {
-    return withTalentDefaults(withLevelDefaults(withNextChapterDefault(character)));
+    return withBestiaryDefaults(withTalentDefaults(withLevelDefaults(withNextChapterDefault(character))));
 }
 
 export class CharacterRepository extends BaseRepository<Character> {
@@ -142,6 +155,9 @@ export class CharacterRepository extends BaseRepository<Character> {
             talents: {},
 
             equipment: {},
+
+            encounteredArchetypeSlugs: [],
+            defeatedArchetypeCounts: {},
 
             nextChapterIndex: 0,
             currentLevelIndex: 0,
@@ -263,6 +279,24 @@ export class CharacterRepository extends BaseRepository<Character> {
      */
     async updateNickname(characterId: string, nickname: string): Promise<Character> {
         return this.update(characterId, { nickname });
+    }
+
+    /**
+     * Merge newly-encountered archetype slugs into a character's bestiary
+     * progress (enemy-bestiary). Caller (CombatService) already filters to
+     * genuinely-new slugs, so this always writes — no-op guard lives upstream.
+     */
+    async addEncounteredArchetypeSlugs(characterId: string, encounteredArchetypeSlugs: string[]): Promise<Character> {
+        return this.update(characterId, { encounteredArchetypeSlugs });
+    }
+
+    /**
+     * Overwrite a character's per-archetype kill counts (enemy-bestiary kill-count
+     * tracking). Caller (CharacterService) already merges the new kills into the
+     * existing counts, so this always writes — no-op guard lives upstream.
+     */
+    async updateDefeatedArchetypeCounts(characterId: string, defeatedArchetypeCounts: Record<string, number>): Promise<Character> {
+        return this.update(characterId, { defeatedArchetypeCounts });
     }
 
     /**

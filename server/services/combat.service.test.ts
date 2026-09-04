@@ -107,15 +107,21 @@ describe('resolveActiveModifiers (blessing-leveling)', () => {
 });
 
 const {
-    getCharacterWithStatsMock, createCursorMock,
+    getCharacterWithStatsMock, createCursorMock, recordEncounteredArchetypesMock, recordDefeatedArchetypesMock,
 } = vi.hoisted(() => ({
     getCharacterWithStatsMock: vi.fn(),
     createCursorMock: vi.fn(),
+    recordEncounteredArchetypesMock: vi.fn(),
+    recordDefeatedArchetypesMock: vi.fn(),
 }));
 
 vi.mock('./character.service', () => ({
     CharacterService: vi.fn().mockImplementation(function CharacterServiceMock() {
-        return { getCharacterWithStats: getCharacterWithStatsMock };
+        return {
+            getCharacterWithStats: getCharacterWithStatsMock,
+            recordEncounteredArchetypes: recordEncounteredArchetypesMock,
+            recordDefeatedArchetypes: recordDefeatedArchetypesMock,
+        };
     }),
 }));
 
@@ -175,6 +181,8 @@ beforeEach(() => {
     getCharacterWithStatsMock.mockResolvedValue({
         nickname: 'Tester',
         attributes: { LUCK: 0 },
+        encounteredArchetypeSlugs: [],
+        defeatedArchetypeCounts: {},
         stats: {
             ATK: 1000, DEF: 1000, HP_MAX: 1000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
         },
@@ -241,6 +249,8 @@ describe('CombatService.resolve', () => {
         getCharacterWithStatsMock.mockResolvedValue({
             nickname: 'Tester',
             attributes: { LUCK: 0 },
+            encounteredArchetypeSlugs: [],
+            defeatedArchetypeCounts: {},
             stats: {
                 ATK: 0, DEF: 0, HP_MAX: 1, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
             },
@@ -269,6 +279,8 @@ describe('CombatService.resolve', () => {
         getCharacterWithStatsMock.mockResolvedValue({
             nickname: 'Tester',
             attributes: { LUCK: 0 },
+            encounteredArchetypeSlugs: [],
+            defeatedArchetypeCounts: {},
             stats: {
                 ATK: 1000, DEF: 1000, HP_MAX: 1000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
             },
@@ -350,6 +362,8 @@ describe('CombatService.resolve', () => {
         getCharacterWithStatsMock.mockResolvedValue({
             nickname: 'Tester',
             attributes: { LUCK: 0 },
+            encounteredArchetypeSlugs: [],
+            defeatedArchetypeCounts: {},
             stats: {
                 ATK: 100, DEF: 0, HP_MAX: 100000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
             },
@@ -389,6 +403,8 @@ describe('CombatService.resolve', () => {
         getCharacterWithStatsMock.mockResolvedValue({
             nickname: 'Tester',
             attributes: { LUCK: 0 },
+            encounteredArchetypeSlugs: [],
+            defeatedArchetypeCounts: {},
             stats: {
                 ATK: 100, DEF: 0, HP_MAX: 100000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
             },
@@ -517,6 +533,8 @@ describe('CombatService.resolve', () => {
             getCharacterWithStatsMock.mockResolvedValue({
                 nickname: 'Tester',
                 attributes: { LUCK: 0 },
+                encounteredArchetypeSlugs: [],
+                defeatedArchetypeCounts: {},
                 stats: {
                     ATK: 1, DEF: 100000, HP_MAX: 100000, actionIntervalSec: 2, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
                 },
@@ -572,6 +590,167 @@ describe('CombatService.resolve', () => {
             const result = await service.resolve(baseRun(), context);
 
             expect(result.combatLog[0]?.action).not.toBe('DODGE');
+        });
+    });
+
+    // enemy-bestiary spec.md "戰鬥開始時記錄角色遇過的敵人 Archetype"
+    describe('bestiary encounter recording', () => {
+        it('records the first wave\'s archetype slugs as newly encountered', async () => {
+            const service = new CombatService();
+            const context: CombatContext = {
+                enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+            };
+
+            await service.resolve(baseRun(), context);
+
+            expect(recordEncounteredArchetypesMock).toHaveBeenCalledWith(
+                'char-1',
+                [],
+                [ENEMY_ARCHETYPES[0]?.slug],
+            );
+        });
+
+        it('still reports the already-encountered slug when re-fought (dedup is CharacterService\'s job)', async () => {
+            getCharacterWithStatsMock.mockResolvedValue({
+                nickname: 'Tester',
+                attributes: { LUCK: 0 },
+                encounteredArchetypeSlugs: [ENEMY_ARCHETYPES[0]?.slug],
+                stats: {
+                    ATK: 1000, DEF: 1000, HP_MAX: 1000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+                },
+            });
+            const service = new CombatService();
+            const context: CombatContext = {
+                enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+            };
+
+            await service.resolve(baseRun(), context);
+
+            expect(recordEncounteredArchetypesMock).toHaveBeenCalledWith(
+                'char-1',
+                [ENEMY_ARCHETYPES[0]?.slug],
+                [ENEMY_ARCHETYPES[0]?.slug],
+            );
+        });
+
+        it('records the encounter even when the player is defeated mid-combat', async () => {
+            getCharacterWithStatsMock.mockResolvedValue({
+                nickname: 'Tester',
+                attributes: { LUCK: 0 },
+                encounteredArchetypeSlugs: [],
+                defeatedArchetypeCounts: {},
+                stats: {
+                    ATK: 0, DEF: 0, HP_MAX: 1, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+                },
+            });
+            const service = new CombatService();
+            const run = baseRun({
+                playerHp: 1, playerHpMax: 1,
+            });
+            const context: CombatContext = {
+                enemyLevel: 1, tier: NodeType.STRONG_ELITE, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [1],
+            };
+
+            const result = await service.resolve(run, context);
+
+            expect(result.victory).toBe(false);
+            expect(recordEncounteredArchetypesMock).toHaveBeenCalledWith(
+                'char-1',
+                [],
+                [ENEMY_ARCHETYPES[1]?.slug],
+            );
+        });
+    });
+
+    // enemy-bestiary kill-count tracking: 戰鬥結算時記錄角色擊敗各 Archetype 的累積次數
+    describe('bestiary kill-count recording', () => {
+        it('records one defeated-archetype entry per enemy actually killed', async () => {
+            const service = new CombatService();
+            const context: CombatContext = {
+                enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+            };
+
+            const result = await service.resolve(baseRun(), context);
+
+            expect(result.victory).toBe(true);
+            expect(recordDefeatedArchetypesMock).toHaveBeenCalledWith(
+                'char-1',
+                {},
+                [ENEMY_ARCHETYPES[0]?.slug],
+            );
+        });
+
+        it('accumulates one entry per kill when the same archetype is defeated multiple times', async () => {
+            const service = new CombatService();
+            // firstWaveArchetypeIndices only pins wave 0 — keep everything in
+            // a single wave so both enemies are deterministically archetype 0.
+            const context: CombatContext = {
+                enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 2, firstWaveArchetypeIndices: [0, 0],
+            };
+
+            const result = await service.resolve(baseRun(), context);
+
+            expect(result.victory).toBe(true);
+            expect(recordDefeatedArchetypesMock).toHaveBeenCalledWith(
+                'char-1',
+                {},
+                [ENEMY_ARCHETYPES[0]?.slug, ENEMY_ARCHETYPES[0]?.slug],
+            );
+        });
+
+        it('still records kills made before the player is defeated mid-combat', async () => {
+            // Player one-shots the first enemy (ATK 1000 vs a low-level DEF);
+            // any enemy attack deals >=1 damage (computeDamage floors at 1),
+            // which instantly kills the 1-HP player back on the second enemy's turn.
+            getCharacterWithStatsMock.mockResolvedValue({
+                nickname: 'Tester',
+                attributes: { LUCK: 0 },
+                encounteredArchetypeSlugs: [],
+                defeatedArchetypeCounts: {},
+                stats: {
+                    ATK: 1000, DEF: 0, HP_MAX: 1, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+                },
+            });
+            const service = new CombatService();
+            const run = baseRun({
+                playerHp: 1, playerHpMax: 1,
+            });
+            const context: CombatContext = {
+                enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 2, firstWaveArchetypeIndices: [0, 1],
+            };
+
+            const result = await service.resolve(run, context);
+
+            expect(result.victory).toBe(false);
+            expect(recordDefeatedArchetypesMock).toHaveBeenCalledWith(
+                'char-1',
+                {},
+                [ENEMY_ARCHETYPES[0]?.slug],
+            );
+        });
+
+        it('calls recordDefeatedArchetypes with an empty list when nothing is killed', async () => {
+            getCharacterWithStatsMock.mockResolvedValue({
+                nickname: 'Tester',
+                attributes: { LUCK: 0 },
+                encounteredArchetypeSlugs: [],
+                defeatedArchetypeCounts: {},
+                stats: {
+                    ATK: 0, DEF: 1000, HP_MAX: 1, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+                },
+            });
+            const service = new CombatService();
+            const run = baseRun({
+                playerHp: 1, playerHpMax: 1,
+            });
+            const context: CombatContext = {
+                enemyLevel: 1, tier: NodeType.STRONG_ELITE, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+            };
+
+            const result = await service.resolve(run, context);
+
+            expect(result.victory).toBe(false);
+            expect(recordDefeatedArchetypesMock).toHaveBeenCalledWith('char-1', {}, []);
         });
     });
 });

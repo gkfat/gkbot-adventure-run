@@ -84,7 +84,15 @@ export type Character = {
 
   // Leaderboard display
   nickname: string;           // Display name; auto-generated on creation, player can override
-  
+
+  // Enemy bestiary (enemy-bestiary): archetype slugs this character has
+  // encountered (seen in a combat's first wave, regardless of outcome).
+  encounteredArchetypeSlugs: string[];
+
+  // Enemy bestiary — cumulative kill count per archetype slug (slug -> count),
+  // incremented whenever a combat actually defeats a unit of that archetype.
+  defeatedArchetypeCounts: Record<string, number>;
+
   // Timestamps
   createdAt: Timestamp;
   updatedAt: Timestamp;

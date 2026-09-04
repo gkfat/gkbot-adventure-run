@@ -65,6 +65,16 @@ export const characterSchema = z.object({
     // Leaderboard display
     nickname: z.string().min(1).max(20),
 
+    // Enemy bestiary (enemy-bestiary): archetype slugs the character has
+    // encountered (seen in a combat's first wave), used to gate name/
+    // description/portrait disclosure in GET /api/character/:characterId/bestiary.
+    encounteredArchetypeSlugs: z.array(z.string()).default([]),
+
+    // Enemy bestiary — cumulative kill count per archetype slug (enemy-bestiary
+    // kill-count tracking), incremented whenever a combat actually defeats a
+    // unit of that archetype (independent of overall victory/defeat).
+    defeatedArchetypeCounts: z.record(z.string(), z.number().int().min(0)).default({}),
+
     // Timestamps
     createdAt: z.number(),
     updatedAt: z.number(),

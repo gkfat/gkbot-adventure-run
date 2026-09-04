@@ -235,6 +235,18 @@ export class CombatService extends BaseService implements CombatResolver {
                 wave === 0 ? context.firstWaveArchetypeIndices : undefined,
             );
             encountered.push(...enemies);
+
+            // enemy-bestiary: "遇過" is recorded at first-wave spawn (seen at
+            // the pre-fight preview already), independent of combat outcome —
+            // see design.md Decision 1. Must happen before the fight loop can
+            // return early on player death.
+            if (wave === 0) {
+                await this.characterService.recordEncounteredArchetypes(
+                    run.characterId,
+                    character.encounteredArchetypeSlugs,
+                    enemies.map(enemy => enemy.archetypeSlug),
+                );
+            }
             const alive = [...enemies];
             // Boss small-composition reinforcement (chapter-level-structure)
             // only applies within a BOSS-tier node's single wave.
@@ -284,6 +296,15 @@ export class CombatService extends BaseService implements CombatResolver {
                 }
             }
         }
+
+        // enemy-bestiary kill-count tracking: tally every unit actually
+        // defeated in this combat, independent of overall victory/defeat —
+        // same "looked at outcome, not victory" stance as recordEncounteredArchetypes.
+        await this.characterService.recordDefeatedArchetypes(
+            run.characterId,
+            character.defeatedArchetypeCounts,
+            defeated.map(unit => unit.archetypeSlug),
+        );
 
         const victory = player.hp > 0;
         const rewards = victory

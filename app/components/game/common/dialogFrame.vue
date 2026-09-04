@@ -4,6 +4,9 @@
         :max-width="maxWidth"
         :persistent="persistent"
         :scrim="scrim"
+        :fullscreen="fullscreen"
+        :attach="fullscreen ? '.game-shell' : undefined"
+        :class="{ 'game-dialog-frame--contained-fullscreen': fullscreen }"
         @update:model-value="emit('update:modelValue', $event)"
     >
         <div
@@ -32,11 +35,15 @@ withDefaults(defineProps<{
     persistent?: boolean;
     scrim?: boolean;
     contentClass?: string;
+    // enemy-bestiary: the bestiary dialog opens fullscreen; every other
+    // existing caller relies on the false default and is unaffected.
+    fullscreen?: boolean;
 }>(), {
     maxWidth: 360,
     persistent: false,
     scrim: true,
     contentClass: '',
+    fullscreen: false,
 });
 
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
@@ -46,5 +53,18 @@ const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 .game-dialog-frame {
     background: rgb(var(--v-theme-background));
     border: 1px solid rgba(196, 203, 219, 0.15);
+}
+</style>
+
+<style lang="scss">
+// enemy-bestiary: Vuetify's `fullscreen` v-dialog hardcodes `position: fixed`
+// (viewport-relative) regardless of the `attach` target — override it back to
+// `absolute` so a fullscreen dialog fills the 500px-wide .game-shell (its
+// `attach` target, which is position: relative) instead of the whole browser
+// window. Unscoped on purpose: the overlay is teleported to .game-shell,
+// outside this component's own scoped DOM subtree, so a scoped `:deep()`
+// selector (which requires a data-v-* ancestor) would never match it.
+.game-dialog-frame--contained-fullscreen.v-overlay {
+    position: absolute !important;
 }
 </style>

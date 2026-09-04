@@ -8,6 +8,7 @@ const {
     listByAccountIdMock, createCharacterFromArchetypeMock, getByIdForAccountMock, characterDeleteMock,
     grantItemMock, equipItemMock,
     inventoryDeleteMock, deleteAllByCharacterIdMock, deleteShopsForCharacterMock, updateTalentsMock,
+    addEncounteredArchetypeSlugsMock, updateDefeatedArchetypeCountsMock,
 } = vi.hoisted(() => ({
     listByAccountIdMock: vi.fn(),
     createCharacterFromArchetypeMock: vi.fn(),
@@ -19,6 +20,8 @@ const {
     deleteAllByCharacterIdMock: vi.fn(),
     deleteShopsForCharacterMock: vi.fn(),
     updateTalentsMock: vi.fn(),
+    addEncounteredArchetypeSlugsMock: vi.fn(),
+    updateDefeatedArchetypeCountsMock: vi.fn(),
 }));
 
 vi.mock('../repositories/character.repository', () => ({
@@ -29,6 +32,8 @@ vi.mock('../repositories/character.repository', () => ({
             getByIdForAccount: getByIdForAccountMock,
             delete: characterDeleteMock,
             updateTalents: updateTalentsMock,
+            addEncounteredArchetypeSlugs: addEncounteredArchetypeSlugsMock,
+            updateDefeatedArchetypeCounts: updateDefeatedArchetypeCountsMock,
         };
     }),
     CHARACTER_ROSTER_MAX: 3,
@@ -234,5 +239,138 @@ describe('CharacterService.deleteCharacter', () => {
         expect(inventoryDeleteMock).toHaveBeenCalledWith('char-1');
         expect(deleteShopsForCharacterMock).toHaveBeenCalledWith('char-1');
         expect(characterDeleteMock).toHaveBeenCalledWith('char-1');
+    });
+});
+
+describe('CharacterService.getBestiary', () => {
+    beforeEach(() => {
+        getByIdForAccountMock.mockReset();
+    });
+
+    it('rejects querying a character that does not belong to the caller', async () => {
+        getByIdForAccountMock.mockResolvedValue(null);
+        const service = new CharacterService();
+
+        await expect(service.getBestiary('account-1', 'char-1')).rejects.toThrow();
+    });
+
+    it('includes all 32 archetypes, marking encountered vs un-encountered and gating name/description/portraitUrl/defeatedCount', async () => {
+        getByIdForAccountMock.mockResolvedValue({
+            characterId: 'char-1',
+            accountId: 'account-1',
+            encounteredArchetypeSlugs: ['gkbot-repair'],
+            defeatedArchetypeCounts: { 'gkbot-repair': 4 },
+        });
+        const service = new CharacterService();
+
+        const bestiary = await service.getBestiary('account-1', 'char-1');
+
+        expect(bestiary).toHaveLength(32);
+
+        const encounteredEntry = bestiary.find(entry => entry.slug === 'gkbot-repair');
+        expect(encounteredEntry?.encountered).toBe(true);
+        expect(encounteredEntry?.name).toBeTruthy();
+        expect(encounteredEntry?.description).toBeTruthy();
+        expect(encounteredEntry?.portraitUrl).toBe('/images/enemies/gkbot-repair.png');
+        expect(encounteredEntry?.defeatedCount).toBe(4);
+
+        const unencounteredEntry = bestiary.find(entry => entry.slug !== 'gkbot-repair');
+        expect(unencounteredEntry?.encountered).toBe(false);
+        expect(unencounteredEntry?.name).toBeUndefined();
+        expect(unencounteredEntry?.description).toBeUndefined();
+        expect(unencounteredEntry?.portraitUrl).toBeUndefined();
+        expect(unencounteredEntry?.defeatedCount).toBeUndefined();
+    });
+
+    it('reports defeatedCount 0 for an encountered archetype with no recorded kills yet', async () => {
+        getByIdForAccountMock.mockResolvedValue({
+            characterId: 'char-1',
+            accountId: 'account-1',
+            encounteredArchetypeSlugs: ['gkbot-repair'],
+            defeatedArchetypeCounts: {},
+        });
+        const service = new CharacterService();
+
+        const bestiary = await service.getBestiary('account-1', 'char-1');
+
+        expect(bestiary.find(entry => entry.slug === 'gkbot-repair')?.defeatedCount).toBe(0);
+    });
+
+    it('sorts encountered archetypes before un-encountered ones, regardless of their position in the static template arrays', async () => {
+        getByIdForAccountMock.mockResolvedValue({
+            characterId: 'char-1',
+            accountId: 'account-1',
+            // 'last-stand-maniac' is the very last entry across all 4 template
+            // arrays — if sorting worked it must still land at index 0.
+            encounteredArchetypeSlugs: ['last-stand-maniac'],
+            defeatedArchetypeCounts: {},
+        });
+        const service = new CharacterService();
+
+        const bestiary = await service.getBestiary('account-1', 'char-1');
+
+        expect(bestiary[0]?.slug).toBe('last-stand-maniac');
+        expect(bestiary[0]?.encountered).toBe(true);
+        expect(bestiary.slice(1).every(entry => !entry.encountered)).toBe(true);
+    });
+});
+
+describe('CharacterService.recordEncounteredArchetypes', () => {
+    beforeEach(() => {
+        addEncounteredArchetypeSlugsMock.mockReset();
+    });
+
+    it('writes the union of existing and newly-seen slugs when a new slug appears', async () => {
+        const service = new CharacterService();
+
+        await service.recordEncounteredArchetypes('char-1', ['gkbot-repair'], ['gkbot-repair', 'gkbot-security-unit']);
+
+        expect(addEncounteredArchetypeSlugsMock).toHaveBeenCalledWith('char-1', ['gkbot-repair', 'gkbot-security-unit']);
+    });
+
+    it('does not write when every slug is already recorded', async () => {
+        const service = new CharacterService();
+
+        await service.recordEncounteredArchetypes('char-1', ['gkbot-repair'], ['gkbot-repair']);
+
+        expect(addEncounteredArchetypeSlugsMock).not.toHaveBeenCalled();
+    });
+});
+
+describe('CharacterService.recordDefeatedArchetypes', () => {
+    beforeEach(() => {
+        updateDefeatedArchetypeCountsMock.mockReset();
+    });
+
+    it('increments the count for a slug already on record', async () => {
+        const service = new CharacterService();
+
+        await service.recordDefeatedArchetypes('char-1', { 'gkbot-repair': 2 }, ['gkbot-repair']);
+
+        expect(updateDefeatedArchetypeCountsMock).toHaveBeenCalledWith('char-1', { 'gkbot-repair': 3 });
+    });
+
+    it('starts a new slug at 1 the first time it is defeated', async () => {
+        const service = new CharacterService();
+
+        await service.recordDefeatedArchetypes('char-1', {}, ['gkbot-security-unit']);
+
+        expect(updateDefeatedArchetypeCountsMock).toHaveBeenCalledWith('char-1', { 'gkbot-security-unit': 1 });
+    });
+
+    it('adds one count per occurrence when the same slug appears multiple times in one combat', async () => {
+        const service = new CharacterService();
+
+        await service.recordDefeatedArchetypes('char-1', { 'gkbot-repair': 1 }, ['gkbot-repair', 'gkbot-repair']);
+
+        expect(updateDefeatedArchetypeCountsMock).toHaveBeenCalledWith('char-1', { 'gkbot-repair': 3 });
+    });
+
+    it('does not write when nothing was defeated', async () => {
+        const service = new CharacterService();
+
+        await service.recordDefeatedArchetypes('char-1', { 'gkbot-repair': 2 }, []);
+
+        expect(updateDefeatedArchetypeCountsMock).not.toHaveBeenCalled();
     });
 });

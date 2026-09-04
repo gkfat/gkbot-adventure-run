@@ -17,6 +17,15 @@ import {
 } from '../constants/templates/characterArchetypes';
 import { getTalentTreeByArchetypeId } from '../constants/templates/talentTrees';
 import {
+    ENEMY_ARCHETYPES, GKBOT_BOSS_ARCHETYPES, HUMAN_ARCHETYPES, HUMAN_BOSS_ARCHETYPES,
+    type EnemyArchetype,
+} from '../constants/templates/enemies';
+import {
+    getEnemyPortraitUrl, type EnemyAvatarTier, 
+} from '../../shared/utils/enemyAvatar';
+import type { EnemyFaction } from '../../shared/types/adventure';
+import type { BestiaryEntry } from '../../shared/schemas/api/bestiary.schema';
+import {
     getStarterEquipmentTemplateIds, STARTER_POTION_TEMPLATE_ID,
 } from '../../shared/constants/starterLoadout';
 import type {
@@ -31,6 +40,25 @@ import {
 import {
     BusinessLogicError, NotFoundError,
 } from '../../shared/types/errors';
+
+/**
+ * All 32 bestiary entries (enemy-bestiary spec.md "查詢圖鑑 API"), each
+ * paired with the faction/tier needed to resolve its portrait fallback.
+ */
+const BESTIARY_ARCHETYPES: { archetype: EnemyArchetype; faction: EnemyFaction; tier: EnemyAvatarTier }[] = [
+    ...ENEMY_ARCHETYPES.map(archetype => ({
+        archetype, faction: 'GKBOT' as const, tier: 'normal' as const,
+    })),
+    ...GKBOT_BOSS_ARCHETYPES.map(archetype => ({
+        archetype, faction: 'GKBOT' as const, tier: 'boss' as const,
+    })),
+    ...HUMAN_ARCHETYPES.map(archetype => ({
+        archetype, faction: 'HUMAN' as const, tier: 'normal' as const,
+    })),
+    ...HUMAN_BOSS_ARCHETYPES.map(archetype => ({
+        archetype, faction: 'HUMAN' as const, tier: 'boss' as const,
+    })),
+];
 
 export class CharacterService extends BaseService {
     protected serviceName = 'character';
@@ -213,6 +241,76 @@ export class CharacterService extends BaseService {
             talents,
             talentPoints,
         });
+    }
+
+    /**
+     * Merge newly-seen archetype slugs into a character's bestiary progress
+     * (enemy-bestiary). `existingSlugs` is the caller's already-fetched
+     * character.encounteredArchetypeSlugs, so this only issues a Firestore
+     * write when at least one slug in `archetypeSlugs` isn't already there
+     * (design.md Risks: avoid a write on every repeat encounter).
+     */
+    async recordEncounteredArchetypes(characterId: string, existingSlugs: string[], archetypeSlugs: string[]): Promise<void> {
+        const newSlugs = archetypeSlugs.filter(slug => !existingSlugs.includes(slug));
+        if (newSlugs.length === 0) {
+            return;
+        }
+        await this.characterRepo.addEncounteredArchetypeSlugs(characterId, [...existingSlugs, ...newSlugs]);
+    }
+
+    /**
+     * Tally newly-defeated archetype slugs into a character's kill counts
+     * (enemy-bestiary kill-count tracking). `existingCounts` is the caller's
+     * already-fetched character.defeatedArchetypeCounts; `defeatedSlugs` is
+     * one entry per unit actually defeated in the combat (so a slug killed
+     * twice in one fight appears twice). No-ops when nothing was defeated.
+     */
+    async recordDefeatedArchetypes(characterId: string, existingCounts: Record<string, number>, defeatedSlugs: string[]): Promise<void> {
+        if (defeatedSlugs.length === 0) {
+            return;
+        }
+        const counts = { ...existingCounts };
+        for (const slug of defeatedSlugs) {
+            counts[slug] = (counts[slug] ?? 0) + 1;
+        }
+        await this.characterRepo.updateDefeatedArchetypeCounts(characterId, counts);
+    }
+
+    /**
+     * Get the full enemy bestiary for a character owned by the caller
+     * (enemy-bestiary). Every archetype is included; `name`/`description`/
+     * `portraitUrl` are only attached when the character has encountered it
+     * (spec.md "查詢圖鑑 API 依遭遇狀態決定資料揭露程度") — the server, not the
+     * frontend, is the disclosure boundary.
+     */
+    async getBestiary(accountId: string, characterId: string): Promise<BestiaryEntry[]> {
+        const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
+        if (!character) {
+            throw new NotFoundError('character');
+        }
+
+        const entries = BESTIARY_ARCHETYPES.map(({
+            archetype, faction, tier,
+        }) => {
+            const encountered = character.encounteredArchetypeSlugs.includes(archetype.slug);
+            if (!encountered) {
+                return {
+                    slug: archetype.slug, encountered,
+                };
+            }
+            return {
+                slug: archetype.slug,
+                encountered,
+                name: archetype.name,
+                description: archetype.description,
+                portraitUrl: getEnemyPortraitUrl(archetype.slug, faction, tier),
+                defeatedCount: character.defeatedArchetypeCounts[archetype.slug] ?? 0,
+            };
+        });
+
+        // 已遇過的敵人排在最前面 — Array.prototype.sort is stable, so each
+        // group (encountered / un-encountered) keeps BESTIARY_ARCHETYPES' order.
+        return entries.sort((a, b) => Number(b.encountered) - Number(a.encountered));
     }
 
     /**
