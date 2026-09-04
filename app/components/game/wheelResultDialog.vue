@@ -1,13 +1,15 @@
 <template>
-    <div
-        v-if="result"
-        class="wheel-result-banner"
+    <GameDialogFrame
+        model-value
+        persistent
+        :scrim="false"
+        content-class="wheel-result-dialog"
     >
-        <div class="wheel-result-banner__title font-pixel mb-2">
+        <div class="wheel-result-dialog__title font-pixel mb-2">
             轉盤結果
         </div>
         <div class="text-caption text-medium-emphasis mb-8">
-            {{ result.description }}
+            {{ result?.description }}
         </div>
 
         <div class="wheel-spinner mb-4">
@@ -25,10 +27,10 @@
             >
         </div>
 
-        <template v-if="revealed">
+        <template v-if="revealed && result">
             <div
                 v-if="result.goldGained || result.gemsGained || result.itemsGained?.length"
-                class="d-flex flex-wrap justify-center ga-4"
+                class="d-flex flex-wrap justify-center ga-4 mb-3"
             >
                 <div
                     v-if="result.goldGained"
@@ -54,12 +56,12 @@
             </div>
             <div
                 v-else
-                class="text-body-2 text-medium-emphasis"
+                class="text-body-2 text-medium-emphasis mb-3"
             >
                 這次沒有任何收穫
             </div>
         </template>
-    </div>
+    </GameDialogFrame>
 </template>
 
 <script setup lang="ts">
@@ -114,27 +116,11 @@ watch(() => props.started, started => {
 </script>
 
 <style scoped lang="scss">
-// 跟 GameModifierAcquiredBanner 同一套視覺語言（疊在目前節點內容上的全寬
-// banner，確認用的「關閉」按鈕在下方 __actions 區塊，見 adventure.vue
-// wheelResultPending 的用法），差別只在轉盤是開獎結果、沒有祝福/詛咒那種
-// 需要疊在角色身上的光暈特效。
-.wheel-result-banner {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+.wheel-result-dialog {
     text-align: center;
-    padding: 12px;
-    background: rgb(10, 11, 14);
-    border-block: 1px solid rgba(196, 203, 219, 0.25);
-    opacity: 0;
-    animation: wheel-result-banner-in 0.2s ease-out forwards;
 }
 
-.wheel-result-banner__title {
+.wheel-result-dialog__title {
     font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -146,6 +132,7 @@ watch(() => props.started, started => {
     position: relative;
     width: 176px;
     height: 176px;
+    margin-inline: auto;
 }
 
 .wheel-spinner__wheel {
@@ -163,16 +150,5 @@ watch(() => props.started, started => {
     height: 52px;
     transform: translateX(-50%);
     image-rendering: pixelated;
-}
-
-@keyframes wheel-result-banner-in {
-    0% {
-        opacity: 0;
-        transform: scaleY(0.6);
-    }
-    100% {
-        opacity: 1;
-        transform: scaleY(1);
-    }
 }
 </style>

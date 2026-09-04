@@ -336,29 +336,30 @@
 
         <!-- 冒險進行中 -->
         <template v-else>
-            <div class="adventure-page__scroll adventure-page__banner-anchor">
-                <!-- 獲得祝福/遭受詛咒：疊在目前節點內容上的 banner，取代原本的
-                     v-dialog（確認用的「關閉」按鈕在下方 __actions 區塊，見
-                     GameModifierAcquiredBanner）。 -->
-                <GameModifierAcquiredBanner
+            <div class="adventure-page__scroll">
+                <!-- 獲得祝福/遭受詛咒：v-dialog 顯示（scrim="false"），「繼續前進」按鈕
+                     在下方固定的 __actions 區塊（見 acquiredModifierDialog 那個
+                     SystemBtn 分支）。 -->
+                <GameModifierAcquiredDialog
                     v-if="acquiredModifierDialog"
                     :modifier="acquiredModifierDialog"
                     :effect-text="acquiredModifierDialog ? describeModifierEffect(acquiredModifierDialog) : ''"
                 />
 
-                <!-- 轉盤事件開獎結果：同一套 banner-anchor 疊加慣例，「關閉」按鈕
-                     在下方 __actions（見 wheelResultPending）。 -->
-                <GameWheelResultBanner
+                <!-- 轉盤事件開獎結果：v-dialog 顯示（scrim="false"），「開始轉盤」/
+                     「繼續前進」按鈕都在下方固定的 __actions 區塊（見 wheelResultPending
+                     那兩個 SystemBtn 分支）。 -->
+                <GameWheelResultDialog
                     v-if="wheelResultPending"
                     :result="lastEventResult"
                     :started="wheelSpinStarted"
                 />
 
-                <!-- 開箱事件(CHOICE 型別的 sealed_crate)結果：用 dialog 顯示，dialog 本身沒有按鈕，
-                     「繼續前進」在下方固定的 __actions 區塊，跟其他結果 dialog 的關閉按鈕擺在一起
-                     （見 chestResultDialogOpen 那個 SystemBtn 分支）。 -->
-                <GameChestResultDialog
-                    :open="chestResultDialogOpen"
+                <!-- 一般事件結果（HEAL/CHOICE 等沒有 blessing/curse/wheel 的事件類型）：
+                     v-dialog 顯示（scrim="false"），「繼續前進」按鈕在下方固定的 __actions
+                     區塊（見 eventResultDialogOpen 那個 SystemBtn 分支）。 -->
+                <GameEventResultDialog
+                    :open="eventResultDialogOpen"
                     :result="lastEventResult"
                 />
 
@@ -425,34 +426,31 @@
                 <!-- COMBAT：觸發戰鬥；戰鬥結果在 COMBAT/RESOLUTION 都顯示，直到玩家繼續前進。
                      玩家本身的顯示（背影/HP/行動條/spark/傷害飄字）已移到頁面下方持久化的
                      「角色 stage」（見 adventure-page__stage）；戰鬥結算文字改用
-                     GameCombatSummaryBanner 疊在 arena 上呈現（確認用的「關閉」按鈕在下方
-                     __actions 區塊），這裡只放敵方 arena，且進行中戰鬥不需要中間 panel 的
+                     GameCombatSummaryDialog 以 v-dialog（scrim="false"）呈現，「繼續前進」
+                     按鈕在下方固定的 __actions 區塊，這裡只放敵方 arena，且進行中戰鬥不需要中間 panel 的
                      邊框（此時畫面就是戰鬥本身）。 -->
                 <template v-if="currentRun.state === AdventureStateType.COMBAT || (currentRun.state === AdventureStateType.RESOLUTION && lastCombatResult)">
-                    <!-- 戰鬥結束、玩家關掉結算 banner 後會自動推進並播放走路動畫（見下方
+                    <!-- 戰鬥結束、玩家關掉結算 dialog 後會自動推進並播放走路動畫（見下方
                          RESOLUTION/EXPLORING 的 auto-advance watch），這段期間 lastCombatResult
                          還沒被下一個節點的回應取代，敵方 panel（此時只剩下已擊敗的敵人）
                          應隨走路動畫隱藏，不要停留在畫面上（known-issue.md #2）。 -->
-                    <div
-                        v-if="lastCombatResult && !walkFrame.isWalking.value"
-                        class="adventure-page__banner-anchor"
-                    >
+                    <template v-if="lastCombatResult && !walkFrame.isWalking.value">
                         <GameCombatResultPanel
                             :displayed-banner="displayedBanner"
                             :enemy-cards="enemyCards"
                             :faction-type="currentRun.factionType"
                             :current-node-type="currentRun.currentNodeType"
                         />
-                        <GameCombatSummaryBanner
+                        <GameCombatSummaryDialog
                             v-if="combatSummaryDialogOpen"
                             :victory="combatVictory"
                             :round-count="combatRoundCount"
                             :exp-gained="combatExpGained"
                             :gold-dropped="combatGoldDropped"
                             :gems-dropped="combatGemsDropped"
-                            :dropped-item-names="combatDroppedItemNames"
+                            :dropped-items="combatDroppedItems"
                         />
-                    </div>
+                    </template>
                     <!-- lastCombatResult 為空才是「還沒開打」的預備畫面；lastCombatResult
                          存在但正在播走路動畫（上面 v-if 為 false）代表戰鬥已經結束、正要
                          離開，不能落到這個 v-else 誤顯示「遭遇敵人，準備戰鬥」。 -->
@@ -712,6 +710,11 @@
             </div>
 
             <div class="adventure-page__actions d-flex flex-column ga-2">
+                <!-- 冒險過程中所有「結果 dialog」的確認/繼續按鈕都統一放在這個固定區塊，
+                     不放在 dialog 內部——這幾個 dialog（GameCombatSummaryDialog /
+                     GameModifierAcquiredDialog / GameEventResultDialog / GameWheelResultDialog /
+                     GameBlessingSelectDialog）都設定 scrim="false"，遮罩不會攔截點擊，
+                     所以外部按鈕不會被 dialog 蓋住而無法點擊（見使用者回報 #2）。 -->
                 <SystemBtn
                     v-if="combatSummaryDialogOpen"
                     block
@@ -720,7 +723,7 @@
                     class="text-none"
                     @click="showCombatSummaryDialog = false"
                 >
-                    關閉
+                    繼續前進
                 </SystemBtn>
 
                 <SystemBtn
@@ -731,16 +734,16 @@
                     class="text-none"
                     @click="acquiredModifierDialog = null"
                 >
-                    關閉
+                    繼續前進
                 </SystemBtn>
 
                 <SystemBtn
-                    v-else-if="chestResultDialogOpen"
+                    v-else-if="eventResultDialogOpen"
                     block
                     variant="flat"
                     color="primary"
                     class="text-none"
-                    @click="chestResultDialogOpen = false"
+                    @click="eventResultDialogOpen = false"
                 >
                     繼續前進
                 </SystemBtn>
@@ -764,7 +767,20 @@
                     class="text-none"
                     @click="wheelResultPending = false"
                 >
-                    關閉
+                    繼續前進
+                </SystemBtn>
+
+                <SystemBtn
+                    v-else-if="currentRun.state === AdventureStateType.BLESSING_SELECT"
+                    block
+                    variant="flat"
+                    color="primary"
+                    class="text-none"
+                    :disabled="!selectedBlessingId"
+                    :loading="runLoading"
+                    @click="selectedBlessingId && handleSelectBlessing(selectedBlessingId)"
+                >
+                    選擇
                 </SystemBtn>
 
                 <SystemBtn
@@ -830,8 +846,8 @@
         <GameBlessingSelectDialog
             :open="currentRun?.state === AdventureStateType.BLESSING_SELECT"
             :candidates="blessingCandidatesWithEffect"
-            :loading="runLoading"
-            @select="handleSelectBlessing"
+            :selected-id="selectedBlessingId"
+            @update:selected-id="selectedBlessingId = $event"
         />
     </div>
 </template>
@@ -947,12 +963,12 @@ const pendingModifierAck = ref(false);
 // auto-advance watch（見 handleResolveEvent 內的用法）。
 const wheelResultPending = ref(false);
 // 轉盤是否已經開始轉動——玩家要主動點下面的「開始轉盤」才會觸發
-// GameWheelResultBanner 內的旋轉動畫，見該元件的 started prop。
+// GameWheelResultDialog 內的旋轉動畫，見該元件的 started prop。
 const wheelSpinStarted = ref(false);
-// 開箱事件(CHOICE 型別的 sealed_crate)結果：跟祝福/詛咒沒有衝突時（沒有
-// blessingGranted/curseApplied，見 handleResolveEvent），用 dialog 顯示結果，
-// 玩家點擊「繼續」才關閉、才能往下推進。
-const chestResultDialogOpen = ref(false);
+// 一般事件結果（HEAL、CHOICE 型別的 sealed_crate 等）：跟祝福/詛咒/轉盤沒有衝突時
+// （沒有 blessingGranted/curseApplied，也不是 WHEEL，見 handleResolveEvent），
+// 統一用這個 dialog 顯示結果，玩家點擊「繼續前進」才關閉、才能往下推進。
+const eventResultDialogOpen = ref(false);
 // 取得祝福/詛咒當下疊在角色 sprite 上的光暈特效來源，跟 acquiredModifierDialog
 // 共用同一個值——dialog 一出現，光暈就套用在角色身上，從小到大再淡出消失（見
 // __stage-glow 的 keyframes）。
@@ -1118,9 +1134,7 @@ const combatRoundCount = computed(() => lastCombatResult.value?.summary.roundCou
 const combatExpGained = computed(() => lastCombatResult.value?.summary.expGained ?? 0);
 const combatGoldDropped = computed(() => lastCombatResult.value?.summary.goldDropped ?? 0);
 const combatGemsDropped = computed(() => lastCombatResult.value?.summary.gemsDropped ?? 0);
-const combatDroppedItemNames = computed(() => (
-    lastCombatResult.value?.summary.itemsDropped.map(item => describeItem(item).name) ?? []
-));
+const combatDroppedItems = computed(() => lastCombatResult.value?.summary.itemsDropped ?? []);
 
 // 戰鬥結果的 log 演繹（stage 上的 playerGauge/playerSpark 等）播完前，不能顯示
 // 「繼續前進」，避免玩家在還沒看完戰鬥過程時就跳過結算。lastCombatResult 換成
@@ -1164,9 +1178,10 @@ const combatPlaybackPending = computed(() => (
 // 直接演繹走路動畫並自動推進；有戰鬥結算 dialog 要看的話，等玩家關掉 dialog
 // 才觸發（不能搶在玩家讀完結算前就跳走）。取得祝福/詛咒的 acquiredModifierDialog
 // 同理：dialog 還開著時不能先播走路動畫（known-issue.md #3）。轉盤事件結果
-// （wheelResultPending）也是同一套邏輯：開獎結果要等玩家自己點「關閉」才能
-// 繼續走路，不能被自動 advance 蓋過去（見使用者回報）。開箱結果 dialog
-// （chestResultDialogOpen）同理：要等玩家自己點「繼續」才能往下走。
+// （wheelResultPending）也是同一套邏輯：開獎結果要等玩家自己點「繼續前進」才能
+// 繼續走路，不能被自動 advance 蓋過去（見使用者回報）。一般事件結果 dialog
+// （eventResultDialogOpen，涵蓋 HEAL、開箱等沒有 blessing/curse/wheel 的事件類型）
+// 同理：要等玩家自己點「繼續前進」才能往下走。
 // INIT「開始探索」、REST「結束休息」仍維持手動點擊，因為這兩個是玩家主動決定
 // 「現在要做這件事」的時機點。
 watch(() => (
@@ -1176,7 +1191,7 @@ watch(() => (
     && !combatSummaryDialogOpen.value
     && !acquiredModifierDialog.value
     && !wheelResultPending.value
-    && !chestResultDialogOpen.value
+    && !eventResultDialogOpen.value
     && !pendingModifierAck.value
     && !runLoading.value
 ), (ready) => {
@@ -1265,6 +1280,14 @@ const blessingCandidatesWithEffect = computed(() => blessingCandidates.value.map
     effectText: describeModifierEffect(candidate),
 })));
 
+// 「選擇」按鈕在下方固定的 __actions 區塊（GameBlessingSelectDialog 用
+// scrim="false"，不會蓋住這裡的點擊），需要知道玩家在 dialog 卡片上選了哪個
+// 候選——每次換一批候選祝福都要清掉上一輪選取，避免殘留選取狀態誤觸。
+const selectedBlessingId = ref<string | null>(null);
+watch(blessingCandidates, () => {
+    selectedBlessingId.value = null;
+});
+
 const advanceLabel = computed(() => {
     switch (currentRun.value?.state) {
         case AdventureStateType.INIT: return '開始探索';
@@ -1349,8 +1372,10 @@ const handleResolveEvent = async (choiceIndex?: number) => {
     } else if (lastEventResult.value?.eventType === EventType.WHEEL) {
         wheelResultPending.value = true;
         wheelSpinStarted.value = false;
-    } else if (lastEventResult.value?.eventType === EventType.CHOICE) {
-        chestResultDialogOpen.value = true;
+    } else {
+        // HEAL、CHOICE(sealed_crate) 等其餘沒有 blessing/curse/wheel 的事件類型
+        // 統一走這個 dialog。
+        eventResultDialogOpen.value = true;
     }
     pendingModifierAck.value = false;
 };
@@ -1410,12 +1435,6 @@ onMounted(() => {
 
     &__actions {
         flex: 0 0 auto;
-    }
-
-    // GameCombatSummaryBanner／GameModifierAcquiredBanner 疊在內容上的定位錨點
-    // （banner 本身 position: absolute; inset: 0）。
-    &__banner-anchor {
-        position: relative;
     }
 
     &__box {

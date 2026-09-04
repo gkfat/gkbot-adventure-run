@@ -1,12 +1,10 @@
 <template>
-    <v-dialog
+    <GameDialogFrame
         v-model="open"
         max-width="300"
+        content-class="item-detail"
     >
-        <div
-            v-if="item"
-            class="item-detail pa-4"
-        >
+        <template v-if="item">
             <div
                 v-if="item.equipSlot"
                 class="item-detail__slot-label text-caption text-medium-emphasis font-pixel"
@@ -103,7 +101,7 @@
             >
                 關閉
             </SystemBtn>
-        </div>
+        </template>
 
         <v-snackbar
             v-model="soldSnackbar"
@@ -113,7 +111,7 @@
         >
             {{ soldSnackbarText }}
         </v-snackbar>
-    </v-dialog>
+    </GameDialogFrame>
 </template>
 
 <script setup lang="ts">
@@ -257,8 +255,6 @@ defineExpose({
 
 .item-detail {
     position: relative;
-    background: rgb(var(--v-theme-background));
-    border: 1px solid rgba(196, 203, 219, 0.15);
 
     &__slot-label {
         position: absolute;

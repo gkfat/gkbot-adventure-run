@@ -1,65 +1,53 @@
 <template>
-    <v-dialog
+    <GameDialogFrame
         :model-value="open"
         max-width="420"
         persistent
+        :scrim="false"
+        content-class="blessing-select-dialog"
     >
-        <div class="blessing-select-dialog pa-4">
-            <div
-                class="text-center font-pixel text-subtitle-1 mb-3"
-                style="color: rgb(var(--v-theme-green));"
-            >
-                選擇一個祝福
-            </div>
-
-            <div class="blessing-select-dialog__cards">
-                <button
-                    v-for="candidate in candidates"
-                    :key="candidate.modifierId"
-                    type="button"
-                    class="blessing-select-dialog__card pixel-press"
-                    :class="{ 'blessing-select-dialog__card--active': selectedId === candidate.modifierId }"
-                    :style="{ borderColor: RARITY_COLOR[candidate.rarity] }"
-                    @click="selectedId = candidate.modifierId"
-                >
-                    <span
-                        class="blessing-select-dialog__rarity font-pixel"
-                        :style="{ background: RARITY_COLOR[candidate.rarity] }"
-                    >
-                        {{ candidate.rarity }}
-                    </span>
-
-                    <span class="font-pixel text-caption blessing-select-dialog__card-level mt-2">
-                        LV.{{ candidate.level }}
-                    </span>
-                    <div class="font-pixel blessing-select-dialog__card-name font-weight-bold mb-2">
-                        {{ candidate.name }}
-                    </div>
-                    <div class="text-caption text-medium-emphasis blessing-select-dialog__card-desc">
-                        {{ candidate.description }}
-                    </div>
-                    <div
-                        v-if="candidate.effectText"
-                        class="font-pixel text-caption blessing-select-dialog__card-effect"
-                    >
-                        {{ candidate.effectText }}
-                    </div>
-                </button>
-            </div>
-
-            <SystemBtn
-                block
-                variant="flat"
-                color="primary"
-                class="text-none mt-4"
-                :disabled="!selectedId"
-                :loading="loading"
-                @click="selectedId && $emit('select', selectedId)"
-            >
-                選擇
-            </SystemBtn>
+        <div
+            class="text-center font-pixel text-subtitle-1 mb-3"
+            style="color: rgb(var(--v-theme-green));"
+        >
+            選擇一個祝福
         </div>
-    </v-dialog>
+
+        <div class="blessing-select-dialog__cards">
+            <button
+                v-for="candidate in candidates"
+                :key="candidate.modifierId"
+                type="button"
+                class="blessing-select-dialog__card pixel-press"
+                :class="{ 'blessing-select-dialog__card--active': selectedId === candidate.modifierId }"
+                :style="{ borderColor: RARITY_COLOR[candidate.rarity] }"
+                @click="emit('update:selectedId', candidate.modifierId)"
+            >
+                <span
+                    class="blessing-select-dialog__rarity font-pixel"
+                    :style="{ background: RARITY_COLOR[candidate.rarity] }"
+                >
+                    {{ candidate.rarity }}
+                </span>
+
+                <span class="font-pixel text-caption blessing-select-dialog__card-level mt-2">
+                    LV.{{ candidate.level }}
+                </span>
+                <div class="font-pixel blessing-select-dialog__card-name font-weight-bold mb-2">
+                    {{ candidate.name }}
+                </div>
+                <div class="text-caption text-medium-emphasis blessing-select-dialog__card-desc">
+                    {{ candidate.description }}
+                </div>
+                <div
+                    v-if="candidate.effectText"
+                    class="font-pixel text-caption blessing-select-dialog__card-effect"
+                >
+                    {{ candidate.effectText }}
+                </div>
+            </button>
+        </div>
+    </GameDialogFrame>
 </template>
 
 <script setup lang="ts">
@@ -76,25 +64,16 @@ const RARITY_COLOR: Record<BlessingRarity, string> = {
     EPIC: '#ffb300',
 };
 
-const props = defineProps<{
+defineProps<{
     open: boolean;
     candidates: BlessingCandidateWithEffect[];
-    loading?: boolean;
+    selectedId: string | null;
 }>();
-defineEmits<{ select: [modifierId: string] }>();
-
-// 每次重新開啟(換一批候選祝福)都要清掉上一輪選取，避免殘留選取狀態誤觸。
-const selectedId = ref<string | null>(null);
-watch(() => props.open, (isOpen) => {
-    if (isOpen) selectedId.value = null;
-});
+const emit = defineEmits<{ 'update:selectedId': [modifierId: string] }>();
 </script>
 
 <style scoped lang="scss">
 .blessing-select-dialog {
-    background: rgb(var(--v-theme-background));
-    border: 1px solid rgba(196, 203, 219, 0.15);
-
     &__cards {
         display: flex;
         gap: 8px;

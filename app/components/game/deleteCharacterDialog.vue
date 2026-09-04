@@ -1,156 +1,155 @@
 <template>
-    <v-dialog
+    <GameDialogFrame
         v-model="open"
         max-width="320"
+        content-class="delete-character"
     >
-        <div class="delete-character pa-4">
-            <div
-                v-if="loading"
-                class="d-flex flex-column align-center justify-center py-6"
-            >
-                <v-progress-circular
-                    indeterminate
-                    color="green"
-                    :size="40"
-                    :width="4"
-                />
+        <div
+            v-if="loading"
+            class="d-flex flex-column align-center justify-center py-6"
+        >
+            <v-progress-circular
+                indeterminate
+                color="green"
+                :size="40"
+                :width="4"
+            />
+        </div>
+
+        <div
+            v-else-if="loadError"
+            class="text-body-2 text-center py-4"
+            style="color: rgb(var(--v-theme-warning));"
+        >
+            {{ loadError }}
+        </div>
+
+        <template v-else-if="detail">
+            <div class="font-pixel text-subtitle-1 mb-3" style="color: rgb(var(--v-theme-warning));">
+                確認刪除角色？
             </div>
 
-            <div
-                v-else-if="loadError"
-                class="text-body-2 text-center py-4"
-                style="color: rgb(var(--v-theme-warning));"
-            >
-                {{ loadError }}
-            </div>
-
-            <template v-else-if="detail">
-                <div class="font-pixel text-subtitle-1 mb-3" style="color: rgb(var(--v-theme-warning));">
-                    確認刪除角色？
-                </div>
-
-                <div class="d-flex align-center ga-3 mb-3">
-                    <img
-                        :src="detail.spriteUrl"
-                        :alt="detail.className"
-                        width="40"
-                        height="40"
-                        class="delete-character__sprite"
-                    >
-                    <div>
-                        <div class="d-flex align-center ga-2">
-                            <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-green));">
-                                LV {{ detail.level }}
-                            </span>
-                            <span class="text-caption text-medium-emphasis">{{ detail.className }}</span>
-                        </div>
-                        <div class="text-body-2">{{ detail.nickname }}</div>
+            <div class="d-flex align-center ga-3 mb-3">
+                <img
+                    :src="detail.spriteUrl"
+                    :alt="detail.className"
+                    width="40"
+                    height="40"
+                    class="delete-character__sprite"
+                >
+                <div>
+                    <div class="d-flex align-center ga-2">
+                        <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-green));">
+                            LV {{ detail.level }}
+                        </span>
+                        <span class="text-caption text-medium-emphasis">{{ detail.className }}</span>
                     </div>
+                    <div class="text-body-2">{{ detail.nickname }}</div>
                 </div>
+            </div>
 
-                <div class="text-caption text-medium-emphasis mb-1">屬性</div>
-                <div class="delete-character__attrs mb-3">
-                    <span
-                        v-for="attr in attrList"
-                        :key="attr.label"
-                        class="text-caption"
-                    >
-                        {{ attr.label }} {{ attr.value }}
+            <div class="text-caption text-medium-emphasis mb-1">屬性</div>
+            <div class="delete-character__attrs mb-3">
+                <span
+                    v-for="attr in attrList"
+                    :key="attr.label"
+                    class="text-caption"
+                >
+                    {{ attr.label }} {{ attr.value }}
+                </span>
+            </div>
+
+            <div class="text-caption text-medium-emphasis mb-1">經濟</div>
+            <div class="d-flex align-center ga-4 mb-3">
+                <div class="d-flex align-center ga-1">
+                    <GameCurrencyIcon
+                        type="GOLD"
+                        :size="12"
+                    />
+                    <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-secondary));">
+                        {{ detail.gold }}
                     </span>
                 </div>
-
-                <div class="text-caption text-medium-emphasis mb-1">經濟</div>
-                <div class="d-flex align-center ga-4 mb-3">
-                    <div class="d-flex align-center ga-1">
-                        <GameCurrencyIcon
-                            type="GOLD"
-                            :size="12"
-                        />
-                        <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-secondary));">
-                            {{ detail.gold }}
-                        </span>
-                    </div>
-                    <div class="d-flex align-center ga-1">
-                        <GameCurrencyIcon
-                            type="GEMS"
-                            :size="12"
-                        />
-                        <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
-                            {{ detail.gems }}
-                        </span>
-                    </div>
+                <div class="d-flex align-center ga-1">
+                    <GameCurrencyIcon
+                        type="GEMS"
+                        :size="12"
+                    />
+                    <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
+                        {{ detail.gems }}
+                    </span>
                 </div>
+            </div>
 
-                <div class="text-caption text-medium-emphasis mb-1">裝備</div>
+            <div class="text-caption text-medium-emphasis mb-1">裝備</div>
+            <div
+                v-if="equippedItems.length > 0"
+                class="delete-character__equip-row mb-3"
+            >
                 <div
-                    v-if="equippedItems.length > 0"
-                    class="delete-character__equip-row mb-3"
+                    v-for="item in equippedItems"
+                    :key="item.itemId"
+                    class="pixel-slot pixel-slot--equip"
+                    :style="{ borderColor: RARITY_COLOR[item.rarity] }"
                 >
-                    <div
-                        v-for="item in equippedItems"
-                        :key="item.itemId"
-                        class="pixel-slot pixel-slot--equip"
-                        :style="{ borderColor: RARITY_COLOR[item.rarity] }"
+                    <span
+                        class="pixel-slot__rarity font-pixel"
+                        :style="{ background: RARITY_COLOR[item.rarity] }"
                     >
-                        <span
-                            class="pixel-slot__rarity font-pixel"
-                            :style="{ background: RARITY_COLOR[item.rarity] }"
-                        >
-                            {{ item.rarity }}
-                        </span>
-                        <GamePixelIcon
-                            :name="resolvePixelIcon(item)"
-                            :size="26"
-                        />
-                    </div>
+                        {{ item.rarity }}
+                    </span>
+                    <GamePixelIcon
+                        :name="resolvePixelIcon(item)"
+                        :size="26"
+                    />
                 </div>
-                <div
-                    v-else
-                    class="text-caption text-medium-emphasis mb-3"
-                >
-                    未裝備任何物品
-                </div>
+            </div>
+            <div
+                v-else
+                class="text-caption text-medium-emphasis mb-3"
+            >
+                未裝備任何物品
+            </div>
 
-                <div class="text-caption text-medium-emphasis mb-1">冒險進度</div>
-                <div class="text-body-2 mb-4">
-                    第 {{ detail.nextChapterIndex + 1 }} 章 · 關卡 {{ detail.currentLevelIndex + 1 }}/{{ detail.chapterTotalLevels }}
-                </div>
+            <div class="text-caption text-medium-emphasis mb-1">冒險進度</div>
+            <div class="text-body-2 mb-4">
+                第 {{ detail.nextChapterIndex + 1 }} 章 · 關卡 {{ detail.currentLevelIndex + 1 }}/{{ detail.chapterTotalLevels }}
+            </div>
 
-                <div class="text-body-2 text-medium-emphasis mb-4">
-                    刪除後角色的冒險紀錄與背包將一併移除，且無法復原。
-                </div>
+            <div class="text-body-2 text-medium-emphasis mb-4">
+                刪除後角色的冒險紀錄與背包將一併移除，且無法復原。
+            </div>
 
-                <div
-                    v-if="deleteError"
-                    class="text-body-2 mb-3"
-                    style="color: rgb(var(--v-theme-warning));"
-                >
-                    {{ deleteError }}
-                </div>
+            <div
+                v-if="deleteError"
+                class="text-body-2 mb-3"
+                style="color: rgb(var(--v-theme-warning));"
+            >
+                {{ deleteError }}
+            </div>
 
-                <SystemBtn
-                    block
-                    variant="flat"
-                    color="warning"
-                    class="text-none mb-2"
-                    :loading="deleting"
-                    @click="handleDelete"
-                >
-                    確認刪除
-                </SystemBtn>
-                <SystemBtn
-                    block
-                    variant="outlined"
-                    color="primary"
-                    class="text-none"
-                    :disabled="deleting"
-                    @click="open = false"
-                >
-                    取消
-                </SystemBtn>
-            </template>
-        </div>
-    </v-dialog>
+            <SystemBtn
+                block
+                variant="flat"
+                color="warning"
+                class="text-none mb-2"
+                :loading="deleting"
+                @click="handleDelete"
+            >
+                確認刪除
+            </SystemBtn>
+            <SystemBtn
+                block
+                variant="outlined"
+                color="primary"
+                class="text-none"
+                :disabled="deleting"
+                @click="open = false"
+            >
+                取消
+            </SystemBtn>
+        </template>
+    </GameDialogFrame>
 </template>
 
 <script setup lang="ts">
@@ -250,9 +249,6 @@ defineExpose({
 
 <style scoped lang="scss">
 .delete-character {
-    background: rgb(var(--v-theme-background));
-    border: 1px solid rgba(196, 203, 219, 0.15);
-
     &__sprite {
         image-rendering: pixelated;
         flex: 0 0 auto;

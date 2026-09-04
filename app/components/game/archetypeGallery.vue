@@ -138,14 +138,12 @@
         </SystemBtn>
 
         <!-- 初始配備詳情 dialog（唯讀預覽，尚未創建角色，不提供裝備/卸下操作） -->
-        <v-dialog
+        <GameDialogFrame
             v-model="starterDetailOpen"
             max-width="300"
+            content-class="item-detail"
         >
-            <div
-                v-if="starterDetail"
-                class="item-detail pa-4"
-            >
+            <template v-if="starterDetail">
                 <div class="d-flex align-center ga-3 mb-3">
                     <div
                         class="pixel-slot pixel-slot--detail"
@@ -191,8 +189,8 @@
                 >
                     關閉
                 </SystemBtn>
-            </div>
-        </v-dialog>
+            </template>
+        </GameDialogFrame>
     </div>
 </template>
 
@@ -495,8 +493,4 @@ const handleConfirm = () => {
     }
 }
 
-.item-detail {
-    background: rgb(var(--v-theme-background));
-    border: 1px solid rgba(196, 203, 219, 0.15);
-}
 </style>
