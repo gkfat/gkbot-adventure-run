@@ -65,7 +65,7 @@ const previewStats = computed(() => {
 type StatFormat = 'int' | 'seconds';
 
 const formatStat = (value: number, format: StatFormat) => (
-    format === 'seconds' ? `${value.toFixed(1)}s` : `${value}`
+    format === 'seconds' ? `${value.toFixed(2)}s` : `${value}`
 );
 
 // `finalValue` (from `stats`) already has the equipment contribution baked
@@ -118,7 +118,7 @@ const statEntries = computed(() => {
 
     return [
         {
-            label: 'HP',
+            label: '生命值',
             ...withEquipmentBonus(stats.HP_MAX, equipmentBonus.HP_MAX, 'int'),
             pendingDelta: pendingDeltaText(stats.HP_MAX, preview?.HP_MAX, 'int'),
         },
@@ -197,7 +197,7 @@ const statEntries = computed(() => {
 }
 
 .character-stage__stat-delta {
-    font-size: 9px;
+    font-size: 11px;
     white-space: nowrap;
     opacity: 0.85;
 }
