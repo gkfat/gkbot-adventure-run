@@ -51,6 +51,10 @@ const NARRATIVE_BY_THEME: Record<string, NarrativeSet> = {
     },
 };
 
+// REST 節點的固定敘述文字——單一場景描寫，不像 intro/transition 依主題分組，
+// 純粹是「找到一處可以歇息的地方」的過場文案。
+export const REST_NARRATIVE = '你找到一處隱蔽的角落，看來應該安全，稍微歇息了一會。你看到牆壁上有個平坦舒適的區塊，靠了上去，覺得舒服不少。起身後，你發現地面上標示著無線充電區域。';
+
 export const pickIntroNarrative = (stageName: string, seed: number): string => {
     const set = NARRATIVE_BY_THEME[stageName] ?? DEFAULT_NARRATIVE;
     return set.intro[seed % set.intro.length]!;

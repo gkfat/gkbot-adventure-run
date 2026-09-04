@@ -354,6 +354,14 @@
                     :started="wheelSpinStarted"
                 />
 
+                <!-- 開箱事件(CHOICE 型別的 sealed_crate)結果：用 dialog 顯示，dialog 本身沒有按鈕，
+                     「繼續前進」在下方固定的 __actions 區塊，跟其他結果 dialog 的關閉按鈕擺在一起
+                     （見 chestResultDialogOpen 那個 SystemBtn 分支）。 -->
+                <GameChestResultDialog
+                    :open="chestResultDialogOpen"
+                    :result="lastEventResult"
+                />
+
                 <div class="adventure-page__box mb-3">
                     <div class="d-flex align-center justify-space-between">
                         <span class="font-pixel text-subtitle-1" style="color: rgb(var(--v-theme-green));">
@@ -552,6 +560,9 @@
                     v-else-if="currentRun.state === AdventureStateType.REST"
                     class="adventure-page__box mb-3"
                 >
+                    <div class="text-body-2 mb-2">
+                        {{ REST_NARRATIVE }}
+                    </div>
                     <div class="text-caption text-medium-emphasis mb-2 d-flex align-center ga-1">
                         <img
                             src="/images/combat-fx/heal-glow.png"
@@ -560,7 +571,7 @@
                             height="18"
                             style="image-rendering: pixelated;"
                         >
-                        休息中，已自動恢復 {{ restNodeData?.autoHealAmount ?? 0 }} 點生命值，可使用藥水回復更多生命值
+                        可在此處使用背包中的藥水
                     </div>
 
                     <div
@@ -574,7 +585,21 @@
                         :key="potion.itemId"
                         class="adventure-page__potion-row"
                     >
-                        <span class="text-body-2">{{ describeItem(potion).name }}（{{ potion.rarity }}）</span>
+                        <div class="d-flex align-center ga-2">
+                            <GamePixelIcon
+                                :name="resolvePixelIcon(potion)"
+                                :size="28"
+                            />
+                            <div class="d-flex flex-column">
+                                <span class="text-body-2">{{ describeItem(potion).name }}（{{ potion.rarity }}）</span>
+                                <span
+                                    v-if="potion.stats.healPercent"
+                                    class="text-caption text-medium-emphasis"
+                                >
+                                    回復 {{ potion.stats.healPercent }}% 生命值
+                                </span>
+                            </div>
+                        </div>
                         <SystemBtn
                             variant="outlined"
                             color="primary"
@@ -710,6 +735,17 @@
                 </SystemBtn>
 
                 <SystemBtn
+                    v-else-if="chestResultDialogOpen"
+                    block
+                    variant="flat"
+                    color="primary"
+                    class="text-none"
+                    @click="chestResultDialogOpen = false"
+                >
+                    繼續前進
+                </SystemBtn>
+
+                <SystemBtn
                     v-else-if="wheelResultPending && !wheelSpinStarted"
                     block
                     variant="flat"
@@ -809,10 +845,10 @@ import { EXP_TABLE } from '../../shared/types/character';
 import { findCurseTemplate, resolveBlessingModifier } from '../../shared/constants/blessings';
 import type { Stats } from '../../shared/types/common';
 import { describeItem, resolvePixelIcon, RARITY_COLOR, type ItemLike } from '../utils/equipmentDisplay';
-import type { EventNodeData, BlessingNodeData, CombatNodeData, RestNodeData } from '../composables/useAdventureRun';
-import { pickIntroNarrative, pickTransitionNarrative } from '../constants/adventureNarrative';
+import type { EventNodeData, BlessingNodeData, CombatNodeData } from '../composables/useAdventureRun';
+import { pickIntroNarrative, pickTransitionNarrative, REST_NARRATIVE } from '../constants/adventureNarrative';
 import { backSpriteUrl } from '../utils/spriteDisplay';
-import { getFacilityBackgroundUrl } from '../utils/facilityBackground';
+import { FACILITY_SEVERITY_TINT, getFacilityBackgroundUrl } from '../utils/facilityBackground';
 import { getEnemyAvatarTier, getEnemyPortraitUrl } from '../utils/enemyAvatar';
 import { useCombat } from '../composables/useCombat';
 
@@ -913,6 +949,10 @@ const wheelResultPending = ref(false);
 // 轉盤是否已經開始轉動——玩家要主動點下面的「開始轉盤」才會觸發
 // GameWheelResultBanner 內的旋轉動畫，見該元件的 started prop。
 const wheelSpinStarted = ref(false);
+// 開箱事件(CHOICE 型別的 sealed_crate)結果：跟祝福/詛咒沒有衝突時（沒有
+// blessingGranted/curseApplied，見 handleResolveEvent），用 dialog 顯示結果，
+// 玩家點擊「繼續」才關閉、才能往下推進。
+const chestResultDialogOpen = ref(false);
 // 取得祝福/詛咒當下疊在角色 sprite 上的光暈特效來源，跟 acquiredModifierDialog
 // 共用同一個值——dialog 一出現，光暈就套用在角色身上，從小到大再淡出消失（見
 // __stage-glow 的 keyframes）。
@@ -931,13 +971,16 @@ const stageDisplayName = computed(() => {
     return getStageDisplayName(currentRun.value.chapterIndex);
 });
 
-// 設施背景底圖：依 run 固定不變的 severityTier 決定，疊一層暗色漸層確保前景
-// 卡片文字可讀性。沒有進行中的 run（loading/角色列表等畫面）時不套用。
+// 設施背景底圖：依 run 固定不變的 chapterIndex（設施主題）決定底圖，再疊一層
+// severityTier 對應的色調（危險程度越高色調越偏紅）與暗色漸層確保前景卡片
+// 文字可讀性。沒有進行中的 run（loading/角色列表等畫面）時不套用。
 const pageBackgroundStyle = computed(() => {
     if (!currentRun.value) return {};
-    const url = getFacilityBackgroundUrl(currentRun.value.severityTier);
+    const url = getFacilityBackgroundUrl(currentRun.value.chapterIndex);
+    const tint = FACILITY_SEVERITY_TINT[currentRun.value.severityTier];
     return {
-        backgroundImage: `linear-gradient(rgba(10, 11, 14, 0.55), rgba(10, 11, 14, 0.8)), url(${url})`,
+        backgroundImage: `linear-gradient(rgba(10, 11, 14, 0.55), rgba(10, 11, 14, 0.8)), `
+            + `linear-gradient(${tint}, ${tint}), url(${url})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center top',
         backgroundRepeat: 'no-repeat',
@@ -1122,9 +1165,10 @@ const combatPlaybackPending = computed(() => (
 // 才觸發（不能搶在玩家讀完結算前就跳走）。取得祝福/詛咒的 acquiredModifierDialog
 // 同理：dialog 還開著時不能先播走路動畫（known-issue.md #3）。轉盤事件結果
 // （wheelResultPending）也是同一套邏輯：開獎結果要等玩家自己點「關閉」才能
-// 繼續走路，不能被自動 advance 蓋過去（見使用者回報）。INIT「開始探索」、
-// REST「結束休息」仍維持手動點擊，因為這兩個是玩家主動決定「現在要做這件事」的
-// 時機點。
+// 繼續走路，不能被自動 advance 蓋過去（見使用者回報）。開箱結果 dialog
+// （chestResultDialogOpen）同理：要等玩家自己點「繼續」才能往下走。
+// INIT「開始探索」、REST「結束休息」仍維持手動點擊，因為這兩個是玩家主動決定
+// 「現在要做這件事」的時機點。
 watch(() => (
     (currentRun.value?.state === AdventureStateType.RESOLUTION
         || currentRun.value?.state === AdventureStateType.EXPLORING)
@@ -1132,6 +1176,7 @@ watch(() => (
     && !combatSummaryDialogOpen.value
     && !acquiredModifierDialog.value
     && !wheelResultPending.value
+    && !chestResultDialogOpen.value
     && !pendingModifierAck.value
     && !runLoading.value
 ), (ready) => {
@@ -1204,12 +1249,6 @@ const canAdvanceGenerically = computed(() => {
 const eventNodeData = computed(() => (
     currentRun.value?.state === AdventureStateType.EVENT
         ? currentRun.value.currentNodeData as EventNodeData
-        : null
-));
-
-const restNodeData = computed(() => (
-    currentRun.value?.state === AdventureStateType.REST
-        ? currentRun.value.currentNodeData as RestNodeData
         : null
 ));
 
@@ -1310,6 +1349,8 @@ const handleResolveEvent = async (choiceIndex?: number) => {
     } else if (lastEventResult.value?.eventType === EventType.WHEEL) {
         wheelResultPending.value = true;
         wheelSpinStarted.value = false;
+    } else if (lastEventResult.value?.eventType === EventType.CHOICE) {
+        chestResultDialogOpen.value = true;
     }
     pendingModifierAck.value = false;
 };
