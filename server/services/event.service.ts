@@ -45,12 +45,18 @@ export class EventService extends BaseService implements EventResolver {
     }
 
     /**
-     * Pick the event template for a fresh EVENT node — one RNG draw,
-     * weighted by EVENT_TEMPLATES' `weight`.
+     * Pick the event template for a fresh EVENT node — a three-stage
+     * weighted draw (facility family → EventType → variant, see events.ts's
+     * header comment), each stage consuming one RNG draw. `healEligible`
+     * gates HEAL-type templates out of the pool until the run has
+     * encountered its first combat (see pickEventTemplate's
+     * require-combat-before-heal note).
      */
-    async selectEvent(runId: string): Promise<EventTemplate> {
-        const roll = await this.rngService.next(runId);
-        return pickEventTemplate(roll);
+    async selectEvent(runId: string, healEligible: boolean): Promise<EventTemplate> {
+        const familyRoll = await this.rngService.next(runId);
+        const typeRoll = await this.rngService.next(runId);
+        const variantRoll = await this.rngService.next(runId);
+        return pickEventTemplate(familyRoll, typeRoll, variantRoll, healEligible);
     }
 
     async resolve(run: AdventureRun, choiceIndex?: number): Promise<EventResult> {

@@ -81,7 +81,7 @@ export const GKBOT_BOSS_ARCHETYPES: EnemyArchetype[] = [
         slug: 'recon-drone', name: '偵察無人機', description: '高速飛行單位，靠著閃避與偷襲拉扯戰局。', baseAtk: 16, baseDef: 6, baseHp: 110, actionIntervalSec: 1.8, dodgeChanceOverride: 0.28,
     },
     {
-        slug: 'core-repair-officer', name: '核心維修官', description: '核心區域的維修統籌單位，未來技能：自我修復（見 worldview §7.5）。', baseAtk: 14, baseDef: 10, baseHp: 170, actionIntervalSec: 2.5, bossMinionCount: 1, canReinforce: true,
+        slug: 'core-repair-officer', name: '核心維修官', description: '核心區域的維修統籌單位。', baseAtk: 14, baseDef: 10, baseHp: 170, actionIntervalSec: 2.5, bossMinionCount: 1, canReinforce: true,
     },
     {
         slug: 'assembly-overseer', name: '產線總管', description: '生產線的最高權限單位，未來技能：過載攻擊。', baseAtk: 22, baseDef: 6, baseHp: 150, actionIntervalSec: 2.2, bossMinionCount: 1,

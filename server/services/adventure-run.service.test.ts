@@ -799,7 +799,7 @@ describe('AdventureRunService.advanceFromExploring — EVENT node selection', ()
         const service = new AdventureRunService();
         await service.advance('account-1', 'char-1');
 
-        expect(selectEventMock).toHaveBeenCalledWith('run-1');
+        expect(selectEventMock).toHaveBeenCalledWith('run-1', false);
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
             state: AdventureStateType.EVENT,
             currentNodeData: expect.objectContaining({ eventTemplateId: 'medbay_leak' }),

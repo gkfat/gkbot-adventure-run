@@ -3,7 +3,7 @@ import {
 } from 'vitest';
 import { EventService } from './event.service';
 import {
-    AdventureStateType, type AdventureRun,
+    AdventureStateType, EventType, type AdventureRun,
 } from '../../shared/types/adventure';
 import { BusinessLogicError } from '../../shared/types/errors';
 import { CURSE_TEMPLATES } from '../../shared/constants/blessings';
@@ -70,6 +70,23 @@ beforeEach(() => {
     rngNextMock.mockImplementation(async () => (rollQueue.length > 0 ? rollQueue.shift() as number : 0.99));
 });
 
+describe('EventService.selectEvent', () => {
+    it('never picks a HEAL template when healEligible is false (require-combat-before-heal)', async () => {
+        const service = new EventService();
+        for (let f = 0; f < 5; f++) {
+            for (let ty = 0; ty < 5; ty++) {
+                rollQueue = [
+                    f / 5,
+                    ty / 5,
+                    0,
+                ];
+                const template = await service.selectEvent('run-1', false);
+                expect(template.type).not.toBe(EventType.HEAL);
+            }
+        }
+    });
+});
+
 describe('EventService.resolve', () => {
     it('throws when currentNodeData has no matching event template', async () => {
         const service = new EventService();
@@ -79,15 +96,15 @@ describe('EventService.resolve', () => {
 
     it('HEAL: heals a percentage of playerHpMax', async () => {
         const service = new EventService();
-        const run = baseRun({ currentNodeData: { eventTemplateId: 'medbay_leak' } });
+        const run = baseRun({ currentNodeData: { eventTemplateId: 'supply_medkit_pallet' } });
         const result = await service.resolve(run);
-        expect(result.hpHealed).toBe(20); // 20% of playerHpMax=100
+        expect(result.hpHealed).toBe(15); // 15% of playerHpMax=100
     });
 
     it('CURSE: applies a curse from CURSE_TEMPLATES', async () => {
         rollQueue = [0];
         const service = new EventService();
-        const run = baseRun({ currentNodeData: { eventTemplateId: 'malfunctioning_unit' } });
+        const run = baseRun({ currentNodeData: { eventTemplateId: 'maintenance_malfunctioning_unit' } });
         const result = await service.resolve(run);
         expect(result.curseApplied).toBe(CURSE_TEMPLATES[0]?.modifierId);
     });

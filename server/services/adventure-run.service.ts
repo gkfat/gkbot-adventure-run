@@ -651,7 +651,7 @@ export class AdventureRunService extends BaseService {
             patch.playerHp = hpCurrent;
             patch.currentNodeData = { autoHealAmount: hpCurrent - run.playerHp };
         } else if (nodeType === NodeType.EVENT || nodeType === NodeType.CHOICE) {
-            const template = await this.eventService.selectEvent(run.runId);
+            const template = await this.eventService.selectEvent(run.runId, run.stageCombatEncountered ?? false);
             patch.state = AdventureStateType.EVENT;
             patch.currentNodeData = {
                 eventTemplateId: template.id,
