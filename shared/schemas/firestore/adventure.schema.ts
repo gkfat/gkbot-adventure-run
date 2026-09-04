@@ -116,7 +116,10 @@ export const adventureRunSchema = z.object({
     // EXPLORING transitions, unlike currentNodeType)
     lastNodeType: z.nativeEnum(NodeType).optional(),
     nodeTypeStreak: z.number().int().min(0).optional(),
-  
+
+    // require-combat-before-rest: whether a combat-tier node has occurred yet
+    stageCombatEncountered: z.boolean().optional(),
+
     // Player state
     playerHp: z.number().min(0),
     playerHpMax: z.number().min(1),

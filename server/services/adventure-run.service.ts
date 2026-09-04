@@ -157,16 +157,21 @@ const WEIGHTED_NODE_TYPES: { type: NodeType; weight: number }[] = [
 // times. Only applies to this weighted-random pool — ELITE/STRONG_ELITE/BOSS
 // are decided deterministically by cadence/priority before this pool is ever
 // consulted (see decideNextNode), so they're outside its scope.
+//
+// `restEligible` (require-combat-before-rest): REST is also excluded from the
+// pool until the run has encountered at least one combat-tier node
+// (COMBAT/ELITE/STRONG_ELITE/BOSS) — see stageCombatEncountered on AdventureRun.
 function weightedNodePoolExcludingStreak(
-    lastNodeType: NodeType | undefined, streak: number,
+    lastNodeType: NodeType | undefined, streak: number, restEligible: boolean,
 ): { type: NodeType; weight: number }[] {
-    if (!lastNodeType) return WEIGHTED_NODE_TYPES;
+    const base = restEligible ? WEIGHTED_NODE_TYPES : WEIGHTED_NODE_TYPES.filter(entry => entry.type !== NodeType.REST);
+    if (!lastNodeType) return base;
     const cap = isCombatNodeType(lastNodeType) ? NODE_CONFIG.COMBAT_STREAK_CAP : 1;
-    if (streak < cap) return WEIGHTED_NODE_TYPES;
-    const filtered = WEIGHTED_NODE_TYPES.filter(entry => entry.type !== lastNodeType);
+    if (streak < cap) return base;
+    const filtered = base.filter(entry => entry.type !== lastNodeType);
     // Pool never actually empties in practice — lastNodeType is always one of
-    // the 4 weighted types when this branch runs — but fall back defensively.
-    return filtered.length > 0 ? filtered : WEIGHTED_NODE_TYPES;
+    // the weighted types when this branch runs — but fall back defensively.
+    return filtered.length > 0 ? filtered : base;
 }
 
 // Stage fields are optional on old (pre-migration) run documents — see
@@ -585,15 +590,22 @@ export class AdventureRunService extends BaseService {
      * The weighted-random branch excludes types that would break the
      * no-consecutive-non-combat-node rule (todo #7) — see
      * weightedNodePoolExcludingStreak.
+     *
+     * require-combat-before-rest: REST (guaranteed or weighted) never appears
+     * until the run has encountered at least one combat-tier node
+     * (COMBAT/ELITE/STRONG_ELITE/BOSS) — otherwise a run could open on Rest
+     * before the player has fought anything. Once that first encounter
+     * happens, REST is unlocked for the rest of the run.
      */
     private async decideNextNode(run: AdventureRun): Promise<NodeType> {
         const {
-            stageNodeIndex, stageNodeCount, 
+            stageNodeIndex, stageNodeCount,
         } = resolveStageFields(run);
+        const restEligible = run.stageCombatEncountered ?? false;
         if (stageNodeIndex === stageNodeCount - 1) {
             return NodeType.BOSS;
         }
-        if (run.step - run.lastRestStep >= NODE_CONFIG.REST_GUARANTEED_INTERVAL) {
+        if (restEligible && run.step - run.lastRestStep >= NODE_CONFIG.REST_GUARANTEED_INTERVAL) {
             return NodeType.REST;
         }
         if (run.step > 0 && run.step % NODE_CONFIG.STRONG_ELITE_INTERVAL === 0) {
@@ -603,7 +615,7 @@ export class AdventureRunService extends BaseService {
             return NodeType.ELITE;
         }
 
-        const pool = weightedNodePoolExcludingStreak(run.lastNodeType, run.nodeTypeStreak ?? 0);
+        const pool = weightedNodePoolExcludingStreak(run.lastNodeType, run.nodeTypeStreak ?? 0, restEligible);
         const total = pool.reduce((sum, entry) => sum + entry.weight, 0);
         const roll = (await this.rngService.next(run.runId)) * total;
         let cursor = 0;
@@ -625,6 +637,9 @@ export class AdventureRunService extends BaseService {
             nodeTypeStreak,
             lastActivityAt: Date.now(),
         };
+        if (!run.stageCombatEncountered && isCombatNodeType(nodeType)) {
+            patch.stageCombatEncountered = true;
+        }
 
         if (nodeType === NodeType.REST) {
             const hpCurrent = clamp(

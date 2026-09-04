@@ -203,7 +203,7 @@ describe('AdventureRunService.advance — node generation priority', () => {
     it('guarantees Rest once REST_GUARANTEED_INTERVAL steps have passed, even on an elite-cadence step', async () => {
         // step=5, lastRestStep=0 -> 5-0=5 >= 4 (guaranteed) AND step%5==0 (elite) — guarantee wins
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
-            step: 5, lastRestStep: 0, 
+            step: 5, lastRestStep: 0, stageCombatEncountered: true,
         }));
 
         const service = new AdventureRunService();
@@ -221,7 +221,7 @@ describe('AdventureRunService.advance — node generation priority', () => {
 
     it('auto-heals a fixed % of playerHpMax when entering a Rest node, clamped to playerHpMax', async () => {
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
-            step: 5, lastRestStep: 0, playerHp: 50, playerHpMax: 100,
+            step: 5, lastRestStep: 0, playerHp: 50, playerHpMax: 100, stageCombatEncountered: true,
         }));
 
         const service = new AdventureRunService();
@@ -315,6 +315,73 @@ describe('AdventureRunService.advance — node generation priority', () => {
             lastNodeType: NodeType.COMBAT,
             nodeTypeStreak: 1,
         }));
+    });
+
+    // require-combat-before-rest: REST must never appear (guaranteed cadence
+    // or weighted pool) until the run has encountered at least one
+    // combat-tier node.
+    describe('require-combat-before-rest', () => {
+        it('does not guarantee Rest once the interval has passed if no combat has happened yet', async () => {
+            // step=5 also hits the elite cadence (step % 5 == 0) — with the
+            // Rest guarantee skipped, that fixed cadence is next in priority.
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 5, lastRestStep: 0, stageCombatEncountered: false,
+            }));
+
+            const service = new AdventureRunService();
+            const result = await service.advance('account-1', 'char-1');
+
+            expect(result.run.currentNodeType).not.toBe(NodeType.REST);
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({ currentNodeType: NodeType.ELITE }));
+        });
+
+        it('excludes REST from the weighted pool until combat has been encountered', async () => {
+            // WEIGHTED_NODE_WEIGHTS: COMBAT 55, EVENT 25, REST 5, CHOICE 15
+            // (total 100) — roll=0.82*100=82 would unfiltered land in REST's
+            // bucket [80,85). With REST excluded from the pool the total
+            // drops to 95 (COMBAT 55/EVENT 25/CHOICE 15), so the *same* roll
+            // (0.82) is instead scaled against 95 -> 0.82*95=77.9, landing in
+            // EVENT's bucket [55,80) — proving REST was actually skipped
+            // rather than just re-rolled.
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 1, lastRestStep: 0, stageCombatEncountered: false,
+            }));
+            rngNextMock.mockResolvedValue(0.82);
+            selectEventMock.mockResolvedValue({
+                id: 'medbay_leak', type: 'HEAL', description: 'flavor text', choices: undefined,
+            });
+
+            const service = new AdventureRunService();
+            await service.advance('account-1', 'char-1');
+
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({ currentNodeType: NodeType.EVENT }));
+        });
+
+        it('flips stageCombatEncountered on when a combat-tier node is decided', async () => {
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 1, lastRestStep: 0, stageCombatEncountered: false,
+            }));
+            rngNextMock.mockResolvedValue(0); // lowest roll -> COMBAT bucket
+
+            const service = new AdventureRunService();
+            await service.advance('account-1', 'char-1');
+
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+                currentNodeType: NodeType.COMBAT,
+                stageCombatEncountered: true,
+            }));
+        });
+
+        it('unlocks the guaranteed Rest rule once combat has already been encountered', async () => {
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 5, lastRestStep: 0, stageCombatEncountered: true,
+            }));
+
+            const service = new AdventureRunService();
+            const result = await service.advance('account-1', 'char-1');
+
+            expect(result.run.currentNodeType).toBe(NodeType.REST);
+        });
     });
 
     // todo #7 (known-issue.md): non-combat node types (EVENT/REST/CHOICE)

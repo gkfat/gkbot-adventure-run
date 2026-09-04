@@ -43,6 +43,11 @@ function withStageDefaults(run: AdventureRun): AdventureRun {
         chapterIndex: run.chapterIndex ?? 0,
         stageNodeIndex: run.stageNodeIndex ?? 0,
         stageNodeCount: run.stageNodeCount ?? STAGE_NODE_COUNT_FALLBACK,
+        // require-combat-before-rest: pre-migration run docs never fought
+        // yet from the state machine's perspective — safe default, since a
+        // run already past its first combat will flip this on its very next
+        // decideNextNode call regardless.
+        stageCombatEncountered: run.stageCombatEncountered ?? false,
         expEarned: run.expEarned ?? 0,
         // enemy-factions-and-severity Migration Plan: missing on pre-migration
         // run docs — tolerate as PARTIAL_ACTIVE/GKBOT (equivalent to the
@@ -111,6 +116,7 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
                 chapterIndex: params.chapterIndex,
                 stageNodeIndex: 0,
                 stageNodeCount,
+                stageCombatEncountered: false,
 
                 severityTier,
                 factionType,

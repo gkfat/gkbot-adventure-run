@@ -350,7 +350,15 @@ export type AdventureRun = {
   // the streak survives across a node's resolution.
   lastNodeType?: NodeType;
   nodeTypeStreak?: number;
-  
+
+  // require-combat-before-rest: whether the run has encountered at least one
+  // combat-tier node (COMBAT/ELITE/STRONG_ELITE/BOSS) yet. REST is excluded
+  // from node generation (both the guaranteed-rest cadence and the weighted
+  // pool) until this flips true, so a run can never open on Rest before the
+  // player has fought anything. Set once, never reset (single-stage-run-
+  // settlement: one Stage = one run, so there's no "next stage" to reset it).
+  stageCombatEncountered?: boolean;
+
   // Player state
   playerHp: number;
   playerHpMax: number;
