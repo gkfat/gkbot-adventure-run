@@ -22,7 +22,7 @@
 - **THEN** 系統在讀取時自動補上 `accountId` 欄位與 `archetypeId: "legacy"`，並將其併入 `characters` 清單回傳，不影響其既有 level/exp/gold/gems/attributes/nickname/equipment 資料
 
 ### Requirement: 依範本建立新角色
-系統 SHALL 提供 `POST /api/character`，允許玩家指定一個 `archetypeId`（5 種可選範本之一：`fighter`/`adventurer`/`scholar`/`tinkerer`/`gambler`）建立一個新角色，新角色套用該範本的初始屬性分配（STR/AGI/CON/LUCK 加總固定為 8），且與帳號名下其他角色相互獨立（各自的 level/exp/gold/gems/nickname/equipment/unspentAttributePoints）。
+系統 SHALL 提供 `POST /api/character`，允許玩家指定一個 `archetypeId`（5 種可選範本之一：`fighter`/`adventurer`/`scholar`/`tinkerer`/`gambler`）建立一個新角色，新角色套用該範本的初始屬性分配（STR/AGI/CON/LUCK 加總固定為 10），且與帳號名下其他角色相互獨立（各自的 level/exp/gold/gems/nickname/equipment/unspentAttributePoints）。
 
 #### Scenario: 成功建立角色
 - **WHEN** 帳號目前有 0~2 筆角色，送出合法的可選 `archetypeId`

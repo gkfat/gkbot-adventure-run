@@ -19,12 +19,12 @@ describe('SELECTABLE_CHARACTER_ARCHETYPES', () => {
         );
     });
 
-    it('every selectable archetype has attributes summing to 8, each dimension >= 1', () => {
+    it('every selectable archetype has attributes summing to 10, each dimension >= 1', () => {
         for (const archetype of SELECTABLE_CHARACTER_ARCHETYPES) {
             const {
                 STR, AGI, CON, LUCK,
             } = archetype.attributes;
-            expect(STR + AGI + CON + LUCK).toBe(8);
+            expect(STR + AGI + CON + LUCK).toBe(10);
             expect(STR).toBeGreaterThanOrEqual(1);
             expect(AGI).toBeGreaterThanOrEqual(1);
             expect(CON).toBeGreaterThanOrEqual(1);

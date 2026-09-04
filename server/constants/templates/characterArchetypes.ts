@@ -1,6 +1,6 @@
 /**
  * Character archetypes (classes) players can pick from when creating a new character.
- * Attribute totals are fixed at 8 across all archetypes so they stay comparable.
+ * Attribute totals are fixed at 10 across all archetypes so they stay comparable.
  */
 
 import type { Attributes } from '../../../shared/types/common';
@@ -19,7 +19,7 @@ export const CHARACTER_ARCHETYPES: readonly CharacterArchetype[] = [
         archetypeId: 'fighter',
         className: '戰士',
         attributes: {
-            STR: 3, AGI: 1, CON: 3, LUCK: 1,
+            STR: 4, AGI: 1, CON: 4, LUCK: 1,
         },
         spriteUrl: '/images/archetypes/fighter.png',
         isSelectable: true,
@@ -28,7 +28,7 @@ export const CHARACTER_ARCHETYPES: readonly CharacterArchetype[] = [
         archetypeId: 'adventurer',
         className: '冒險家',
         attributes: {
-            STR: 1, AGI: 3, CON: 2, LUCK: 2,
+            STR: 1, AGI: 5, CON: 2, LUCK: 2,
         },
         spriteUrl: '/images/archetypes/adventurer.png',
         isSelectable: true,
@@ -37,7 +37,7 @@ export const CHARACTER_ARCHETYPES: readonly CharacterArchetype[] = [
         archetypeId: 'scholar',
         className: '學者',
         attributes: {
-            STR: 4, AGI: 1, CON: 1, LUCK: 2,
+            STR: 5, AGI: 1, CON: 1, LUCK: 3,
         },
         spriteUrl: '/images/archetypes/scholar.png',
         isSelectable: true,
@@ -46,7 +46,7 @@ export const CHARACTER_ARCHETYPES: readonly CharacterArchetype[] = [
         archetypeId: 'tinkerer',
         className: '工匠',
         attributes: {
-            STR: 1, AGI: 2, CON: 3, LUCK: 2,
+            STR: 1, AGI: 3, CON: 4, LUCK: 2,
         },
         spriteUrl: '/images/archetypes/tinkerer.png',
         isSelectable: true,
@@ -55,7 +55,7 @@ export const CHARACTER_ARCHETYPES: readonly CharacterArchetype[] = [
         archetypeId: 'gambler',
         className: '投機者',
         attributes: {
-            STR: 1, AGI: 2, CON: 1, LUCK: 4,
+            STR: 1, AGI: 3, CON: 1, LUCK: 5,
         },
         spriteUrl: '/images/archetypes/gambler.png',
         isSelectable: true,

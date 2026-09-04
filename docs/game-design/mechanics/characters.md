@@ -64,19 +64,24 @@ type CharacterArchetype = {
 
 新建角色時自動獲得（`shared/constants/starterLoadout.ts` + `CharacterService.grantStarterLoadout`）：
 
-- **1 件 N 稀有度裝備**，依職業主題化並**直接裝備**到對應欄位：
+- **2 件 N 稀有度裝備**，依職業主題化並**直接裝備**到各自對應欄位：
 
   | archetypeId | templateId | 裝備部位 | 主題 |
   |---|---|---|---|
   | `fighter` | `riot_shield_scrap` | 左手 | 重型武器 |
+  | `fighter` | `supply_crate_vest` | 身體 | 重型防具 |
   | `adventurer` | `scrap_daggers` | 右手 | 輕型武器 |
+  | `adventurer` | `servo_greaves` | 鞋類 | 輕型鞋類 |
   | `scholar` | `gkbot_faceplate` | 頭部 | 中等防具 |
+  | `scholar` | `maintenance_terminal_gloves` | 左手 | 輕型副手 |
   | `tinkerer` | `salvaged_wrench` | 右手 | 中等武器 |
+  | `tinkerer` | `hydraulic_arm_guard` | 左手 | 中等副手 |
   | `gambler` | `research_chip_ring` | 戒指 | 加攻速飾品 |
+  | `gambler` | `tech_goggles` | 頭部 | 輕型頭部裝備 |
 
-  未收錄於對照表的新職業，退回 `DEFAULT_STARTER_EQUIPMENT_TEMPLATE_ID = 'salvaged_wrench'`。
+  未收錄於對照表的新職業，退回 `DEFAULT_STARTER_EQUIPMENT_TEMPLATE_IDS = ['salvaged_wrench', 'hydraulic_arm_guard']`。
 - **1 瓶 N 稀有度藥水**（`engine_oil_basic` 機油，回復 15~20% 生命值），所有職業共用，放入永久背包（不自動使用）。
-- 兩者皆以 `ItemSource.STARTER, maxRarity: Rarity.N` 的生成脈絡呼叫 `InventoryService.grantItem`，裝備件再額外呼叫 `EquipmentService.equipItem` 裝備上去。
+- 三者皆以 `ItemSource.STARTER, maxRarity: Rarity.N` 的生成脈絡呼叫 `InventoryService.grantItem`，兩件裝備再各自額外呼叫 `EquipmentService.equipItem` 裝備上去。
 - `getStarterLoadoutPreview(archetypeId)` 提供**建立角色前**的唯讀預覽（供 `archetypeGallery.vue` 使用），文案/數值手動對照 `server/constants/templates.ts` 的 N 級文案——兩處需手動同步，程式碼註解已提醒此耦合。
 
 ## 6. 查詢、屬性分配、改名

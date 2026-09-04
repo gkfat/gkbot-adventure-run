@@ -16,7 +16,7 @@ import {
     SELECTABLE_CHARACTER_ARCHETYPES, getArchetypeById,
 } from '../constants/templates/characterArchetypes';
 import {
-    getStarterEquipmentTemplateId, STARTER_POTION_TEMPLATE_ID,
+    getStarterEquipmentTemplateIds, STARTER_POTION_TEMPLATE_ID,
 } from '../../shared/constants/starterLoadout';
 import type {
     Character, CharacterWithStats, CharacterSummary, AllocateAttributesInput,
@@ -98,19 +98,21 @@ export class CharacterService extends BaseService {
 
     /**
      * Grant a newly created character its starter loadout (character-starter-loadout,
-     * weapon/armor-by-class): one N-rarity equipment piece themed to the
-     * archetype (see getStarterEquipmentTemplateId), equipped straight into
-     * its slot, and one N-rarity potion left in the permanent inventory.
+     * weapon/armor-by-class): two N-rarity equipment pieces themed to the
+     * archetype (see getStarterEquipmentTemplateIds), each equipped straight
+     * into its own slot, and one N-rarity potion left in the permanent inventory.
      */
     private async grantStarterLoadout(accountId: string, characterId: string, archetypeId: string): Promise<void> {
         const context: ItemGenerationContext = {
             source: ItemSource.STARTER, maxRarity: Rarity.N,
         };
 
-        const equipmentTemplateId = getStarterEquipmentTemplateId(archetypeId);
-        const equipment = await this.inventoryService.grantItem(characterId, equipmentTemplateId, context);
+        const equipmentTemplateIds = getStarterEquipmentTemplateIds(archetypeId);
+        for (const equipmentTemplateId of equipmentTemplateIds) {
+            const equipment = await this.inventoryService.grantItem(characterId, equipmentTemplateId, context);
+            await this.equipmentService.equipItem(accountId, characterId, equipment.itemId);
+        }
         await this.inventoryService.grantItem(characterId, STARTER_POTION_TEMPLATE_ID, context);
-        await this.equipmentService.equipItem(accountId, characterId, equipment.itemId);
     }
 
     /**

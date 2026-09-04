@@ -110,14 +110,14 @@ describe('CharacterService.createCharacterFromArchetype', () => {
         expect(createCharacterFromArchetypeMock).not.toHaveBeenCalled();
     });
 
-    it('grants a starter weapon (equipped) and a starter potion to a newly created character', async () => {
+    it('grants 2 starter equipment pieces (each equipped) and a starter potion to a newly created character', async () => {
         const character = {
             characterId: 'char-1',
             accountId: 'account-1',
             archetypeId: 'fighter',
             className: '戰士',
             attributes: {
-                STR: 3, AGI: 1, CON: 3, LUCK: 1,
+                STR: 4, AGI: 1, CON: 4, LUCK: 1,
             },
             equipment: {},
         };
@@ -125,24 +125,29 @@ describe('CharacterService.createCharacterFromArchetype', () => {
         listByAccountIdMock.mockResolvedValue([]);
         createCharacterFromArchetypeMock.mockResolvedValue(character);
         getByIdForAccountMock.mockResolvedValue(character);
-        grantItemMock.mockResolvedValue({ itemId: 'item-weapon-1' });
+        grantItemMock
+            .mockResolvedValueOnce({ itemId: 'item-weapon-1' })
+            .mockResolvedValueOnce({ itemId: 'item-armor-1' })
+            .mockResolvedValueOnce({ itemId: 'item-potion-1' });
 
         const service = new CharacterService();
         await service.createCharacterFromArchetype('account-1', 'fighter');
 
-        expect(grantItemMock).toHaveBeenCalledTimes(2);
+        expect(grantItemMock).toHaveBeenCalledTimes(3);
         expect(grantItemMock.mock.calls[0]?.[0]).toBe('char-1');
+        expect(equipItemMock).toHaveBeenCalledTimes(2);
         expect(equipItemMock).toHaveBeenCalledWith('account-1', 'char-1', 'item-weapon-1');
+        expect(equipItemMock).toHaveBeenCalledWith('account-1', 'char-1', 'item-armor-1');
         expect(getByIdForAccountMock).toHaveBeenCalledWith('char-1', 'account-1');
     });
 
     it.each([
-        ['fighter', 'riot_shield_scrap'],
-        ['adventurer', 'scrap_daggers'],
-        ['scholar', 'gkbot_faceplate'],
-        ['tinkerer', 'salvaged_wrench'],
-        ['gambler', 'research_chip_ring'],
-    ])('grants the %s-themed starter equipment for archetype %s', async (archetypeId, expectedTemplateId) => {
+        ['fighter', ['riot_shield_scrap', 'supply_crate_vest']],
+        ['adventurer', ['scrap_daggers', 'servo_greaves']],
+        ['scholar', ['gkbot_faceplate', 'maintenance_terminal_gloves']],
+        ['tinkerer', ['salvaged_wrench', 'hydraulic_arm_guard']],
+        ['gambler', ['research_chip_ring', 'tech_goggles']],
+    ])('grants the %s-themed starter equipment for archetype %s', async (archetypeId, expectedTemplateIds) => {
         const character = {
             characterId: 'char-1',
             accountId: 'account-1',
@@ -164,18 +169,27 @@ describe('CharacterService.createCharacterFromArchetype', () => {
         expect(grantItemMock.mock.calls[0]).toEqual(
             [
                 'char-1',
-                expectedTemplateId,
+                expectedTemplateIds[0],
                 {
-                    source: 'STARTER', maxRarity: 'N', 
+                    source: 'STARTER', maxRarity: 'N',
                 },
             ],
         );
         expect(grantItemMock.mock.calls[1]).toEqual(
             [
                 'char-1',
+                expectedTemplateIds[1],
+                {
+                    source: 'STARTER', maxRarity: 'N',
+                },
+            ],
+        );
+        expect(grantItemMock.mock.calls[2]).toEqual(
+            [
+                'char-1',
                 'engine_oil_basic',
                 {
-                    source: 'STARTER', maxRarity: 'N', 
+                    source: 'STARTER', maxRarity: 'N',
                 },
             ],
         );
