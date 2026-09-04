@@ -1,8 +1,8 @@
 import { BREATH_FRAME_COUNT } from '../utils/spriteDisplay';
 
-const FRAME_DURATION_MS = 350;
-const PEAK_HOLD_MS = 1200;
-const RESTED_HOLD_MS = 1500;
+const FRAME_DURATION_MS = 200;
+const PEAK_HOLD_MS = 500;
+const RESTED_HOLD_MS = 500;
 
 /**
  * How long each step in the shared breath sequence (rest, L1, L2, L1) is held
