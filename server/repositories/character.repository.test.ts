@@ -42,6 +42,8 @@ function baseCharacter(overrides: Partial<Character> = {}): Character {
             STR: 1, AGI: 1, CON: 1, LUCK: 1,
         },
         unspentAttributePoints: 0,
+        talentPoints: 0,
+        talents: {},
         equipment: {},
         nextChapterIndex: 0,
         currentLevelIndex: 0,
@@ -158,6 +160,45 @@ describe('CharacterRepository.settleRunRewards — chapter/level advance (chapte
         expect(result.leveledUp).toBe(true);
         expect(result.character.level).toBe(2);
         expect(result.unspentAttributePointsGained).toBe(1);
+    });
+
+    it('grants 1 talentPoint per level up alongside unspentAttributePoints', async () => {
+        txGetMock.mockResolvedValue({
+            exists: true, data: () => baseCharacter({
+                level: 1, exp: 0, talentPoints: 0,
+            }),
+        });
+
+        const repo = new CharacterRepository();
+        // EXP_TABLE[1] = 359 — grant enough to clear one level.
+        const result = await repo.settleRunRewards('char-1', {
+            goldEarned: 0, gemsEarned: 0, expGained: 400, endReason: AdventureEndReason.COMPLETED,
+        });
+
+        expect(result.character.level).toBe(2);
+        expect(result.unspentAttributePointsGained).toBe(1);
+        expect(result.character.talentPoints).toBe(1);
+        expect(txUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'char-1' }), expect.objectContaining({
+            unspentAttributePoints: 1, talentPoints: 1,
+        }));
+    });
+
+    it('grants talentPoints for every level gained in a single settlement (level 5 -> 8)', async () => {
+        txGetMock.mockResolvedValue({
+            exists: true, data: () => baseCharacter({
+                level: 5, exp: 0, talentPoints: 0, unspentAttributePoints: 0,
+            }),
+        });
+
+        const repo = new CharacterRepository();
+        // EXP_TABLE[5]+[6]+[7] = 1702+2080+2470 = 6252 — enough to clear 3 levels.
+        const result = await repo.settleRunRewards('char-1', {
+            goldEarned: 0, gemsEarned: 0, expGained: 6252, endReason: AdventureEndReason.COMPLETED,
+        });
+
+        expect(result.character.level).toBe(8);
+        expect(result.unspentAttributePointsGained).toBe(3);
+        expect(result.character.talentPoints).toBe(3);
     });
 
     it('treats a missing nextChapterIndex on a legacy character document as 0', async () => {

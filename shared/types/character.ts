@@ -1,6 +1,41 @@
 import type {
-    Timestamp, Attributes, EquipmentSlot, 
+    Timestamp, Attributes, EquipmentSlot, Stats,
 } from './common';
+
+/**
+ * A single stat contribution of a talent node, applied `perRank` times the
+ * node's current rank (see TalentNode.maxRank). `actionIntervalSec` uses a
+ * negative value to mean "faster", matching applyEquipmentStats's convention.
+ */
+export type TalentEffect = {
+  stat: 'ATK' | 'DEF' | 'HP_MAX' | 'actionIntervalSec' | 'critChance' | 'dodgeChance' | 'carryCapacity';
+  perRank: number;
+};
+
+/**
+ * One node in a TalentTree. `nodeId` is globally unique (format
+ * `{archetypeId}_t{tier}{branchLetter?}`). Nodes sharing a `tier` +
+ * `branchGroup` are mutually exclusive — investing in one permanently locks
+ * the other at rank 0 (character-talents: 岔路互斥).
+ */
+export type TalentNode = {
+  nodeId: string;
+  archetypeId: string;
+  tier: number;
+  branchGroup?: string;
+  name: string;
+  description: string;
+  maxRank: 3;
+  effect: readonly TalentEffect[];
+};
+
+/**
+ * Static, per-archetype talent tree definition (server/constants/templates/talentTrees.ts).
+ */
+export type TalentTree = {
+  archetypeId: string;
+  nodes: readonly TalentNode[];
+};
 
 /**
  * Character document stored in Firestore
@@ -24,6 +59,12 @@ export type Character = {
   // Attributes (permanent growth)
   attributes: Attributes;
   unspentAttributePoints: number; // Gained 3 per level up
+
+  // Talents (permanent growth, character-talents): per-archetype talent tree,
+  // gained 1 talentPoint per level up, spent 1 at a time via
+  // POST /api/character/:characterId/talents.
+  talentPoints: number;
+  talents: Record<string, number>; // nodeId -> current rank (0/missing = not invested)
 
   // Equipment (slot -> itemId mapping)
   equipment: Partial<Record<EquipmentSlot, string>>;
@@ -53,10 +94,16 @@ export type Character = {
  * Character with computed stats (returned by API)
  */
 export type CharacterWithStats = Character & {
-  stats: import('./common').Stats;
+  stats: Stats;
   // The portion of `stats` contributed by currently equipped items — same
   // keys as Stats, present only for keys equipment actually affects.
-  equipmentBonus: Partial<import('./common').Stats>;
+  equipmentBonus: Partial<Stats>;
+  // The portion of `stats` contributed by invested talent nodes — same
+  // shape as equipmentBonus, present only for keys with a non-zero total.
+  talentBonus: Partial<Stats>;
+  // This character's archetype's full talent tree definition, for the
+  // frontend talent tree UI (see character-talents design decision 1).
+  talentTree: TalentTree;
   spriteUrl: string;
 };
 

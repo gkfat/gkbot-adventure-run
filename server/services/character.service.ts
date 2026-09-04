@@ -4,7 +4,7 @@ import {
 } from '../repositories/character.repository';
 import { ItemRepository } from '../repositories/item.repository';
 import {
-    calculateBaseStats, applyEquipmentStats,
+    calculateBaseStats, applyEquipmentStats, applyTalentStats,
 } from '../constants/stats';
 import { sumEquipmentStats } from './item.service';
 import { InventoryService } from './inventory.service';
@@ -15,16 +15,19 @@ import { AdventureRunRepository } from '../repositories/adventure-run.repository
 import {
     SELECTABLE_CHARACTER_ARCHETYPES, getArchetypeById,
 } from '../constants/templates/characterArchetypes';
+import { getTalentTreeByArchetypeId } from '../constants/templates/talentTrees';
 import {
     getStarterEquipmentTemplateIds, STARTER_POTION_TEMPLATE_ID,
 } from '../../shared/constants/starterLoadout';
 import type {
-    Character, CharacterWithStats, CharacterSummary, AllocateAttributesInput,
+    Character, CharacterWithStats, CharacterSummary, AllocateAttributesInput, TalentTree,
 } from '../../shared/types/character';
 import {
     ItemSource, type ItemGenerationContext,
 } from '../../shared/types/item';
-import { Rarity } from '../../shared/types/common';
+import {
+    Rarity, type Stats,
+} from '../../shared/types/common';
 import {
     BusinessLogicError, NotFoundError,
 } from '../../shared/types/errors';
@@ -157,6 +160,62 @@ export class CharacterService extends BaseService {
     }
 
     /**
+     * Invest 1 talent point into a node on a character owned by the caller
+     * (character-talents). Validation order follows design.md decision 3:
+     * node exists -> talentPoints available -> node not already maxRank ->
+     * previous tier has a maxRank node (tier 1 always open) -> the opposing
+     * branch (if any) hasn't been invested in.
+     */
+    async allocateTalentPoint(accountId: string, characterId: string, nodeId: string): Promise<Character> {
+        const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
+        if (!character) {
+            throw new NotFoundError('character');
+        }
+
+        const tree = getTalentTreeByArchetypeId(character.archetypeId);
+        const node = tree?.nodes.find(n => n.nodeId === nodeId);
+        if (!tree || !node) {
+            throw new BusinessLogicError('Unknown talent node');
+        }
+
+        if (character.talentPoints < 1) {
+            throw new BusinessLogicError('Not enough talentPoints');
+        }
+
+        const currentRank = character.talents[nodeId] ?? 0;
+        if (currentRank >= node.maxRank) {
+            throw new BusinessLogicError('Talent node is already at maxRank');
+        }
+
+        if (node.tier > 1) {
+            const previousTierNodes = tree.nodes.filter(n => n.tier === node.tier - 1);
+            const previousTierOpened = previousTierNodes.some(n => (character.talents[n.nodeId] ?? 0) >= n.maxRank);
+            if (!previousTierOpened) {
+                throw new BusinessLogicError('Previous talent tier is not fully invested yet');
+            }
+        }
+
+        if (node.branchGroup) {
+            const opposingBranchNode = tree.nodes.find(
+                n => n.tier === node.tier && n.branchGroup === node.branchGroup && n.nodeId !== node.nodeId,
+            );
+            if (opposingBranchNode && (character.talents[opposingBranchNode.nodeId] ?? 0) > 0) {
+                throw new BusinessLogicError('Opposing talent branch is already locked in');
+            }
+        }
+
+        const talents = {
+            ...character.talents, [nodeId]: currentRank + 1,
+        };
+        const talentPoints = character.talentPoints - 1;
+
+        return this.characterRepo.updateTalents(characterId, {
+            talents,
+            talentPoints,
+        });
+    }
+
+    /**
      * Set (or overwrite) the display name of a character owned by the caller
      */
     async setNickname(accountId: string, characterId: string, nickname: string): Promise<Character> {
@@ -193,13 +252,24 @@ export class CharacterService extends BaseService {
     private async withStats(character: Character): Promise<CharacterWithStats> {
         const baseStats = calculateBaseStats(character.attributes);
         const equipmentBonus = await this.getEquipmentBonus(character);
-        const stats = applyEquipmentStats(baseStats, equipmentBonus);
+        const afterEquipment = applyEquipmentStats(baseStats, equipmentBonus);
+        // Legacy (pre-roster) characters have no talent tree — treat as empty.
+        const talentTree: TalentTree = getTalentTreeByArchetypeId(character.archetypeId)
+            ?? {
+                archetypeId: character.archetypeId, nodes: [], 
+            };
+        const talentBonus = this.getTalentBonus(character, talentTree);
+        const stats = applyTalentStats(afterEquipment, talentBonus);
 
-        // Only report keys equipment actually contributes to — sumEquipmentStats
-        // always fills in all four keys (0 for unaffected ones), which would
-        // otherwise show up as a misleading "+0" in the UI.
+        // Only report keys equipment/talents actually contribute to —
+        // sumEquipmentStats/getTalentBonus always fill in every key they touch
+        // (0 for uninvested ones), which would otherwise show up as a
+        // misleading "+0" in the UI.
         const nonZeroBonus = Object.fromEntries(
             Object.entries(equipmentBonus).filter(([, value]) => value),
+        );
+        const nonZeroTalentBonus = Object.fromEntries(
+            Object.entries(talentBonus).filter(([, value]) => value),
         );
 
         return {
@@ -210,7 +280,29 @@ export class CharacterService extends BaseService {
                 HP_CURRENT: stats.HP_MAX,
             },
             equipmentBonus: nonZeroBonus,
+            talentBonus: nonZeroTalentBonus,
+            talentTree,
         };
+    }
+
+    /**
+     * Sum the stat effects of every invested talent node (rank > 0) on the
+     * character's archetype tree (character-talents) — the talent-tree
+     * equivalent of sumEquipmentStats.
+     */
+    private getTalentBonus(character: Character, talentTree: TalentTree): Partial<Stats> {
+        const bonus: Partial<Stats> = {};
+
+        for (const node of talentTree.nodes) {
+            const rank = character.talents[node.nodeId] ?? 0;
+            if (rank <= 0) continue;
+
+            for (const effect of node.effect) {
+                bonus[effect.stat] = (bonus[effect.stat] ?? 0) + effect.perRank * rank;
+            }
+        }
+
+        return bonus;
     }
 
     /**

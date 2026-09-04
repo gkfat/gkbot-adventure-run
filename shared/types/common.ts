@@ -70,9 +70,11 @@ export type Stats = {
   critChance: number;      // Critical hit chance (0.0 - 1.0)
   critMultiplier: number;  // Critical damage multiplier
   dodgeChance: number;     // Dodge chance (0.0 - 1.0)
-  carryCapacity: number;   // STR+CON — how much a HEAVY item's actionSpeedMod/
-                            // dodgeChanceMod penalty gets discounted; not
-                            // affected by equipment itself
+  carryCapacity: number;   // STR+CON+talentBonus.carryCapacity — how much a HEAVY
+                            // item's actionSpeedMod/dodgeChanceMod penalty gets
+                            // discounted; not affected by equipment itself, but
+                            // IS affected by talents (permanent growth, same
+                            // bucket as attributes — see character-talents)
 };
 
 /**

@@ -28,6 +28,48 @@ const equipmentBonusSchema = z.object({
     dodgeChance: z.number().optional(),
 });
 
+// Only the keys invested talent nodes actually contributed to are present.
+const talentBonusSchema = z.object({
+    ATK: z.number().optional(),
+    DEF: z.number().optional(),
+    HP_MAX: z.number().optional(),
+    actionIntervalSec: z.number().optional(),
+    critChance: z.number().optional(),
+    dodgeChance: z.number().optional(),
+    carryCapacity: z.number().optional(),
+});
+
+const talentEffectSchema = z.object({
+    stat: z.enum([
+        'ATK',
+        'DEF',
+        'HP_MAX',
+        'actionIntervalSec',
+        'critChance',
+        'dodgeChance',
+        'carryCapacity',
+    ]),
+    perRank: z.number(),
+});
+
+const talentNodeSchema = z.object({
+    nodeId: z.string(),
+    archetypeId: z.string(),
+    tier: z.number(),
+    branchGroup: z.string().optional(),
+    name: z.string(),
+    description: z.string(),
+    maxRank: z.literal(3),
+    effect: z.array(talentEffectSchema),
+});
+
+const talentTreeSchema = z.object({
+    archetypeId: z.string(),
+    nodes: z.array(talentNodeSchema),
+});
+
+const talentsSchema = z.record(z.string(), z.number());
+
 const archetypeSchema = z.object({
     archetypeId: z.string(),
     className: z.string(),
@@ -78,11 +120,15 @@ export const getCharacterResponseSchema = z.object({
         gems: z.number(),
         attributes: attributesSchema,
         unspentAttributePoints: z.number(),
+        talentPoints: z.number(),
+        talents: talentsSchema,
+        talentTree: talentTreeSchema,
         equipment: equipmentSchema,
         nickname: z.string(),
         spriteUrl: z.string(),
         stats: statsSchema,
         equipmentBonus: equipmentBonusSchema,
+        talentBonus: talentBonusSchema,
         nextChapterIndex: z.number(),
         currentLevelIndex: z.number(),
         chapterTotalLevels: z.number(),
@@ -116,6 +162,19 @@ export const allocateAttributesResponseSchema = z.object({
 });
 
 /**
+ * POST /api/character/:characterId/talents
+ */
+export const allocateTalentRequestSchema = z.object({ nodeId: z.string().min(1) }).strict();
+
+export const allocateTalentResponseSchema = z.object({
+    success: z.boolean(),
+    data: z.object({
+        talents: talentsSchema,
+        talentPoints: z.number(),
+    }),
+});
+
+/**
  * POST /api/character/:characterId/nickname
  */
 export const setNicknameRequestSchema = z.object({ nickname: z.string().min(1).max(20) }).strict();
@@ -138,6 +197,8 @@ export type CreateCharacterRequest = z.infer<typeof createCharacterRequestSchema
 export type GetCharacterResponse = z.infer<typeof getCharacterResponseSchema>;
 export type AllocateAttributesRequest = z.infer<typeof allocateAttributesRequestSchema>;
 export type AllocateAttributesResponse = z.infer<typeof allocateAttributesResponseSchema>;
+export type AllocateTalentRequest = z.infer<typeof allocateTalentRequestSchema>;
+export type AllocateTalentResponse = z.infer<typeof allocateTalentResponseSchema>;
 export type SetNicknameRequest = z.infer<typeof setNicknameRequestSchema>;
 export type SetNicknameResponse = z.infer<typeof setNicknameResponseSchema>;
 export type DeleteCharacterResponse = z.infer<typeof deleteCharacterResponseSchema>;

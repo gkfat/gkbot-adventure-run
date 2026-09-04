@@ -7,7 +7,7 @@ import { CharacterService } from './character.service';
 const {
     listByAccountIdMock, createCharacterFromArchetypeMock, getByIdForAccountMock, characterDeleteMock,
     grantItemMock, equipItemMock,
-    inventoryDeleteMock, deleteAllByCharacterIdMock, deleteShopsForCharacterMock,
+    inventoryDeleteMock, deleteAllByCharacterIdMock, deleteShopsForCharacterMock, updateTalentsMock,
 } = vi.hoisted(() => ({
     listByAccountIdMock: vi.fn(),
     createCharacterFromArchetypeMock: vi.fn(),
@@ -18,6 +18,7 @@ const {
     inventoryDeleteMock: vi.fn(),
     deleteAllByCharacterIdMock: vi.fn(),
     deleteShopsForCharacterMock: vi.fn(),
+    updateTalentsMock: vi.fn(),
 }));
 
 vi.mock('../repositories/character.repository', () => ({
@@ -27,6 +28,7 @@ vi.mock('../repositories/character.repository', () => ({
             createCharacterFromArchetype: createCharacterFromArchetypeMock,
             getByIdForAccount: getByIdForAccountMock,
             delete: characterDeleteMock,
+            updateTalents: updateTalentsMock,
         };
     }),
     CHARACTER_ROSTER_MAX: 3,
@@ -119,6 +121,8 @@ describe('CharacterService.createCharacterFromArchetype', () => {
             attributes: {
                 STR: 4, AGI: 1, CON: 4, LUCK: 1,
             },
+            talentPoints: 0,
+            talents: {},
             equipment: {},
         };
 
@@ -155,6 +159,8 @@ describe('CharacterService.createCharacterFromArchetype', () => {
             attributes: {
                 STR: 1, AGI: 1, CON: 1, LUCK: 1,
             },
+            talentPoints: 0,
+            talents: {},
             equipment: {},
         };
 

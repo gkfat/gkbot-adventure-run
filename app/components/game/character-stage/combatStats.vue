@@ -37,19 +37,32 @@
 
 <script setup lang="ts">
 import type { Attributes, Stats } from '../../../../shared/types/common';
-import { calculateBaseStats, applyEquipmentStats } from '../../../../shared/utils/calculateStats';
+import { calculateBaseStats, applyEquipmentStats, applyTalentStats } from '../../../../shared/utils/calculateStats';
 
 const props = defineProps<{
     attributes: Attributes;
     stats: Stats;
     equipmentBonus: Partial<Stats>;
+    talentBonus: Partial<Stats>;
     pendingAllocation: Partial<Attributes>;
     totalPending: number;
 }>();
 
+// 裝備與天賦都是已經反映在 `stats` 裡的加成來源,顯示時合併成單一括號差值
+// (例如 "(+3)" 可能是裝備+2、天賦+1 的總和),不特別區分來源。
+const totalBonus = (stat: keyof Stats): number | undefined => {
+    const fromEquipment = props.equipmentBonus[stat] ?? 0;
+    const fromTalent = props.talentBonus[stat] ?? 0;
+    const total = fromEquipment + fromTalent;
+    return total || undefined;
+};
+
 // 分配過程中的即時狀態值預覽：以暫定屬性（現有值 + 待分配點數）套用純前端的
-// calculateBaseStats/applyEquipmentStats（與後端同一份公式，見 shared/utils/calculateStats），
-// 疊上目前裝備加成後與伺服端目前的 stats 比較差值，顯示在下方戰鬥數值旁。
+// calculateBaseStats/applyEquipmentStats/applyTalentStats（與後端同一份公式，見
+// shared/utils/calculateStats），疊上目前裝備＋天賦加成後與伺服端目前的 stats
+// 比較差值，顯示在下方戰鬥數值旁。天賦加成不會因為分配屬性點而改變，但仍要疊
+// 上去──否則拿掉裝備/天賦後的 preview 會比已經含裝備/天賦加成的 `stats` 低，
+// 明明只加點卻算出負的 pendingDelta（見使用者回報）。
 const previewStats = computed(() => {
     if (props.totalPending === 0) return null;
     const previewAttributes = {
@@ -59,7 +72,8 @@ const previewStats = computed(() => {
         LUCK: props.attributes.LUCK + (props.pendingAllocation.LUCK ?? 0),
     };
     const base = calculateBaseStats(previewAttributes);
-    return applyEquipmentStats(base, props.equipmentBonus);
+    const afterEquipment = applyEquipmentStats(base, props.equipmentBonus);
+    return applyTalentStats(afterEquipment, props.talentBonus);
 });
 
 type StatFormat = 'int' | 'seconds';
@@ -113,40 +127,38 @@ const withEquipmentBonusPercent = (finalValue: number, bonus: number | undefined
 };
 
 const statEntries = computed(() => {
-    const { stats, equipmentBonus } = props;
+    const { stats } = props;
     const preview = previewStats.value;
 
     return [
         {
             label: '生命值',
-            ...withEquipmentBonus(stats.HP_MAX, equipmentBonus.HP_MAX, 'int'),
+            ...withEquipmentBonus(stats.HP_MAX, totalBonus('HP_MAX'), 'int'),
             pendingDelta: pendingDeltaText(stats.HP_MAX, preview?.HP_MAX, 'int'),
         },
         {
             label: '攻擊力',
-            ...withEquipmentBonus(stats.ATK, equipmentBonus.ATK, 'int'),
+            ...withEquipmentBonus(stats.ATK, totalBonus('ATK'), 'int'),
             pendingDelta: pendingDeltaText(stats.ATK, preview?.ATK, 'int'),
         },
         {
             label: '防禦力',
-            ...withEquipmentBonus(stats.DEF, equipmentBonus.DEF, 'int'),
+            ...withEquipmentBonus(stats.DEF, totalBonus('DEF'), 'int'),
             pendingDelta: pendingDeltaText(stats.DEF, preview?.DEF, 'int'),
         },
         {
             label: '攻速',
-            ...withEquipmentBonus(stats.actionIntervalSec, equipmentBonus.actionIntervalSec, 'seconds'),
+            ...withEquipmentBonus(stats.actionIntervalSec, totalBonus('actionIntervalSec'), 'seconds'),
             pendingDelta: pendingDeltaText(stats.actionIntervalSec, preview?.actionIntervalSec, 'seconds'),
         },
         {
             label: '爆擊',
-            value: `${Math.round(stats.critChance * 100)}%`,
-            delta: '',
-            buffed: false,
+            ...withEquipmentBonusPercent(stats.critChance, totalBonus('critChance')),
             pendingDelta: pendingPercentDeltaText(stats.critChance, preview?.critChance),
         },
         {
             label: '閃避',
-            ...withEquipmentBonusPercent(stats.dodgeChance, equipmentBonus.dodgeChance),
+            ...withEquipmentBonusPercent(stats.dodgeChance, totalBonus('dodgeChance')),
             pendingDelta: pendingPercentDeltaText(stats.dodgeChance, preview?.dodgeChance),
         },
     ];

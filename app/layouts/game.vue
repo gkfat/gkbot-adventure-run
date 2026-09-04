@@ -1,9 +1,9 @@
 <template>
     <v-app
         full-height
-        :styles="{
-            height,
-            width
+        :style="{
+            height: `${height}px`,
+            width: `${width}px`
         }"
         class="bg-transparent overflow-hidden"
     >
@@ -52,6 +52,7 @@ const isAdventurePage = computed(() => route.path === '/adventure');
 
 .game-stage {
     position: relative;
+    min-height: 0;
     overflow: hidden;
 }
 </style>

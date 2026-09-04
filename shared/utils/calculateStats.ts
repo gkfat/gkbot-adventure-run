@@ -154,3 +154,42 @@ export function applyEquipmentStats(
         carryCapacity: baseStats.carryCapacity,
     };
 }
+
+/**
+ * Apply talent effect totals (character-talents) to stats — same shape and
+ * clamp behavior as applyEquipmentStats, applied after it in the pipeline
+ * (calculateBaseStats -> applyEquipmentStats -> applyTalentStats). Unlike
+ * equipment, talents ARE allowed to add to carryCapacity: talents are
+ * permanent growth (same bucket as attributes), not a swappable resource
+ * (see design.md decision 4).
+ */
+export function applyTalentStats(
+    stats: Omit<Stats, 'HP_CURRENT'>,
+    talentBonus: Partial<Stats>,
+): Omit<Stats, 'HP_CURRENT'> {
+    return {
+        ATK: stats.ATK + (talentBonus.ATK || 0),
+        DEF: stats.DEF + (talentBonus.DEF || 0),
+        HP_MAX: stats.HP_MAX + (talentBonus.HP_MAX || 0),
+        actionIntervalSec: Math.max(
+            STATS_CONFIG.ACTION_INTERVAL_MIN,
+            Math.min(
+                STATS_CONFIG.ACTION_INTERVAL_MAX,
+                stats.actionIntervalSec + (talentBonus.actionIntervalSec || 0),
+            ),
+        ),
+        critChance: Math.min(
+            COMBAT_CONFIG.CRIT_CAP,
+            stats.critChance + (talentBonus.critChance || 0),
+        ),
+        critMultiplier: stats.critMultiplier,
+        dodgeChance: Math.max(
+            0,
+            Math.min(
+                COMBAT_CONFIG.DODGE_CAP,
+                stats.dodgeChance + (talentBonus.dodgeChance || 0),
+            ),
+        ),
+        carryCapacity: stats.carryCapacity + (talentBonus.carryCapacity || 0),
+    };
+}

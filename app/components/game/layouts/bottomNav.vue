@@ -36,13 +36,23 @@
             :key="item.key"
             type="button"
             class="bottom-nav__item pixel-press"
-            :aria-label="item.label"
+            :class="{ 'bottom-nav__item--attention': item.key === 'talents' && hasAvailableTalentPoints }"
+            :aria-label="item.key === 'talents' && hasAvailableTalentPoints ? `${item.label}（有可用天賦點）` : item.label"
             @click="handleTap(item)"
         >
-            <v-icon
-                :icon="item.icon"
-                size="22"
-            />
+            <span class="bottom-nav__icon-wrap">
+                <v-icon
+                    :icon="item.icon"
+                    size="22"
+                />
+                <span
+                    v-if="item.key === 'talents' && hasAvailableTalentPoints"
+                    class="bottom-nav__badge font-pixel"
+                    aria-hidden="true"
+                >
+                    {{ talentPointsBadgeText }}
+                </span>
+            </span>
             <span class="bottom-nav__label">{{ item.label }}</span>
         </button>
 
@@ -71,7 +81,7 @@ const leftItems: NavItem[] = [
 ];
 
 const rightItems: NavItem[] = [
-    { key: 'quest', label: '任務', icon: 'mdi-scroll-text-outline' },
+    { key: 'talents', label: '天賦', icon: 'mdi-star-four-points-outline' },
     { key: 'leaderboard', label: '排行', icon: 'mdi-trophy-outline' },
 ];
 
@@ -81,6 +91,14 @@ const snackbarText = ref('');
 const route = useRoute();
 const isOnMainPage = computed(() => route.path === '/main');
 
+// 有可用天賦點時,天賦入口做醒目提示(數字 badge + 暖色系),提醒玩家有點數可以投。
+const { character } = useCharacter();
+const hasAvailableTalentPoints = computed(() => (character.value?.talentPoints ?? 0) > 0);
+const talentPointsBadgeText = computed(() => {
+    const points = character.value?.talentPoints ?? 0;
+    return points > 99 ? '99+' : String(points);
+});
+
 const handleTap = (item: NavItem) => {
     if (item.key === 'inventory') {
         navigateTo('/inventory');
@@ -88,6 +106,10 @@ const handleTap = (item: NavItem) => {
     }
     if (item.key === 'shop') {
         navigateTo('/shop');
+        return;
+    }
+    if (item.key === 'talents') {
+        navigateTo('/talents');
         return;
     }
     snackbarText.value = `${item.label}即將推出`;
@@ -102,6 +124,10 @@ const handleHomeTap = () => {
 </script>
 
 <style scoped lang="scss">
+// 天賦點的主色（characterStage.vue 的 LV 標籤同色），與屬性點沿用的
+// warning（暗紅，見 vuetify.ts 的 theme.colors.warning）區分開來。
+$talent-point-color: #ffd166;
+
 .bottom-nav {
     position: relative;
     flex: 0 0 auto;
@@ -135,6 +161,38 @@ const handleHomeTap = () => {
             outline: 2px solid rgb(var(--v-theme-primary));
             outline-offset: -2px;
         }
+
+        &--attention {
+            opacity: 1;
+            // 天賦點的主色統一用黃色（characterStage.vue 的 LV 標籤同色），
+            // 與屬性點沿用的 warning（暗紅）區分開來。
+            color: $talent-point-color;
+        }
+    }
+
+    &__icon-wrap {
+        position: relative;
+        display: inline-flex;
+    }
+
+    &__badge {
+        position: absolute;
+        top: -6px;
+        right: -10px;
+        min-width: 15px;
+        height: 15px;
+        padding: 0 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        background: $talent-point-color;
+        border: 1.5px solid rgb(var(--v-theme-background));
+        color: #14171c;
+        font-size: 9px;
+        line-height: 1;
+        white-space: nowrap;
+        animation: bottom-nav-badge-pulse 1.4s ease-in-out infinite;
     }
 
     &__home-slot {
@@ -166,6 +224,15 @@ const handleHomeTap = () => {
         &--home {
             color: rgb(var(--v-theme-green));
         }
+    }
+}
+
+@keyframes bottom-nav-badge-pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.12);
     }
 }
 </style>

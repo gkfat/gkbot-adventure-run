@@ -26,6 +26,8 @@ import {
     getCharacterResponseSchema,
     allocateAttributesRequestSchema,
     allocateAttributesResponseSchema,
+    allocateTalentRequestSchema,
+    allocateTalentResponseSchema,
     setNicknameRequestSchema,
     setNicknameResponseSchema,
     deleteCharacterResponseSchema,
@@ -107,6 +109,8 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         GetCharacterResponse: getCharacterResponseSchema,
         AllocateAttributesRequest: allocateAttributesRequestSchema,
         AllocateAttributesResponse: allocateAttributesResponseSchema,
+        AllocateTalentRequest: allocateTalentRequestSchema,
+        AllocateTalentResponse: allocateTalentResponseSchema,
         SetNicknameRequest: setNicknameRequestSchema,
         SetNicknameResponse: setNicknameResponseSchema,
         StartAdventureResponse: startAdventureResponseSchema,
@@ -275,6 +279,36 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             },
             400: {
                 description: 'Invalid request or insufficient points',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/talents',
+        description: 'Invest 1 talent point into a node on the character\'s archetype talent tree',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: allocateTalentRequestSchema } } },
+        },
+        responses: {
+            200: {
+                description: 'Talent point successfully allocated',
+                content: { 'application/json': { schema: allocateTalentResponseSchema } },
+            },
+            400: {
+                description: 'Unknown node, insufficient talentPoints, node already maxRank, previous tier not opened, or opposing branch locked',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
             401: {

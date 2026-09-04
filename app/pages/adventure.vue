@@ -381,43 +381,46 @@
                         </div>
                     </div>
 
-                    <!-- 累積獲得：從冒險一開始就顯示（初始為 0），不用等第一筆獎勵入帳 -->
+                    <!-- 累積獲得：從冒險一開始就顯示（初始為 0），不用等第一筆獎勵入帳。
+                         戰鬥結束到玩家關閉結算 dialog 前這段期間顯示 displayedRunTotals
+                         凍結的戰前快照，而不是 currentRun 的即時值（見上方 frozenRunTotals
+                         的說明，避免這一列在玩家還沒看完戰鬥結算前就先跳成戰後數字）。 -->
                     <v-divider class="my-2" />
                     <div class="d-flex flex-wrap ga-4">
                         <div class="adventure-page__loot-stat">
                             <div class="text-caption text-medium-emphasis">EXP</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
-                                {{ currentRun.expEarned }}
+                                {{ displayedRunTotals.expEarned }}
                             </div>
                         </div>
                         <div class="adventure-page__loot-stat">
                             <div class="text-caption text-medium-emphasis">金幣</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
-                                +{{ currentRun.goldEarned }}
+                                +{{ displayedRunTotals.goldEarned }}
                             </div>
                         </div>
                         <div class="adventure-page__loot-stat">
                             <div class="text-caption text-medium-emphasis">寶石</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
-                                +{{ currentRun.gemsEarned }}
+                                +{{ displayedRunTotals.gemsEarned }}
                             </div>
                         </div>
                         <div class="adventure-page__loot-stat">
                             <div class="text-caption text-medium-emphasis">道具</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
-                                x{{ currentRun.runInventory.length }}
+                                x{{ displayedRunTotals.itemCount }}
                             </div>
                         </div>
                         <div class="adventure-page__loot-stat">
                             <div class="text-caption text-medium-emphasis">祝福</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
-                                x{{ currentRun.blessings.length }}
+                                x{{ displayedRunTotals.blessingCount }}
                             </div>
                         </div>
                         <div class="adventure-page__loot-stat">
                             <div class="text-caption text-medium-emphasis">詛咒</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
-                                x{{ currentRun.curses.length }}
+                                x{{ displayedRunTotals.curseCount }}
                             </div>
                         </div>
                     </div>
@@ -701,7 +704,7 @@
                     class="text-none"
                     @click="showCombatSummaryDialog = false"
                 >
-                    繼續前進
+                    {{ isRunEndingCombat ? '結束探索' : '繼續前進' }}
                 </SystemBtn>
 
                 <SystemBtn
@@ -892,6 +895,34 @@ const characterSpriteSrc = computed(() => (
 // 回應，currentRun.playerHp 就已經是戰鬥「結束後」的數字，若動畫起點直接引用
 // currentRun.playerHp 會被這個結束值污染。
 const combatStartHp = ref(0);
+
+// 頂端「累積獲得」summary 列（EXP/金幣/寶石/道具/祝福/詛咒）在戰鬥結束前
+// 不應變更：startCombat 一收到勝利回應就已經 fetchCurrent()，把 currentRun
+// 更新成戰鬥「結束後」的數字，但玩家這時可能還在看戰鬥演出或戰鬥結算 dialog
+// （見使用者回報）。做法比照上面 combatStartHp：在 handleStartCombat 呼叫
+// startCombat 前先快照目前的 currentRun 累積值，戰鬥期間（有 lastCombatResult
+// 且結算 dialog 還沒被玩家關掉）顯示這份快照，玩家按下「繼續前進」關閉
+// 結算 dialog 後才切回 currentRun 的即時值（見下方 combatSummaryDialogOpen 的 watch）。
+const frozenRunTotals = ref<{
+    expEarned: number
+    goldEarned: number
+    gemsEarned: number
+    itemCount: number
+    blessingCount: number
+    curseCount: number
+} | null>(null);
+const combatTotalsFrozen = ref(false);
+const displayedRunTotals = computed(() => {
+    if (combatTotalsFrozen.value && frozenRunTotals.value) return frozenRunTotals.value;
+    return {
+        expEarned: currentRun.value?.expEarned ?? 0,
+        goldEarned: currentRun.value?.goldEarned ?? 0,
+        gemsEarned: currentRun.value?.gemsEarned ?? 0,
+        itemCount: currentRun.value?.runInventory.length ?? 0,
+        blessingCount: currentRun.value?.blessings.length ?? 0,
+        curseCount: currentRun.value?.curses.length ?? 0,
+    };
+});
 const {
     displayedBanner,
     enemyCards,
@@ -1113,6 +1144,15 @@ const showCombatSummaryDialog = ref(false);
 // 節點）但這個旗標還沒同步回 false 的極短暫視窗裡，顯示出資料全是預設值
 // （戰鬥失敗／回合0）的殘影 dialog。
 const combatSummaryDialogOpen = computed(() => showCombatSummaryDialog.value && !!lastCombatResult.value);
+
+// 這場戰鬥的結算 dialog 關掉之後，run 是否會直接結束（跳到結算頁，而非
+// 繼續往下一個節點走）：任何戰鬥落敗當場結束 run（DEAD），頭目戰打贏也一定
+// 結束 run（single-stage-run-settlement：一個 Stage 只有一場頭目戰，見
+// adventure-run.service.ts 的 advanceFromResolution）。這種情況下按鈕文字
+// 改顯示「結束探索」，避免玩家誤以為按下去還會繼續深入。
+const isRunEndingCombat = computed(() => (
+    !combatVictory.value || currentRun.value?.currentNodeType === NodeType.BOSS
+));
 watch(lastCombatResult, () => {
     combatPlaybackDone.value = false;
     showCombatSummaryDialog.value = false;
@@ -1130,6 +1170,7 @@ watch(combatAnimPlaybackDone, (done) => {
 // （known-issue.md #issue，戰鬥失敗需關閉 dialog 後才進入冒險失敗畫面）。
 watch(showCombatSummaryDialog, async (open, wasOpen) => {
     if (wasOpen && !open) {
+        combatTotalsFrozen.value = false;
         await commitPendingSettlement();
     }
 });
@@ -1310,6 +1351,15 @@ const handleRetreat = async () => {
 const handleStartCombat = async () => {
     if (!character.value) return false;
     combatStartHp.value = currentRun.value?.playerHp ?? 0;
+    frozenRunTotals.value = {
+        expEarned: currentRun.value?.expEarned ?? 0,
+        goldEarned: currentRun.value?.goldEarned ?? 0,
+        gemsEarned: currentRun.value?.gemsEarned ?? 0,
+        itemCount: currentRun.value?.runInventory.length ?? 0,
+        blessingCount: currentRun.value?.blessings.length ?? 0,
+        curseCount: currentRun.value?.curses.length ?? 0,
+    };
+    combatTotalsFrozen.value = true;
     return await startCombat(character.value.characterId);
 };
 

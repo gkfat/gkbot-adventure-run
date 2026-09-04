@@ -65,8 +65,21 @@ function withLevelDefaults(character: Character): Character {
     };
 }
 
+/**
+ * Backfill `talentPoints`/`talents` for character documents written before
+ * `character-talent-tree` shipped — same "不做資料回填" tolerance pattern as
+ * withNextChapterDefault/withLevelDefaults.
+ */
+function withTalentDefaults(character: Character): Character {
+    return {
+        ...character,
+        talentPoints: character.talentPoints ?? 0,
+        talents: character.talents ?? {},
+    };
+}
+
 function withCharacterDefaults(character: Character): Character {
-    return withLevelDefaults(withNextChapterDefault(character));
+    return withTalentDefaults(withLevelDefaults(withNextChapterDefault(character)));
 }
 
 export class CharacterRepository extends BaseRepository<Character> {
@@ -124,6 +137,9 @@ export class CharacterRepository extends BaseRepository<Character> {
 
             attributes: { ...archetype.attributes },
             unspentAttributePoints: 0,
+
+            talentPoints: 0,
+            talents: {},
 
             equipment: {},
 
@@ -229,6 +245,20 @@ export class CharacterRepository extends BaseRepository<Character> {
     }
 
     /**
+     * Update character talents and remaining talentPoints (character-talents).
+     * A single update, not a transaction — see design.md decision 3: talent
+     * allocation doesn't touch gold/exp-style fields that need
+     * read-modify-write protection, and the frontend refetches after every
+     * allocation, making rapid concurrent requests unlikely.
+     */
+    async updateTalents(
+        characterId: string,
+        patch: { talents: Character['talents']; talentPoints: number },
+    ): Promise<Character> {
+        return this.update(characterId, patch);
+    }
+
+    /**
      * Update character nickname
      */
     async updateNickname(characterId: string, nickname: string): Promise<Character> {
@@ -277,11 +307,13 @@ export class CharacterRepository extends BaseRepository<Character> {
                 let { level } = character;
                 let exp = character.exp + rewards.expGained;
                 let unspentAttributePoints = character.unspentAttributePoints;
+                let { talentPoints } = character;
 
                 while (level < RESOURCE_LIMITS.LEVEL_MAX && exp >= (EXP_TABLE[level] ?? Infinity)) {
                     exp -= EXP_TABLE[level] as number;
                     level += 1;
                     unspentAttributePoints += 1;
+                    talentPoints += 1;
                 }
                 if (level >= RESOURCE_LIMITS.LEVEL_MAX) {
                     exp = 0;
@@ -305,10 +337,10 @@ export class CharacterRepository extends BaseRepository<Character> {
                 }
 
                 const updated: Character = {
-                    ...character, gold, gems, level, exp, unspentAttributePoints, nextChapterIndex, currentLevelIndex, chapterTotalLevels,
+                    ...character, gold, gems, level, exp, unspentAttributePoints, talentPoints, nextChapterIndex, currentLevelIndex, chapterTotalLevels,
                 };
                 tx.update(docRef, {
-                    gold, gems, level, exp, unspentAttributePoints, nextChapterIndex, currentLevelIndex, chapterTotalLevels, updatedAt: Date.now(),
+                    gold, gems, level, exp, unspentAttributePoints, talentPoints, nextChapterIndex, currentLevelIndex, chapterTotalLevels, updatedAt: Date.now(),
                 });
 
                 return {

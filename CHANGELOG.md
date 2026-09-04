@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 實作轉盤 UI
 - 新增戰力計算，實作依戰力生成章節、關卡、stage 數量機制
 - 新增機制：遇敵後才會出現休息節點
+- 實作天賦系統
 
 ### Changed
 

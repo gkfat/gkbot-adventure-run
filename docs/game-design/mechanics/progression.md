@@ -1,6 +1,8 @@
 # 角色成長與職業系統
 
-> 本文件是內部設計參考文件，彙整 `character-progression`／`character-roster`／`character-archetype-abilities` 三份 spec，加上 `server/constants/characterArchetypes.ts`、`server/constants/archetypeAbilities.ts`、`server/constants/stats.ts`、`server/services/character.service.ts`、`server/repositories/character.repository.ts` 的實際落地邏輯，說明角色的職業選擇、屬性成長、等級曲線，以及與裝備/戰鬥系統的關聯。全部數值直接取自 code，未在 code 中定義的機制標註「待確認」。
+> 本文件是內部設計參考文件，彙整 `character-progression`／`character-roster`／`character-talents` 三份 spec，加上 `server/constants/templates/characterArchetypes.ts`、`server/constants/templates/talentTrees.ts`、`server/constants/stats.ts`、`server/services/character.service.ts`、`server/repositories/character.repository.ts` 的實際落地邏輯，說明角色的職業選擇、屬性成長、天賦樹、等級曲線，以及與裝備/戰鬥系統的關聯。全部數值直接取自 code，未在 code 中定義的機制標註「待確認」。
+>
+> **變更記錄**：`character-talent-tree` change 以「天賦樹」機制取代原本只有敘事文案、沒有任何消費端的 `character-archetype-abilities`（`ArchetypeAbilityTrigger`）；該資料檔與 capability 已隨此變更移除，本文件第 2 節改為天賦樹說明。
 
 ## 1. 可選職業（archetype）與初始屬性
 
@@ -20,19 +22,28 @@
 
 角色名冊上限：同一帳號最多 3 個角色（`CHARACTER_ROSTER_MAX`，定義於 `server/repositories/character.repository.ts`），各角色的 level/exp/gold/gems/nickname/equipment/unspentAttributePoints 互相獨立。
 
-## 2. 職業核心特色機制（ArchetypeAbility）
+## 2. 職業天賦樹（Talent Tree）
 
-每個可選職業恰好定義 1 個核心特色機制，用穩定的 `trigger` enum 供 events/items/adventure-run/combat 等消費端查表分支，本 spec 只定案資料結構與敘事文案，**不定義任何機率/倍率數值**（`server/constants/archetypeAbilities.ts`）：
+每個可選職業各定義一棵靜態天賦樹（`server/constants/templates/talentTrees.ts`，`TALENT_TREES`），作為職業差異化真正落地的機制（取代原本只有文案、沒有數值運算的 `ArchetypeAbility`）：
 
-| archetypeId | abilityId | name | trigger | 效果概念（文案） |
-|---|---|---|---|---|
-| `fighter` | `physical_adaptation` | Physical Adaptation | `blessing_effect_boost` | 提升身體能力類 Blessing 的效果加成（「身體素質類的祝福，對你的效果總是好一些。」） |
-| `adventurer` | `explorer` | Explorer | `non_combat_node_bonus` | 經過非戰鬥節點有機率發現額外內容（「路過非戰鬥的地方時，你總能多發現一點別人沒注意到的東西。」） |
-| `scholar` | `study` | Study | `enemy_encounter_record` | 記錄遭遇過的敵人/事件類型，再次遭遇獲得額外效果（「你會記下遇過的對手與狀況，下次再遇到，就沒那麼手忙腳亂了。」） |
-| `tinkerer` | `salvage` | Salvage | `salvage_material_drop` | 擊敗機械類敵人或開寶箱有機率獲得可轉化的素材（「打倒機械類的對手、翻找戰利品時，你總能多撿到一些零件——而且莫名其妙就知道怎麼用。」） |
-| `gambler` | `risk_and_reward` | Risk & Reward | `risk_reward_choice` | 在輪盤/事件節點提供額外高風險高回報選項（「遇到輪盤或抉擇時，你永遠多一個別人沒有的選項——賭大的。」） |
+- **結構**：5 層（Tier 1~5），Tier 1/3/5 各 1 個節點，Tier 2/4 各 2 個節點（同層同 `branchGroup`，只能擇一投入，即「岔路」）；每個節點最高 3 級（`maxRank`），附帶一組固定數值的 `TalentEffect`（`stat` + 每級增量 `perRank`）。
+- **天賦點**：角色升 1 級額外發放 `talentPoints += 1`（與 `unspentAttributePoints` 同一個 while 迴圈內，見第 3 節、`CharacterRepository.settleRunRewards`），累計投入記錄在 `talents: Record<nodeId, rank>`。
+- **開放規則**：某層要開放，上一層必須存在一個已點滿（`rank = maxRank`）的節點；Tier 1 永遠開放。此規則對單節點層與岔路層一視同仁。
+- **岔路互斥**：同層同 `branchGroup` 的節點，只要其中一個 `rank > 0`，另一個永久鎖定在 `rank 0`——**不支援重置/轉點**，與屬性點分配的不可逆慣例一致。
+- **投點端點**：`POST /api/character/:characterId/talents`（`{ nodeId }`），每次呼叫投 1 級，`CharacterService.allocateTalentPoint` 依序驗證節點存在 → 天賦點足夠 → 未點滿 → 上一層已開放 → 未鎖定於對向分支，任一失敗回傳 400、不修改資料。
+- **併入 stats**：投入節點的效果依 rank 加總（`character.service.ts` 的 `getTalentBonus`，邏輯與裝備的 `sumEquipmentStats` 對稱），在 `calculateBaseStats → applyEquipmentStats` 之後、以 `applyTalentStats`（`shared/utils/calculateStats.ts`）套用，回傳 `talentBonus`（結構同 `equipmentBonus`，只列非零項）。`carryCapacity` 是目前唯一「天賦可以加成、但裝備不行」的 stat（天賦與屬性同屬永久成長，裝備是可替換資源）。
 
-> **待確認**：以上 5 個 trigger 的實際機率/倍率數值，由各自消費端 change（events-and-blessings／items-and-equipment／adventure-run-core／combat-engine）各自實作，目前 code 尚未找到對應的數值常數。
+5 個職業的天賦樹內容（`perRank` 為每級增量，3 級為滿；Tier 2/4 的 A／B 為岔路二擇一）：
+
+| archetypeId | Tier 1 | Tier 2（A／B 岔路） | Tier 3 | Tier 4（A／B 岔路） | Tier 5（畢業技） |
+|---|---|---|---|---|---|
+| `fighter` | 體魄鍛鍊：HP_MAX+15、DEF+2、carryCapacity+1 | 剛毅意志 DEF+3／蠻力衝擊 ATK+3 | 沉重打擊：ATK+2、DEF+1 | 銅牆鐵壁 DEF+5、actionIntervalSec+0.05／破陣猛攻 ATK+5 | 不屈之軀：HP_MAX+40、DEF+4 |
+| `adventurer` | 輕裝疾行：actionIntervalSec-0.03、dodgeChance+0.01 | 靈巧步伐 dodgeChance+0.02／疾風連擊 actionIntervalSec-0.05 | 隨機應變：carryCapacity+2、dodgeChance+0.01 | 影步 dodgeChance+0.04／迅捷本能 actionIntervalSec-0.08 | 探索者之心：ATK+3、dodgeChance+0.02 |
+| `scholar` | 戰術洞察：critChance+0.02、ATK+2 | 精準打擊 critChance+0.03／弱點分析 ATK+4 | 冷靜分析：DEF+2、critChance+0.01 | 致命一擊 critChance+0.05／博學強化 ATK+6 | 大師手筆：ATK+5、critChance+0.03 |
+| `tinkerer` | 裝備強化：DEF+2、actionIntervalSec-0.02 | 加固護甲 DEF+4／潤滑機構 actionIntervalSec-0.04 | 隨行工具：carryCapacity+3、HP_MAX+10 | 重裝改造 DEF+6／高速齒輪 actionIntervalSec-0.06 | 巧匠傑作：DEF+5、actionIntervalSec-0.05 |
+| `gambler` | 幸運本能：critChance+0.02、dodgeChance+0.01 | 賭徒直覺 critChance+0.03／死裡逃生 dodgeChance+0.03 | 孤注一擲：ATK+3、critChance+0.01 | 全下 critChance+0.05／命運女神 dodgeChance+0.05 | 賭王之運：critChance+0.03、dodgeChance+0.03 |
+
+> **設計備註**：完整點滿一條天賦路徑（Tier1+2+3+4+5 單一分支）僅需 15 點，遠低於 30 級可累積的 87 點上限，多餘天賦點目前無處可花——是否於後續 change 擴充更多層數/節點，或調整每級發放量，留待後續依實際遊戲節奏評估（見 `character-talent-tree` change 的 design.md Open Questions）。
 
 ## 3. 等級與經驗值成長
 
@@ -79,10 +90,12 @@
 
 - `POST /api/character/:characterId/attributes` 允許玩家把 `unspentAttributePoints` 分配到 STR/AGI/CON/LUCK 任意組合，總分配量不可超過剩餘點數，超過則回傳 400 且不修改任何資料。
 - 屬性點只會增加、沒有重置/洗點機制（code 中未找到相關端點）。
+- 天賦點的投點規則見第 2 節，同樣不支援重置/洗點。
 
 ## 6. 角色與裝備/戰鬥系統的關聯
 
-- 裝備加成在 `applyEquipmentStats`（`server/constants/stats.ts`）疊加在屬性算出的 base stats 之上：`ATK`/`DEF`/`HP_MAX` 直接相加，`actionIntervalSec` 相加後再套用同一組 0.5–5.0 秒的夾限；`critChance`/`critMultiplier`/`dodgeChance` 目前的裝備加成邏輯**不修改**（維持 base stats 值，即裝備欄位如 `research_chip_ring`/`servo_greaves` 提供的 `actionSpeedMod` 才會影響出手速度，數值曲線見 `docs/game-design/balance/item-stats.md`）。
+- 裝備加成在 `applyEquipmentStats`（`server/constants/stats.ts`）疊加在屬性算出的 base stats 之上：`ATK`/`DEF`/`HP_MAX` 直接相加，`actionIntervalSec`/`dodgeChance` 相加後再套用夾限；`critChance`/`critMultiplier` 目前的裝備加成邏輯**不修改**（維持 base stats 值，即裝備欄位如 `research_chip_ring`/`servo_greaves` 提供的 `actionSpeedMod` 才會影響出手速度，數值曲線見 `docs/game-design/balance/item-stats.md`）。
+- 天賦加成在裝備之後再套用一次（`applyTalentStats`）：`ATK`/`DEF`/`HP_MAX`/`carryCapacity` 直接相加，`actionIntervalSec`/`critChance`/`dodgeChance` 相加後再套用與 base stats 相同的夾限——與裝備不同，**天賦可以加成 `critChance` 與 `carryCapacity`**（見第 2 節）。
 - 對應到第 1 節的職業初始屬性分佈，各職業因此天生偏重不同的裝備搭配方向：
   - `fighter`（STR3/CON3）：ATK 與 DEF/HP 並重，適合搭配右手 ATK 裝備或身體/頭部 DEF+HP 裝備補強耐久。
   - `adventurer`（AGI3）：天生出手較快、閃避/爆擊率較高，適合疊加戒指/鞋子的 `actionSpeedMod`（負值）裝備進一步壓縮出手間隔。
@@ -93,6 +106,6 @@
 ## 7. 尚待確認 / 資料缺口
 
 - `unspentAttributePoints` 每級發放數量：型別註解寫「3」，實際 `settleRunRewards` 邏輯是「+1」，兩者不一致，本文件依實際 code 行為記錄，數值以哪個為準待工程端確認。
-- `character-archetype-abilities` 定義的 5 個 trigger（`blessing_effect_boost`／`non_combat_node_bonus`／`enemy_encounter_record`／`salvage_material_drop`／`risk_reward_choice`）目前只有敘事文案與 trigger 列舉值，機率/倍率等實際數值散落在對應消費端 change（events-and-blessings／items-and-equipment／adventure-run-core／combat-engine），本文件未找到明確數值常數，暫記為待確認，待各消費端 change 定案後回頭補充。
+- 天賦樹多餘點數（見第 2 節設計備註）：目前無擴充機制，暫記為待確認。
 - `calculateBaseStats` 雖接收 `characterLevel` 參數，但目前實作完全未使用它做任何等級相關的數值縮放，等級對戰鬥力的影響僅透過屬性點分配間接發生；是否為刻意設計（例如未來預留等級直接加成的擴充點）待確認。
 - 屬性點洗點/重置機制：code 中未找到對應端點，目前判定為不存在此機制。

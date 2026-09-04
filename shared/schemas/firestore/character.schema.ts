@@ -47,7 +47,11 @@ export const characterSchema = z.object({
     // Attributes
     attributes: attributesSchema,
     unspentAttributePoints: z.number().int().min(0),
-  
+
+    // Talents (character-talents)
+    talentPoints: z.number().int().min(0).default(0),
+    talents: z.record(z.string(), z.number().int().min(0)).default({}),
+
     // Equipment
     equipment: equipmentSchema,
 

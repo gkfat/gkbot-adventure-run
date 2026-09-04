@@ -12,6 +12,29 @@ interface CharacterStats {
     carryCapacity: number;
 }
 
+type TalentStat = 'ATK' | 'DEF' | 'HP_MAX' | 'actionIntervalSec' | 'critChance' | 'dodgeChance' | 'carryCapacity';
+
+interface TalentEffect {
+    stat: TalentStat;
+    perRank: number;
+}
+
+interface TalentNode {
+    nodeId: string;
+    archetypeId: string;
+    tier: number;
+    branchGroup?: string;
+    name: string;
+    description: string;
+    maxRank: number;
+    effect: TalentEffect[];
+}
+
+interface TalentTree {
+    archetypeId: string;
+    nodes: TalentNode[];
+}
+
 interface CharacterData {
     characterId: string;
     archetypeId: string;
@@ -27,11 +50,15 @@ interface CharacterData {
         LUCK: number;
     };
     unspentAttributePoints: number;
+    talentPoints: number;
+    talents: Record<string, number>;
+    talentTree: TalentTree;
     equipment: Partial<Record<EquipmentSlot, string>>;
     nickname: string;
     spriteUrl: string;
     stats: CharacterStats;
     equipmentBonus: Partial<Pick<CharacterStats, 'ATK' | 'DEF' | 'HP_MAX' | 'actionIntervalSec' | 'dodgeChance'>>;
+    talentBonus: Partial<Pick<CharacterStats, TalentStat>>;
     nextChapterIndex: number;
     currentLevelIndex: number;
     chapterTotalLevels: number;
@@ -262,6 +289,29 @@ export const useCharacter = () => {
     };
 
     /**
+     * 對目前選定角色的天賦樹某一節點投入 1 點，成功後重新整理角色資料
+     * （含 server 重新計算的 stats／talentBonus）。
+     */
+    const allocateTalent = async (nodeId: string): Promise<boolean> => {
+        if (!selectedCharacterId.value) return false;
+
+        loading.value = true;
+        error.value = null;
+
+        try {
+            await api.post(`/api/character/${selectedCharacterId.value}/talents`, { nodeId });
+            await fetchCharacter();
+            return true;
+        } catch (err: any) {
+            console.error('[useCharacter] Failed to allocate talent:', err);
+            error.value = err.message || '投入天賦點失敗';
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    /**
      * 刪除指定角色（連同其冒險紀錄、永久背包一併移除，裝備物品本身不會被刪除，
      * 僅解除其擁有者關聯），成功後從本地清單移除；若刪除的正是目前選定角色，
      * 一併清空選定狀態與記住的 localStorage 紀錄。
@@ -340,6 +390,7 @@ export const useCharacter = () => {
         equipItem,
         unequipItem,
         allocateAttributes,
+        allocateTalent,
         deleteCharacter,
         clearSelection,
 

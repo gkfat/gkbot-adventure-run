@@ -27,8 +27,6 @@ export const idleFrameUrl = (spriteUrl: string, step: number) => {
  * facility) rather than the front-facing camp-screen portrait. Back sprites
  * have no walk-cycle frames, but can share the same idle frame naming as the
  * front sprite (`{name}-back-idle-{1,2}.png`) — compose with `idleFrameUrl`.
- * As of writing `tinkerer`, `adventurer` and `gambler` ship those files;
- * `fighter` and `scholar` will 404 at idle levels 1/2 until their frames
- * exist.
+ * All five archetypes ship those files.
  */
 export const backSpriteUrl = (spriteUrl: string) => spriteUrl.replace(/\.png$/, '-back.png');
