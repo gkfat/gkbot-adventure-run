@@ -646,6 +646,13 @@
                         alt=""
                         class="adventure-page__stage-glow"
                     >
+                    <img
+                        v-if="healFx"
+                        :key="healFx.key"
+                        src="/images/combat-fx/heal-glow.png"
+                        alt=""
+                        class="adventure-page__stage-glow"
+                    >
                     <div
                         :key="inCombatStage && playerCardFx ? playerCardFx.key : -1"
                         class="adventure-page__stage-sprite-wrap"
@@ -676,6 +683,13 @@
                             class="adventure-page__stage-damage-text-crit-label"
                         >爆擊</span>
                         <span>{{ playerDamageText.kind === 'dodge' ? '閃避' : playerDamageText.value }}</span>
+                    </span>
+                    <span
+                        v-if="healFx"
+                        :key="healFx.key"
+                        class="adventure-page__stage-damage-text adventure-page__stage-damage-text--heal"
+                    >
+                        +{{ healFx.amount }}
                     </span>
                 </div>
                 <div class="adventure-page__stage-hp">
@@ -861,7 +875,7 @@ import { EXP_TABLE } from '../../shared/types/character';
 import { findCurseTemplate, resolveBlessingModifier } from '../../shared/constants/blessings';
 import type { Stats } from '../../shared/types/common';
 import { describeItem, resolvePixelIcon, RARITY_COLOR, type ItemLike } from '../utils/equipmentDisplay';
-import type { EventNodeData, BlessingNodeData, CombatNodeData } from '../composables/useAdventureRun';
+import type { EventNodeData, BlessingNodeData, CombatNodeData, RestNodeData } from '../composables/useAdventureRun';
 import { pickIntroNarrative, pickTransitionNarrative, REST_NARRATIVE } from '../constants/adventureNarrative';
 import { backSpriteUrl } from '../utils/spriteDisplay';
 import { FACILITY_SEVERITY_TINT, getFacilityBackgroundUrl } from '../utils/facilityBackground';
@@ -977,6 +991,33 @@ const modifierGlowSrc = computed(() => {
     return acquiredModifierDialog.value.isBlessing
         ? '/images/combat-fx/blessing-glow.png'
         : '/images/combat-fx/curse-glow.png';
+});
+
+// 只要玩家受到治療（休息節點使用藥水/自動回血、事件節點的治療結果），疊在
+// 角色 sprite 上的治療光暈 + 飄字（回復 +X）都要播放。玩家喝藥水沒有直接的
+// API 回傳值可用（見 useHealingItem），改監聽 runLog 新增的 HEAL 條目
+// （appendRunLog 內含伺服端算好的 hpHealed）來觸發；休息節點的自動回血則是
+// 一進入 REST 節點就已經算好（currentNodeData.autoHealAmount），改監聽
+// state 轉入 REST 來觸發；事件節點的治療結果（lastEventResult.hpHealed）
+// 在 handleResolveEvent 內直接觸發。三者都跟 modifierGlowSrc 一樣靠 :key
+// 讓元件重新掛載才會重播。
+const healFx = ref<{ key: number; amount: number } | null>(null);
+let lastSeenHealSeq = -1;
+watch(runLog, (entries) => {
+    const last = entries[entries.length - 1];
+    if (!last || last.kind !== 'HEAL' || last.seq === lastSeenHealSeq) return;
+    lastSeenHealSeq = last.seq;
+    healFx.value = {
+        key: Date.now(), amount: last.hpHealed,
+    };
+});
+watch(() => currentRun.value?.state, (state, prevState) => {
+    if (state !== AdventureStateType.REST || prevState === AdventureStateType.REST) return;
+    const autoHealAmount = (currentRun.value?.currentNodeData as RestNodeData | undefined)?.autoHealAmount ?? 0;
+    if (autoHealAmount <= 0) return;
+    healFx.value = {
+        key: Date.now(), amount: autoHealAmount,
+    };
 });
 const {
     items: permanentItems, fetchInventory, loaded: inventoryLoaded, invalidate: invalidateInventory,
@@ -1363,6 +1404,12 @@ const handleResolveEvent = async (choiceIndex?: number) => {
     // 設成 true 堵住這個時間差，等 dialog 內容真的設定好才清掉（見下方 watch）。
     pendingModifierAck.value = true;
     await resolveEvent(character.value.characterId, choiceIndex);
+    const hpHealed = lastEventResult.value?.hpHealed ?? 0;
+    if (hpHealed > 0) {
+        healFx.value = {
+            key: Date.now(), amount: hpHealed,
+        };
+    }
     const grantedBlessing = lastEventResult.value?.blessingGranted;
     const grantedCurseId = lastEventResult.value?.curseApplied;
     if (grantedBlessing) {
@@ -1575,6 +1622,10 @@ onMounted(() => {
         &--dodge {
             font-size: 16px;
             color: rgba(255, 255, 255, 0.8);
+        }
+
+        &--heal {
+            color: rgb(var(--v-theme-green));
         }
     }
 
