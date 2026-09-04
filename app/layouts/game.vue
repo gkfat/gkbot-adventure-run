@@ -11,17 +11,17 @@
             class="game-shell mx-auto d-flex flex-column"
             :style="{ width: '100%', maxWidth: '500px', height: '100%' }"
         >
-            <GameHeader @open-drawer="drawerOpen = true" />
-            <GameResourceBar v-if="selectedCharacterId && !isAdventurePage" />
+            <GameLayoutsHeader @open-drawer="drawerOpen = true" />
+            <GameLayoutsResourceBar v-if="selectedCharacterId && !isAdventurePage" />
 
             <main class="game-stage flex-grow-1">
                 <slot />
             </main>
 
-            <GameBottomNav v-if="selectedCharacterId && !isAdventurePage" />
+            <GameLayoutsBottomNav v-if="selectedCharacterId && !isAdventurePage" />
         </div>
 
-        <GameAccountDrawer v-model="drawerOpen" />
+        <GameCommonAccountDrawer v-model="drawerOpen" />
 
         <BackgroundAnimation />
     </v-app>

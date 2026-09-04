@@ -82,7 +82,7 @@
                         >
                             {{ item.rarity }}
                         </span>
-                        <GamePixelIcon
+                        <GameCommonPixelIcon
                             :name="resolvePixelIcon(item)"
                             :size="20"
                         />
@@ -124,7 +124,7 @@
                         >
                             {{ item.rarity }}
                         </span>
-                        <GamePixelIcon
+                        <GameCommonPixelIcon
                             :name="resolvePixelIcon(item)"
                             :size="20"
                         />
@@ -340,7 +340,7 @@
                 <!-- 獲得祝福/遭受詛咒：v-dialog 顯示（scrim="false"），「繼續前進」按鈕
                      在下方固定的 __actions 區塊（見 acquiredModifierDialog 那個
                      SystemBtn 分支）。 -->
-                <GameModifierAcquiredDialog
+                <GameAdventureModifierAcquiredDialog
                     v-if="acquiredModifierDialog"
                     :modifier="acquiredModifierDialog"
                     :effect-text="acquiredModifierDialog ? describeModifierEffect(acquiredModifierDialog) : ''"
@@ -349,7 +349,7 @@
                 <!-- 轉盤事件開獎結果：v-dialog 顯示（scrim="false"），「開始轉盤」/
                      「繼續前進」按鈕都在下方固定的 __actions 區塊（見 wheelResultPending
                      那兩個 SystemBtn 分支）。 -->
-                <GameWheelResultDialog
+                <GameAdventureWheelResultDialog
                     v-if="wheelResultPending"
                     :result="lastEventResult"
                     :started="wheelSpinStarted"
@@ -358,7 +358,7 @@
                 <!-- 一般事件結果（HEAL/CHOICE 等沒有 blessing/curse/wheel 的事件類型）：
                      v-dialog 顯示（scrim="false"），「繼續前進」按鈕在下方固定的 __actions
                      區塊（見 eventResultDialogOpen 那個 SystemBtn 分支）。 -->
-                <GameEventResultDialog
+                <GameAdventureEventResultDialog
                     :open="eventResultDialogOpen"
                     :result="lastEventResult"
                 />
@@ -426,7 +426,7 @@
                 <!-- COMBAT：觸發戰鬥；戰鬥結果在 COMBAT/RESOLUTION 都顯示，直到玩家繼續前進。
                      玩家本身的顯示（背影/HP/行動條/spark/傷害飄字）已移到頁面下方持久化的
                      「角色 stage」（見 adventure-page__stage）；戰鬥結算文字改用
-                     GameCombatSummaryDialog 以 v-dialog（scrim="false"）呈現，「繼續前進」
+                     GameAdventureCombatSummaryDialog 以 v-dialog（scrim="false"）呈現，「繼續前進」
                      按鈕在下方固定的 __actions 區塊，這裡只放敵方 arena，且進行中戰鬥不需要中間 panel 的
                      邊框（此時畫面就是戰鬥本身）。 -->
                 <template v-if="currentRun.state === AdventureStateType.COMBAT || (currentRun.state === AdventureStateType.RESOLUTION && lastCombatResult)">
@@ -435,13 +435,13 @@
                          還沒被下一個節點的回應取代，敵方 panel（此時只剩下已擊敗的敵人）
                          應隨走路動畫隱藏，不要停留在畫面上（known-issue.md #2）。 -->
                     <template v-if="lastCombatResult && !walkFrame.isWalking.value">
-                        <GameCombatResultPanel
+                        <GameAdventureCombatResultPanel
                             :displayed-banner="displayedBanner"
                             :enemy-cards="enemyCards"
                             :faction-type="currentRun.factionType"
                             :current-node-type="currentRun.currentNodeType"
                         />
-                        <GameCombatSummaryDialog
+                        <GameAdventureCombatSummaryDialog
                             v-if="combatSummaryDialogOpen"
                             :victory="combatVictory"
                             :round-count="combatRoundCount"
@@ -548,7 +548,7 @@
                         class="adventure-page__potion-row"
                     >
                         <div class="d-flex align-center ga-2">
-                            <GamePixelIcon
+                            <GameCommonPixelIcon
                                 :name="resolvePixelIcon(potion)"
                                 :size="28"
                             />
@@ -629,7 +629,7 @@
                             :class="{ 'adventure-page__stage-sprite--dead': inCombatStage && !playerAlive }"
                         >
                     </div>
-                    <GameSparkFx
+                    <GameAdventureSparkFx
                         v-if="inCombatStage && playerSpark"
                         :key="playerSpark.key"
                         :kind="playerSpark.kind"
@@ -689,9 +689,9 @@
 
             <div class="adventure-page__actions d-flex flex-column ga-2">
                 <!-- 冒險過程中所有「結果 dialog」的確認/繼續按鈕都統一放在這個固定區塊，
-                     不放在 dialog 內部——這幾個 dialog（GameCombatSummaryDialog /
-                     GameModifierAcquiredDialog / GameEventResultDialog / GameWheelResultDialog /
-                     GameBlessingSelectDialog）都設定 scrim="false"，遮罩不會攔截點擊，
+                     不放在 dialog 內部——這幾個 dialog（GameAdventureCombatSummaryDialog /
+                     GameAdventureModifierAcquiredDialog / GameAdventureEventResultDialog / GameAdventureWheelResultDialog /
+                     GameAdventureBlessingSelectDialog）都設定 scrim="false"，遮罩不會攔截點擊，
                      所以外部按鈕不會被 dialog 蓋住而無法點擊（見使用者回報 #2）。 -->
                 <SystemBtn
                     v-if="combatSummaryDialogOpen"
@@ -824,7 +824,7 @@
             :entries="runLog"
         />
 
-        <GameBlessingSelectDialog
+        <GameAdventureBlessingSelectDialog
             :open="currentRun?.state === AdventureStateType.BLESSING_SELECT"
             :candidates="blessingCandidatesWithEffect"
             :selected-id="selectedBlessingId"
@@ -882,7 +882,7 @@ const characterSpriteSrc = computed(() => (
     character.value ? backSpriteUrl(character.value.spriteUrl) : ''
 ));
 
-// 戰鬥演出狀態集中在這裡（而非 GameCombatResultPanel 內部）：探索與戰鬥共用同一個
+// 戰鬥演出狀態集中在這裡（而非 GameAdventureCombatResultPanel 內部）：探索與戰鬥共用同一個
 // 「角色 stage」，玩家的 HP/行動條/spark/傷害飄字需要疊加在同一個持久化角色圖像
 // 上，不能只存在戰鬥子元件裡。getResult 在沒有進行中戰鬥時回傳 null，useCombat
 // 內部對此已有保護（見 useCombat.ts）。
@@ -923,7 +923,7 @@ const pendingModifierAck = ref(false);
 // auto-advance watch（見 handleResolveEvent 內的用法）。
 const wheelResultPending = ref(false);
 // 轉盤是否已經開始轉動——玩家要主動點下面的「開始轉盤」才會觸發
-// GameWheelResultDialog 內的旋轉動畫，見該元件的 started prop。
+// GameAdventureWheelResultDialog 內的旋轉動畫，見該元件的 started prop。
 const wheelSpinStarted = ref(false);
 // 一般事件結果（HEAL、CHOICE 型別的 sealed_crate 等）：跟祝福/詛咒/轉盤沒有衝突時
 // （沒有 blessingGranted/curseApplied，也不是 WHEEL，見 handleResolveEvent），
@@ -1092,7 +1092,7 @@ const describeModifierEffect = (modifier: Pick<RunModifier, 'statModifiers' | 'd
 
 const settlementIsSuccess = computed(() => lastSettlement.value?.endReason === 'COMPLETED');
 
-// GameCombatResultPanel 現在是純渲染元件（不再自己呼叫 useCombat），結算文字用
+// GameAdventureCombatResultPanel 現在是純渲染元件（不再自己呼叫 useCombat），結算文字用
 // 的欄位從 lastCombatResult.summary 直接取出當 props 傳下去。
 const combatVictory = computed(() => lastCombatResult.value?.summary.victory ?? false);
 const combatRoundCount = computed(() => lastCombatResult.value?.summary.roundCount ?? 0);
@@ -1104,7 +1104,7 @@ const combatDroppedItems = computed(() => lastCombatResult.value?.summary.itemsD
 // 戰鬥結果的 log 演繹（stage 上的 playerGauge/playerSpark 等）播完前，不能顯示
 // 「繼續前進」，避免玩家在還沒看完戰鬥過程時就跳過結算。lastCombatResult 換成
 // 新的一場戰鬥時重新歸零，等 useCombat 的 playbackDone 再次變 true 才放行；播完的
-// 同一刻也跳出戰鬥結算 dialog（見 GameCombatSummaryDialog）。
+// 同一刻也跳出戰鬥結算 dialog（見 GameAdventureCombatSummaryDialog）。
 const combatPlaybackDone = ref(false);
 const showCombatSummaryDialog = ref(false);
 // 保險起見，dialog 實際開關再疊一層 lastCombatResult 存在與否的判斷——
@@ -1245,7 +1245,7 @@ const blessingCandidatesWithEffect = computed(() => blessingCandidates.value.map
     effectText: describeModifierEffect(candidate),
 })));
 
-// 「選擇」按鈕在下方固定的 __actions 區塊（GameBlessingSelectDialog 用
+// 「選擇」按鈕在下方固定的 __actions 區塊（GameAdventureBlessingSelectDialog 用
 // scrim="false"，不會蓋住這裡的點擊），需要知道玩家在 dialog 卡片上選了哪個
 // 候選——每次換一批候選祝福都要清掉上一輪選取，避免殘留選取狀態誤觸。
 const selectedBlessingId = ref<string | null>(null);
@@ -1314,7 +1314,7 @@ const handleStartCombat = async () => {
 
 // 進入 COMBAT 節點的自動進場流程：先播「遭遇敵人」banner，banner 結束後不再
 // 顯示敵人清單，直接自動呼叫 startCombat（不需玩家點擊按鈕），成功後
-// lastCombatResult 被設定，畫面自然切到 GameCombatResultPanel、播放既有的
+// lastCombatResult 被設定，畫面自然切到 GameAdventureCombatResultPanel、播放既有的
 // 「戰鬥開始」banner（useCombat.ts 的 displayedBanner）。
 const COMBAT_ENCOUNTER_BANNER_MS = 1400;
 const COMBAT_AUTO_RETRY_DELAY_MS = 1500;

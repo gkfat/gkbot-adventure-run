@@ -1,5 +1,5 @@
 <template>
-    <GameDialogFrame
+    <GameCommonDialogFrame
         v-model="open"
         max-width="320"
         content-class="delete-character"
@@ -62,7 +62,7 @@
             <div class="text-caption text-medium-emphasis mb-1">經濟</div>
             <div class="d-flex align-center ga-4 mb-3">
                 <div class="d-flex align-center ga-1">
-                    <GameCurrencyIcon
+                    <GameCommonCurrencyIcon
                         type="GOLD"
                         :size="12"
                     />
@@ -71,7 +71,7 @@
                     </span>
                 </div>
                 <div class="d-flex align-center ga-1">
-                    <GameCurrencyIcon
+                    <GameCommonCurrencyIcon
                         type="GEMS"
                         :size="12"
                     />
@@ -98,7 +98,7 @@
                     >
                         {{ item.rarity }}
                     </span>
-                    <GamePixelIcon
+                    <GameCommonPixelIcon
                         :name="resolvePixelIcon(item)"
                         :size="26"
                     />
@@ -149,14 +149,14 @@
                 取消
             </SystemBtn>
         </template>
-    </GameDialogFrame>
+    </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
 import {
     RARITY_COLOR, resolvePixelIcon, type ItemLike,
-} from '../../utils/equipmentDisplay';
-import type { EquipmentSlot } from '../../../shared/types/common';
+} from '../../../utils/equipmentDisplay';
+import type { EquipmentSlot } from '../../../../shared/types/common';
 
 type CharacterDetail = {
     characterId: string;
@@ -213,7 +213,7 @@ const load = async (characterId: string) => {
         const equippedIds = new Set(Object.values(characterRes.data.equipment).filter(Boolean));
         equippedItems.value = inventoryRes.data.items.filter(item => equippedIds.has(item.itemId));
     } catch (err: unknown) {
-        console.error('[GameDeleteCharacterDialog] Failed to load character detail:', err);
+        console.error('[GameCommonDeleteCharacterDialog] Failed to load character detail:', err);
         loadError.value = err instanceof Error ? err.message : '無法取得角色資料';
     } finally {
         loading.value = false;

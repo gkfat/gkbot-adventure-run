@@ -73,7 +73,7 @@
                                 />
                             </div>
                         </div>
-                        <GameSparkFx
+                        <GameAdventureSparkFx
                             v-if="enemy.spark"
                             :key="enemy.spark.key"
                             :kind="enemy.spark.kind"
@@ -100,9 +100,9 @@
 </template>
 
 <script setup lang="ts">
-import type { WaveBanner, EnemyCardView } from '../../composables/useCombat';
-import { getEnemyAvatarTier, getEnemyPortraitUrl } from '../../utils/enemyAvatar';
-import type { EnemyFaction, NodeType } from '../../../shared/types/adventure';
+import type { WaveBanner, EnemyCardView } from '../../../composables/useCombat';
+import { getEnemyAvatarTier, getEnemyPortraitUrl } from '../../../utils/enemyAvatar';
+import type { EnemyFaction, NodeType } from '../../../../shared/types/adventure';
 
 const props = defineProps<{
     displayedBanner: WaveBanner | null;
@@ -226,7 +226,7 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     }
 
     // 受擊像素風特效：疊在卡片正中央，命中/爆擊共用同一個 pop-in→停留→
-    // 淡出的容器動畫，實際揮砍影格演繹由 GameSparkFx 自己播放（見
+    // 淡出的容器動畫，實際揮砍影格演繹由 GameAdventureSparkFx 自己播放（見
     // useCombat.ts sparkFrameUrls）。全程 0.45s，落在「500ms 內演繹完畢」的要求內。
     &__spark {
         position: absolute;

@@ -1,5 +1,5 @@
 <template>
-    <GameDialogFrame
+    <GameCommonDialogFrame
         v-model="open"
         max-width="300"
         content-class="item-detail"
@@ -23,7 +23,7 @@
                     >
                         {{ slot.item.rarity }}
                     </span>
-                    <GamePixelIcon
+                    <GameCommonPixelIcon
                         :name="resolvePixelIcon(slot.item)"
                         :size="40"
                     />
@@ -49,7 +49,7 @@
             </p>
 
             <div class="d-flex align-center ga-1 mb-3">
-                <GameCurrencyIcon :type="props.shopType" />
+                <GameCommonCurrencyIcon :type="props.shopType" />
                 <span class="font-pixel text-body-2">{{ price }}</span>
                 <span
                     v-if="!canAfford"
@@ -90,14 +90,14 @@
                 關閉
             </SystemBtn>
         </template>
-    </GameDialogFrame>
+    </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
 import {
     RARITY_COLOR, SLOT_LABEL, resolvePixelIcon, describeItem,
-} from '../../utils/equipmentDisplay';
-import type { ShopSlot, ShopType } from '../../composables/useShop';
+} from '../../../utils/equipmentDisplay';
+import type { ShopSlot, ShopType } from '../../../composables/useShop';
 
 const props = defineProps<{ shopType: ShopType }>();
 const emit = defineEmits<{ purchased: [] }>();

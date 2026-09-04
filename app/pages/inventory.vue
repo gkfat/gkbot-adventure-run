@@ -67,7 +67,7 @@
                             >
                                 {{ itemById(character?.equipment[slot])!.rarity }}
                             </span>
-                            <GamePixelIcon
+                            <GameCommonPixelIcon
                                 :name="slotIcon(slot)"
                                 :size="30"
                             />
@@ -121,7 +121,7 @@
                     >
                         {{ item.rarity }}
                     </span>
-                    <GamePixelIcon
+                    <GameCommonPixelIcon
                         :name="resolvePixelIcon(item)"
                         :size="32"
                     />
@@ -154,7 +154,7 @@
         </template>
 
         <!-- 物品詳情 dialog -->
-        <GameItemDetailDialog ref="itemDetailDialogRef" />
+        <GameCommonItemDetailDialog ref="itemDetailDialogRef" />
     </div>
 </template>
 

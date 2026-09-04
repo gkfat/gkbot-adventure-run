@@ -1,5 +1,5 @@
 <template>
-    <GameDialogFrame
+    <GameCommonDialogFrame
         :model-value="open"
         max-width="420"
         persistent
@@ -47,12 +47,12 @@
                 </div>
             </button>
         </div>
-    </GameDialogFrame>
+    </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
-import type { BlessingCandidate } from '../../composables/useAdventureRun';
-import type { BlessingRarity } from '../../../shared/constants/blessings';
+import type { BlessingCandidate } from '../../../composables/useAdventureRun';
+import type { BlessingRarity } from '../../../../shared/constants/blessings';
 
 type BlessingCandidateWithEffect = BlessingCandidate & { effectText: string };
 

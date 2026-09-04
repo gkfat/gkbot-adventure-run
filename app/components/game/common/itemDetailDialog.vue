@@ -1,5 +1,5 @@
 <template>
-    <GameDialogFrame
+    <GameCommonDialogFrame
         v-model="open"
         max-width="300"
         content-class="item-detail"
@@ -23,7 +23,7 @@
                     >
                         {{ item.rarity }}
                     </span>
-                    <GamePixelIcon
+                    <GameCommonPixelIcon
                         :name="resolvePixelIcon(item)"
                         :size="40"
                     />
@@ -111,14 +111,14 @@
         >
             {{ soldSnackbarText }}
         </v-snackbar>
-    </GameDialogFrame>
+    </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
 import {
     RARITY_COLOR, SLOT_LABEL, resolvePixelIcon, describeItem, pickTargetSlot, type ItemLike,
-} from '../../utils/equipmentDisplay';
-import type { EquipmentSlot } from '../../../shared/types/common';
+} from '../../../utils/equipmentDisplay';
+import type { EquipmentSlot } from '../../../../shared/types/common';
 
 const {
     character, equipItem, unequipItem,

@@ -1,5 +1,5 @@
 /**
- * Item/equipment icon identifiers, rendered by <GamePixelIcon> as
+ * Item/equipment icon identifiers, rendered by <GameCommonPixelIcon> as
  * `/images/pixel-icons/<name>.png` (12x12 pixel art, one file per name).
  *
  * The pixel data itself is not in the app bundle — it's authored/regenerated

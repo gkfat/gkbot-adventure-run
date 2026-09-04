@@ -59,7 +59,7 @@
                         >
                             {{ preview.rarity }}
                         </span>
-                        <GamePixelIcon
+                        <GameCommonPixelIcon
                             :name="resolvePixelIcon(preview)"
                             :size="28"
                         />
@@ -138,7 +138,7 @@
         </SystemBtn>
 
         <!-- 初始配備詳情 dialog（唯讀預覽，尚未創建角色，不提供裝備/卸下操作） -->
-        <GameDialogFrame
+        <GameCommonDialogFrame
             v-model="starterDetailOpen"
             max-width="300"
             content-class="item-detail"
@@ -155,7 +155,7 @@
                         >
                             {{ starterDetail.rarity }}
                         </span>
-                        <GamePixelIcon
+                        <GameCommonPixelIcon
                             :name="resolvePixelIcon(starterDetail)"
                             :size="40"
                         />
@@ -190,16 +190,16 @@
                     關閉
                 </SystemBtn>
             </template>
-        </GameDialogFrame>
+        </GameCommonDialogFrame>
     </div>
 </template>
 
 <script setup lang="ts">
-import { breatheFrameUrl } from '../../utils/spriteDisplay';
-import { RARITY_COLOR, resolvePixelIcon } from '../../utils/equipmentDisplay';
+import { breatheFrameUrl } from '../../../utils/spriteDisplay';
+import { RARITY_COLOR, resolvePixelIcon } from '../../../utils/equipmentDisplay';
 import {
     getStarterLoadoutPreview, type StarterLoadoutItemPreview,
-} from '../../../shared/constants/starterLoadout';
+} from '../../../../shared/constants/starterLoadout';
 
 defineEmits<{ cancel: [] }>();
 

@@ -1,6 +1,6 @@
 /**
  * Shared display data for equipment slots/rarity — used by the home screen's
- * equipment mini-slots (characterStage.vue) and the inventory page.
+ * equipment mini-slots (game/character-stage/equipSlots.vue) and the inventory page.
  */
 import {
     EquipmentSlot, Rarity, HAND_SLOTS,

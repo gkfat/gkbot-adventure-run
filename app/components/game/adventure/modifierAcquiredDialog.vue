@@ -1,5 +1,5 @@
 <template>
-    <GameDialogFrame
+    <GameCommonDialogFrame
         :model-value="!!modifier"
         persistent
         :scrim="false"
@@ -31,11 +31,11 @@
                 {{ effectText }}
             </div>
         </template>
-    </GameDialogFrame>
+    </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
-import type { RunModifier } from '../../../shared/types/adventure';
+import type { RunModifier } from '../../../../shared/types/adventure';
 
 defineProps<{ modifier: RunModifier | null; effectText?: string }>();
 </script>

@@ -84,7 +84,7 @@
                         >
                             {{ slot.item.rarity }}
                         </span>
-                        <GamePixelIcon
+                        <GameCommonPixelIcon
                             :name="resolvePixelIcon(slot.item)"
                             :size="32"
                         />
@@ -99,7 +99,7 @@
                             {{ primaryStatValue(slot.item) }}
                         </span>
                         <span class="shop-page__price font-pixel">
-                            <GameCurrencyIcon
+                            <GameCommonCurrencyIcon
                                 :type="activeTab"
                                 :size="10"
                             />
@@ -118,7 +118,7 @@
         </div>
 
         <!-- 購買 dialog -->
-        <GameShopPurchaseDialog
+        <GameCommonShopPurchaseDialog
             ref="purchaseDialogRef"
             :shop-type="activeTab"
         />

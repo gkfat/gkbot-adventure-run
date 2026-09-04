@@ -1,5 +1,5 @@
 <template>
-    <GameDialogFrame
+    <GameCommonDialogFrame
         model-value
         persistent
         :scrim="false"
@@ -36,14 +36,14 @@
                     v-if="result.goldGained"
                     class="d-flex align-center ga-1"
                 >
-                    <GameCurrencyIcon type="GOLD" :size="18" />
+                    <GameCommonCurrencyIcon type="GOLD" :size="18" />
                     <span class="font-pixel text-body-1" style="color: #e0c063;">+{{ result.goldGained }}</span>
                 </div>
                 <div
                     v-if="result.gemsGained"
                     class="d-flex align-center ga-1"
                 >
-                    <GameCurrencyIcon type="GEMS" :size="18" />
+                    <GameCommonCurrencyIcon type="GEMS" :size="18" />
                     <span class="font-pixel text-body-1" style="color: rgb(var(--v-theme-primary));">+{{ result.gemsGained }}</span>
                 </div>
                 <div
@@ -61,14 +61,14 @@
                 這次沒有任何收穫
             </div>
         </template>
-    </GameDialogFrame>
+    </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
 import {
     ref, watch,
 } from 'vue';
-import type { EventOutcome } from '../../composables/useAdventureRun';
+import type { EventOutcome } from '../../../composables/useAdventureRun';
 
 const props = defineProps<{ result: EventOutcome | null; started: boolean }>();
 

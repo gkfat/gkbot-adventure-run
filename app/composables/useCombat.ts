@@ -94,7 +94,7 @@ export type EnemyCardView = {
 };
 
 // 受擊特效改用揮砍(從右上到左下的刀痕)影格序列演繹路徑，而非單張靜態圖：一般
-// 命中 4 格、爆擊(紅色、粒子更多更強烈) 5 格，圖檔見 GameSparkFx。
+// 命中 4 格、爆擊(紅色、粒子更多更強烈) 5 格，圖檔見 GameAdventureSparkFx。
 export const SPARK_FRAME_MS = 90;
 const HIT_SPARK_FRAME_COUNT = 4;
 const CRIT_SPARK_FRAME_COUNT = 5;

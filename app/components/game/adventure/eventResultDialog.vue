@@ -1,5 +1,5 @@
 <template>
-    <GameDialogFrame
+    <GameCommonDialogFrame
         :model-value="open"
         persistent
         :scrim="false"
@@ -92,12 +92,12 @@
                 </div>
             </div>
         </template>
-    </GameDialogFrame>
+    </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
-import type { EventOutcome } from '../../composables/useAdventureRun';
-import { EventType } from '../../../shared/types/adventure';
+import type { EventOutcome } from '../../../composables/useAdventureRun';
+import { EventType } from '../../../../shared/types/adventure';
 
 defineProps<{ open: boolean; result: EventOutcome | null }>();
 </script>

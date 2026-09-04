@@ -9,7 +9,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ShopType } from '../../composables/useShop';
+import type { ShopType } from '../../../composables/useShop';
 
 withDefaults(defineProps<{
     type: ShopType;

@@ -1,5 +1,5 @@
 <template>
-    <GameDialogFrame
+    <GameCommonDialogFrame
         :model-value="modelValue"
         max-width="420"
         content-class="adventure-log-dialog"
@@ -89,12 +89,12 @@
         >
             關閉
         </SystemBtn>
-    </GameDialogFrame>
+    </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
-import type { RunLogEntry } from '../../composables/useAdventureRun';
-import { describeCombatLogEntry } from '../../utils/combatLogDisplay';
+import type { RunLogEntry } from '../../../composables/useAdventureRun';
+import { describeCombatLogEntry } from '../../../utils/combatLogDisplay';
 
 defineProps<{ modelValue: boolean; entries: RunLogEntry[] }>();
 defineEmits<{ 'update:modelValue': [value: boolean] }>();

@@ -6,7 +6,7 @@
 </template>
 
 <script setup lang="ts">
-import { SPARK_FRAME_MS, sparkFrameUrls } from '../../composables/useCombat';
+import { SPARK_FRAME_MS, sparkFrameUrls } from '../../../composables/useCombat';
 
 // 播放揮砍受擊特效的影格序列(見 useCombat.ts sparkFrameUrls)：掛載時從第一格
 // 開始，每 SPARK_FRAME_MS 前進一格，播到最後一格就停在原地，不循環——呼叫端

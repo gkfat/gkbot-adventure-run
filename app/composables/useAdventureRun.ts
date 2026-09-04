@@ -187,7 +187,7 @@ const lastCombatResult = ref<CombatApiResult | null>(null);
 const lastEventResult = ref<EventOutcome | null>(null);
 const lastSettlement = ref<SettlementView | null>(null);
 // A settlement delivered by startCombat() on a loss, held back from
-// lastSettlement until the caller confirms GameCombatResultPanel finished
+// lastSettlement until the caller confirms GameAdventureCombatResultPanel finished
 // playing back the combat log — see startCombat/commitPendingSettlement.
 const pendingSettlement = ref<SettlementView | null>(null);
 let pendingSettlementCharacterId: string | null = null;
@@ -339,7 +339,7 @@ export const useAdventureRun = () => {
         try {
             const response = await api.post<StartCombatResponse>('/api/adventure/combat/start', { characterId });
             lastCombatResult.value = response.data;
-            // Not appended to runLog here — GameCombatResultPanel plays the
+            // Not appended to runLog here — GameAdventureCombatResultPanel plays the
             // combatLog back sequentially, so writing the full result now
             // would let the 記事本 spoil an in-progress fight. The caller
             // (adventure.vue) calls commitCombatLog() once the panel's
@@ -349,7 +349,7 @@ export const useAdventureRun = () => {
                 // fetchCurrent() below would flip currentRun to null before the
                 // player has even seen the fight play out — the page would
                 // bounce straight to the "no active run" empty state instead
-                // of GameCombatResultPanel (see known-issue.md). Hold the
+                // of GameAdventureCombatResultPanel (see known-issue.md). Hold the
                 // settlement and skip refetching until playback finishes;
                 // the caller applies it via commitPendingSettlement().
                 pendingSettlement.value = response.data.settlement;
@@ -427,7 +427,7 @@ export const useAdventureRun = () => {
 
     /**
      * 把目前的 `lastCombatResult` 寫進記事本（runLog）。呼叫時機是
-     * GameCombatResultPanel 的 `playback-done` 事件觸發後，而不是戰鬥
+     * GameAdventureCombatResultPanel 的 `playback-done` 事件觸發後，而不是戰鬥
      * API 一回來就寫——避免玩家還沒看完戰鬥演繹，記事本就先暴雷結果。
      */
     const commitCombatLog = () => {
@@ -440,7 +440,7 @@ export const useAdventureRun = () => {
     /**
      * 套用 startCombat() 因為戰敗而暫扣住的結算摘要，並重新抓一次 run（此時
      * 才會真的變成 null）。呼叫時機跟 commitCombatLog() 一樣，是
-     * GameCombatResultPanel 的 `playback-done` 事件觸發後——見 startCombat
+     * GameAdventureCombatResultPanel 的 `playback-done` 事件觸發後——見 startCombat
      * 裡的說明，戰敗結算不能在玩家看完戰鬥演繹前就套用。
      */
     const commitPendingSettlement = async () => {

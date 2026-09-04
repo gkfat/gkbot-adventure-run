@@ -9,7 +9,7 @@
 </template>
 
 <script setup lang="ts">
-import type { PixelIconName } from '../../utils/pixelIcons';
+import type { PixelIconName } from '../../../utils/pixelIcons';
 
 withDefaults(defineProps<{
     name: PixelIconName;

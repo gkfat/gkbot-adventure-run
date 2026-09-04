@@ -2,14 +2,14 @@
     <div class="resource-bar">
         <div class="resource-bar__row d-flex align-center ga-4 px-4">
             <div class="d-flex align-center ga-1">
-                <GameCurrencyIcon type="GOLD" />
+                <GameCommonCurrencyIcon type="GOLD" />
                 <span class="font-pixel text-caption resource-bar__value">
                     {{ character ? character.gold : '—' }}
                 </span>
             </div>
 
             <div class="d-flex align-center ga-1">
-                <GameCurrencyIcon type="GEMS" />
+                <GameCommonCurrencyIcon type="GEMS" />
                 <span class="font-pixel text-caption resource-bar__value">
                     {{ character ? character.gems : '—' }}
                 </span>
@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { EXP_TABLE } from '../../../shared/types/character';
+import { EXP_TABLE } from '../../../../shared/types/character';
 
 const { character } = useCharacter();
 

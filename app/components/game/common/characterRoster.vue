@@ -31,7 +31,7 @@
                         </div>
                         <div class="d-flex align-center ga-3 mt-1">
                             <div class="d-flex align-center ga-1">
-                                <GameCurrencyIcon
+                                <GameCommonCurrencyIcon
                                     type="GOLD"
                                     :size="12"
                                 />
@@ -40,7 +40,7 @@
                                 </span>
                             </div>
                             <div class="d-flex align-center ga-1">
-                                <GameCurrencyIcon
+                                <GameCommonCurrencyIcon
                                     type="GEMS"
                                     :size="12"
                                 />
@@ -84,7 +84,7 @@
             {{ rosterFull ? `角色已達上限 (${roster.length}/3)` : `新建角色 (${roster.length}/3)` }}
         </SystemBtn>
 
-        <GameDeleteCharacterDialog ref="deleteDialogRef" />
+        <GameCommonDeleteCharacterDialog ref="deleteDialogRef" />
     </div>
 </template>
 

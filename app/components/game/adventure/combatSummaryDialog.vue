@@ -1,5 +1,5 @@
 <template>
-    <GameDialogFrame
+    <GameCommonDialogFrame
         model-value
         persistent
         :scrim="false"
@@ -80,7 +80,7 @@
                         >
                             {{ item.rarity }}
                         </span>
-                        <GamePixelIcon
+                        <GameCommonPixelIcon
                             :name="resolvePixelIcon(item)"
                             :size="32"
                         />
@@ -99,13 +99,13 @@
                 </div>
             </div>
         </template>
-    </GameDialogFrame>
+    </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
 import {
     RARITY_COLOR, resolvePixelIcon, describeItem, type ItemLike,
-} from '../../utils/equipmentDisplay';
+} from '../../../utils/equipmentDisplay';
 
 defineProps<{
     victory: boolean;

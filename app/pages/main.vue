@@ -46,13 +46,13 @@
         <GameCharacterStage v-else-if="selectedCharacterId" />
 
         <!-- 選擇職業建立新角色（roster 為空或玩家主動點新建） -->
-        <GameArchetypeGallery
+        <GameCommonArchetypeGallery
             v-else-if="roster.length === 0 || showGallery"
             @cancel="showGallery = false"
         />
 
         <!-- 角色列表 -->
-        <GameCharacterRoster v-else @create="showGallery = true" />
+        <GameCommonCharacterRoster v-else @create="showGallery = true" />
     </div>
 </template>
 
