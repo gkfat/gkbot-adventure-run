@@ -844,7 +844,7 @@ import type { Stats } from '../../shared/types/common';
 import { describeItem, resolvePixelIcon, RARITY_COLOR, type ItemLike } from '../utils/equipmentDisplay';
 import type { EventNodeData, BlessingNodeData, RestNodeData } from '../composables/useAdventureRun';
 import { pickIntroNarrative, pickTransitionNarrative, REST_NARRATIVE } from '../constants/adventureNarrative';
-import { backSpriteUrl } from '../utils/spriteDisplay';
+import { backSpriteUrl, idleFrameUrl } from '../utils/spriteDisplay';
 import { FACILITY_SEVERITY_TINT, getFacilityBackgroundUrl } from '../utils/facilityBackground';
 import { useCombat } from '../composables/useCombat';
 
@@ -878,8 +878,9 @@ const enteredAdventureCold = !checked.value;
 
 const showLogDialog = ref(false);
 const walkFrame = useWalkFrame();
+const idleStep = useIdleFrame();
 const characterSpriteSrc = computed(() => (
-    character.value ? backSpriteUrl(character.value.spriteUrl) : ''
+    character.value ? idleFrameUrl(backSpriteUrl(character.value.spriteUrl), idleStep.value) : ''
 ));
 
 // 戰鬥演出狀態集中在這裡（而非 GameAdventureCombatResultPanel 內部）：探索與戰鬥共用同一個

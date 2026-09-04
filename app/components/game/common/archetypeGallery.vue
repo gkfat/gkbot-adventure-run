@@ -18,7 +18,7 @@
                     @click="selectedIndex = index"
                 >
                     <img
-                        :src="breatheFrameUrl(archetype.spriteUrl, breathStep)"
+                        :src="idleFrameUrl(archetype.spriteUrl, idleStep)"
                         :alt="archetype.className"
                         width="100"
                         height="100"
@@ -195,7 +195,7 @@
 </template>
 
 <script setup lang="ts">
-import { breatheFrameUrl } from '../../../utils/spriteDisplay';
+import { idleFrameUrl } from '../../../utils/spriteDisplay';
 import { RARITY_COLOR, resolvePixelIcon } from '../../../utils/equipmentDisplay';
 import {
     getStarterLoadoutPreview, type StarterLoadoutItemPreview,
@@ -213,7 +213,7 @@ const openStarterDetail = (preview: StarterLoadoutItemPreview) => {
 const {
     archetypes, roster, loading, createCharacter,
 } = useCharacter();
-const breathStep = useIdleBreathingFrame();
+const idleStep = useIdleFrame();
 
 const selectedIndex = ref(0);
 const selected = computed(() => archetypes.value[selectedIndex.value] ?? archetypes.value[0] ?? null);

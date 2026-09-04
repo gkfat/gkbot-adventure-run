@@ -69,6 +69,7 @@
                     :attributes="character.attributes"
                     :stats="character.stats"
                     :equipment-bonus="character.equipmentBonus"
+                    :talent-bonus="character.talentBonus"
                     :pending-allocation="pendingAllocation"
                     :total-pending="totalPending"
                 />
@@ -108,7 +109,7 @@
 
                         <div class="character-stage__sprite-wrap">
                             <img
-                                :src="breatheFrameUrl(character.spriteUrl, breathStep)"
+                                :src="idleFrameUrl(character.spriteUrl, idleStep)"
                                 alt="角色"
                                 width="140"
                                 height="140"
@@ -147,7 +148,7 @@
 import { getStageDisplayName } from '../../../../shared/types/adventure';
 import { calculateCombatPower } from '../../../../shared/utils/calculateStats';
 import { EQUIP_SLOTS_LEFT, EQUIP_SLOTS_RIGHT, type ItemLike } from '../../../utils/equipmentDisplay';
-import { breatheFrameUrl } from '../../../utils/spriteDisplay';
+import { idleFrameUrl } from '../../../utils/spriteDisplay';
 
 const {
     character, loading, error, fetchCharacter, allocateAttributes,
@@ -159,7 +160,7 @@ const {
     currentRun, hasActiveRun, loading: adventureLoading, fetchCurrent: fetchCurrentRun, start: startAdventure,
     abandon: abandonAdventure,
 } = useAdventureRun();
-const breathStep = useIdleBreathingFrame();
+const idleStep = useIdleFrame();
 
 // 剛按下「開始探索」、run 還沒建立完成時，hasActiveRun／currentRun 會在
 // startAdventure() 內部（fetchCurrent）比 navigateTo('/adventure') 完成頁面
