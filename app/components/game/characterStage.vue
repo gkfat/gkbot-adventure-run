@@ -283,41 +283,51 @@
                 <!-- 中斷中的冒險：顯示上次斷掉的位置 -->
                 <div
                     v-if="interruptedRunLabel"
-                    class="text-caption text-medium-emphasis text-center character-stage__interrupted-run"
+                    class="text-caption text-medium-emphasis character-stage__interrupted-run"
                 >
                     上次探索中斷於：{{ interruptedRunLabel }}
                 </div>
-                <SystemBtn
-                    block
-                    size="x-large"
-                    variant="flat"
-                    color="primary"
-                    class="text-none mt-2 mx-auto character-stage__adventure-cta"
-                    :loading="adventureLoading"
-                    @click="handleAdventureCta"
-                >
-                    <span class="d-flex flex-column">
-                        <span
-                            v-if="levelProgress"
-                            class="text-caption font-weight-regular character-stage__adventure-cta-progress"
+                <div class="d-flex ga-2">
+                    <div style="flex: 1;">
+                        <SystemBtn
+                            block
+                            size="x-large"
+                            variant="flat"
+                            color="primary"
+                            class="text-none mx-auto character-stage__adventure-cta"
+                            :loading="adventureLoading"
+                            @click="handleAdventureCta"
                         >
-                            {{ levelProgress.stageName }} - {{ levelProgress.levelIndex }}/{{ levelProgress.levelTotal }}
-                        </span>
-                        <span>{{ adventureCtaLabel }}</span>
-                    </span>
-                </SystemBtn>
-                <!-- 放棄本次探索：僅在有進行中的 run 時顯示 -->
-                <SystemBtn
-                    v-if="hasActiveRun && !justStarting"
-                    block
-                    color="error"
-                    size="x-small"
-                    class="text-none mt-1 mx-auto"
-                    :loading="adventureLoading"
-                    @click="handleAbandonRun"
-                >
-                    放棄本次探索
-                </SystemBtn>
+                            <span class="d-flex flex-column">
+                                <span
+                                    v-if="levelProgress"
+                                    class="text-caption font-weight-regular character-stage__adventure-cta-progress"
+                                >
+                                    {{ levelProgress.stageName }} - {{ levelProgress.levelIndex }}/{{ levelProgress.levelTotal }}
+                                </span>
+                                <span>{{ adventureCtaLabel }}</span>
+                            </span>
+                        </SystemBtn>
+                    </div>
+                    <!-- 放棄探索：僅在有進行中的 run 時顯示，與「繼續探索」同列、各佔一半寬度 -->
+                    <div
+                        v-if="hasActiveRun && !justStarting"
+                        style="flex: 1;"
+                    >
+                        <SystemBtn
+                            block
+                            color="error"
+                            size="x-large"
+                            class="text-none mx-auto"
+                            :loading="adventureLoading"
+                            @click="handleAbandonRun"
+                        >
+                            <span class="d-flex flex-column">
+                                放棄探索
+                            </span>
+                        </SystemBtn>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
