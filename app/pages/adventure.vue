@@ -479,54 +479,31 @@
 
                 <!-- EVENT：顯示事件描述；有 choices 顯示選項（留在這裡，因為要對應多個選項按鈕），
                      沒有 choices 時「繼續」改到下方固定的 __actions 區塊，跟角色 stage 對齊
-                     （見下方 actions 的對應分支）。結果在 EVENT/RESOLUTION 都顯示，直到玩家繼續前進 -->
+                     （見下方 actions 的對應分支）。事件結果已由 GameAdventureEventResultDialog 顯示，
+                     這裡只顯示描述，不重複顯示結果 -->
                 <div
                     v-else-if="currentRun.state === AdventureStateType.EVENT || (currentRun.state === AdventureStateType.RESOLUTION && lastEventResult && !wheelResultPending)"
                     class="adventure-page__box mb-3"
                 >
-                    <template v-if="lastEventResult">
-                        <div class="text-body-2 mb-2">
-                            {{ lastEventResult.description }}
-                        </div>
-                        <div class="d-flex flex-wrap ga-4 text-caption text-medium-emphasis">
-                            <span v-if="lastEventResult.hpHealed">HP +{{ lastEventResult.hpHealed }}</span>
-                            <span v-if="lastEventResult.goldGained">金幣 +{{ lastEventResult.goldGained }}</span>
-                            <span v-if="lastEventResult.gemsGained">寶石 +{{ lastEventResult.gemsGained }}</span>
-                            <span v-if="lastEventResult.blessingGranted">獲得一個祝福</span>
-                            <span v-if="lastEventResult.curseApplied">遭受一個詛咒</span>
-                        </div>
-                        <div
-                            v-if="lastEventResult.itemsGained?.length"
-                            class="d-flex flex-column ga-2 mt-2"
+                    <div class="text-body-2 mb-3">
+                        {{ eventNodeData?.description ?? lastEventResult?.description }}
+                    </div>
+                    <div
+                        v-if="eventNodeData?.choices?.length"
+                        class="d-flex flex-column ga-2"
+                    >
+                        <SystemBtn
+                            v-for="(choice, index) in eventNodeData.choices"
+                            :key="index"
+                            variant="outlined"
+                            color="primary"
+                            class="text-none"
+                            :loading="runLoading"
+                            @click="handleResolveEvent(index)"
                         >
-                            <GameCommonItemRewardChip
-                                v-for="gainedItem in lastEventResult.itemsGained"
-                                :key="gainedItem.itemId"
-                                :item="gainedItem"
-                            />
-                        </div>
-                    </template>
-                    <template v-else>
-                        <div class="text-body-2 mb-3">
-                            {{ eventNodeData?.description }}
-                        </div>
-                        <div
-                            v-if="eventNodeData?.choices?.length"
-                            class="d-flex flex-column ga-2"
-                        >
-                            <SystemBtn
-                                v-for="(choice, index) in eventNodeData.choices"
-                                :key="index"
-                                variant="outlined"
-                                color="primary"
-                                class="text-none"
-                                :loading="runLoading"
-                                @click="handleResolveEvent(index)"
-                            >
-                                {{ choice.label }}
-                            </SystemBtn>
-                        </div>
-                    </template>
+                            {{ choice.label }}
+                        </SystemBtn>
+                    </div>
                 </div>
 
                 <!-- REST：可使用藥水 -->
@@ -1567,7 +1544,7 @@ onMounted(() => {
     // 時被重新掛載、看起來像是重播了一次（見使用者回報：首次受擊 effect 跳兩/三次）。
     &__stage-fx-anchor {
         position: relative;
-        height: 150px;
+        height: 120px;
         aspect-ratio: 1;
     }
 

@@ -18,6 +18,14 @@ const WAVE_END_DELAY_MS = 1000;
 const BANNER_TEXT_CYCLE_MS = BANNER_TEXT_ENTER_DELAY_MS + BANNER_TEXT_HOLD_MS + BANNER_TEXT_EXIT_MS;
 const FIRST_WAVE_DELAY_MS = BANNER_TEXT_CYCLE_MS + BANNER_POST_DELAY_MS;
 const WAVE_TRANSITION_DELAY_MS = WAVE_END_DELAY_MS + (BANNER_TEXT_CYCLE_MS * 3) + BANNER_POST_DELAY_MS;
+// 敵人單排最多同時顯示一個 wave（見 combat.service.ts spawnWave，每個 wave
+// 最多 3 隻），換 wave 時的進出場動畫時長：banner 整條完全消失（goneAt）後，
+// 先讓上一個 wave 的敵人往上退場 ENEMY_WAVE_EXIT_MS，退場播完才換上下一個
+// wave、由上往下滑入 ENEMY_WAVE_ENTER_MS（見 waveDisplay，使用者要求兩波
+// 不要同時疊在畫面上）。第一個 wave 沒有「上一波」可以退場，goneAt 後直接
+// 播進場。
+const ENEMY_WAVE_EXIT_MS = 320;
+const ENEMY_WAVE_ENTER_MS = 320;
 // 被打中會讓「這個單位自己的下一次出手」延後最多 STUN_MS，模擬視覺上的頓挫感
 // （伺服器排程本身不會因為受擊延後 nextAttackAt，見 combat.service.ts；這純粹
 // 是演出）。
@@ -91,6 +99,7 @@ export type EnemyCardView = {
     cardFx?: CardFx;
     spark?: SparkFx;
     damageText?: DamageTextFx;
+    rowState: 'entering' | 'exiting' | 'idle';
 };
 
 // 受擊特效改用揮砍(從右上到左下的刀痕)影格序列演繹路徑，而非單張靜態圖：一般
@@ -454,30 +463,50 @@ export function useCombat(
     });
     const displayedBanner = computed(() => waveBanner.value ?? combatEndBanner.value);
 
-    // 判斷「目前播放進度落在哪個 wave 已經揭露」——用 banner 消失的時間點
-    // （goneAt）而非充能開始的時間點（startAt）：增援/下一波敵人要在 banner
-    // 播完、退場的當下就站上場（給玩家時間看清楚新一波敵人），而不是要等到
-    // BANNER_POST_DELAY_MS 停頓結束、真正開始出手攻擊的那一刻才出現在畫面上
-    // （見使用者回報：敵人會在被攻擊到時才出現）。
-    const revealedWave = computed(() => {
-        let wave = waveBannerTimings.value[0]?.wave ?? 0;
-        for (const {
-            wave: candidateWave, goneAt, 
-        } of waveBannerTimings.value) {
-            if (goneAt > nowMs.value) break;
-            wave = candidateWave;
+    // 判斷「目前該顯示哪個 wave、以及進出場動畫播到哪個階段」——一律只顯示單
+    // 一個 wave（畫面上永遠最多一排、最多 3 隻，見 spawnWave），不像過去累積
+    // 顯示所有已揭露過的 wave。以 banner 消失的時間點（goneAt）為分界：banner
+    // 播完的瞬間先讓「上一個 wave」進入 exiting（往上退場），退場動畫播完後
+    // 才切換成「這個 wave」並進入 entering（由上往下滑入），最後回到 idle。
+    // 第一個 wave 沒有「上一個 wave」可以退場，goneAt 後直接進 entering。
+    const waveDisplay = computed<{ wave: number; state: 'entering' | 'exiting' | 'idle' }>(() => {
+        const timings = waveBannerTimings.value;
+        if (timings.length === 0) return {
+            wave: 0, state: 'idle', 
+        };
+
+        let activeIndex = 0;
+        for (let i = 0; i < timings.length; i += 1) {
+            if (timings[i]!.goneAt <= nowMs.value) activeIndex = i;
+            else break;
         }
-        return wave;
+
+        const timing = timings[activeIndex]!;
+        const exitEndAt = activeIndex === 0 ? timing.goneAt : timing.goneAt + ENEMY_WAVE_EXIT_MS;
+        const enterEndAt = exitEndAt + ENEMY_WAVE_ENTER_MS;
+
+        if (activeIndex > 0 && nowMs.value < exitEndAt) {
+            return {
+                wave: timings[activeIndex - 1]!.wave, state: 'exiting', 
+            };
+        }
+        if (nowMs.value < enterEndAt) return {
+            wave: timing.wave, state: 'entering', 
+        };
+        return {
+            wave: timing.wave, state: 'idle', 
+        };
     });
 
     // 敵人狀態：以目前已播放的 log 批次逐步套用 targetHpRemaining/DEATH，還原
     // 每隻敵人「播放進度當下」的 HP 與存活狀態；只有 Boss 戰（有任一 isBoss）
-    // 才顯示頭目/小兵的階級標籤，一般戰鬥沒有這個區分，不硬套標籤。尚未輪到的
-    // wave（見 revealedWave）其敵人先過濾掉，不提前出現在場上。
+    // 才顯示頭目/小兵的階級標籤，一般戰鬥沒有這個區分，不硬套標籤。只保留
+    // 目前正在顯示的那個 wave（見 waveDisplay），不是這個 wave 的敵人一律
+    // 過濾掉，換 wave 時交由 waveDisplay 的 exiting/entering 階段接手畫面。
     const hasBossComposition = computed(() => getResult()?.summary.enemies.some(enemy => enemy.isBoss) ?? false);
     const enemyStatus = computed(() => {
         const status = new Map((getResult()?.summary.enemies ?? [])
-            .filter(enemy => (enemyWaveById.value.get(enemy.enemyId) ?? 0) <= revealedWave.value)
+            .filter(enemy => (enemyWaveById.value.get(enemy.enemyId) ?? 0) === waveDisplay.value.wave)
             .map(enemy => [
                 enemy.enemyId, {
                     enemyId: enemy.enemyId,
@@ -751,6 +780,7 @@ export function useCombat(
         cardFx: cardFx.get(enemy.enemyId),
         spark: sparkFx.get(enemy.enemyId),
         damageText: damageTextFx.get(enemy.enemyId),
+        rowState: waveDisplay.value.state,
     })));
     const playerGauge = computed(() => gaugeAt('player', nowMs.value));
     const playerCardFx = computed(() => cardFx.get('player'));

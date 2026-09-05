@@ -1,7 +1,9 @@
 <template>
     <div class="combat-result-panel">
-        <!-- 戰場：敵人單排橫向卡片（不換行，過多時橫向捲動）。玩家不再是這裡的一張小卡，
-             改由 adventure.vue 的持久化「大角色 stage」承接（見該檔案），這裡只負責
+        <!-- 戰場：敵人卡片橫向排列單排最多 3 張（每個 wave 最多 3 隻，見 spawnWave），
+             一次只顯示目前這個 wave，換 wave 時上一波先往上滑出、下一波再由上滑入
+             （見 useCombat.ts waveDisplay）。玩家不再是這裡的一張小卡，改由
+             adventure.vue 的持久化「大角色 stage」承接（見該檔案），這裡只負責
              banner + 敵方卡片 + 結算文字。 -->
         <div class="combat-result-panel__arena d-flex flex-column">
             <div
@@ -24,12 +26,16 @@
                     </span>
                 </div>
             </div>
-            <div class="combat-result-panel__enemy-row d-flex flex-nowrap justify-center">
+            <div class="combat-result-panel__enemy-row d-flex justify-center">
                 <div
                     v-for="enemy in enemyCards"
                     :key="enemy.enemyId"
                     class="combat-result-panel__unit"
-                    :class="{ 'combat-result-panel__unit--dead': !enemy.alive }"
+                    :class="{
+                        'combat-result-panel__unit--dead': !enemy.alive,
+                        'combat-result-panel__unit--entering': enemy.rowState === 'entering',
+                        'combat-result-panel__unit--exiting': enemy.rowState === 'exiting',
+                    }"
                 >
                     <div class="combat-result-panel__fx-anchor">
                         <div
@@ -167,15 +173,14 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     }
 
     &__enemy-row {
-        // overflow-x/overflow-y 只要有一軸不是 visible，另一軸宣告成 visible
-        // 會被瀏覽器強制轉成 auto（CSS Overflow 規格），所以這裡兩軸都明確宣告
-        // 非 visible，改用 padding-block 預留 lunge/spark 特效的位移空間，
-        // 靠 margin-block 抵消 padding 造成的版面位移，避免多出垂直捲軸。
-        overflow-x: auto;
-        overflow-y: hidden;
-        gap: 6px;
+        // 單排最多 3 張卡片（每個 wave 最多 3 隻，見 spawnWave），一次只顯示
+        // 一個 wave，不會換行也不需要再縮放卡片。用 padding-block 預留
+        // lunge/spark 特效的位移空間，靠 margin-block 抵消 padding 造成的
+        // 版面位移，避免多出捲軸。
+        column-gap: 6px;
+        margin-inline: auto;
         padding: 16px 0 18px;
-        margin: -16px 0 -18px;
+        margin-block: -16px -18px;
         // 出手方向：敵人向下（朝玩家）撲出去再彈回來。
         --fx-dir: 1;
     }
@@ -187,6 +192,16 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
 
         &--dead {
             opacity: 0.45;
+        }
+
+        // 換 wave 進出場：上一波往上滑出淡出，下一波由上滑入淡入，時長跟
+        // useCombat.ts 的 ENEMY_WAVE_EXIT_MS/ENEMY_WAVE_ENTER_MS 對齊。
+        &--entering {
+            animation: combat-result-panel-unit-enter 0.32s ease-out;
+        }
+
+        &--exiting {
+            animation: combat-result-panel-unit-exit 0.32s ease-in forwards;
         }
     }
 
@@ -453,6 +468,31 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     100% {
         opacity: 0;
         transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+// 換 wave 進場：新一波敵人從上方滑入並淡入到定位（見 script rowState）。
+@keyframes combat-result-panel-unit-enter {
+    0% {
+        opacity: 0;
+        transform: translateY(-40px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+// 換 wave 退場：上一波敵人往上滑出並淡出（forwards 讓退場保持在畫面外，
+// 直到 DOM 真正被下一波取代）。
+@keyframes combat-result-panel-unit-exit {
+    0% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-40px);
     }
 }
 
