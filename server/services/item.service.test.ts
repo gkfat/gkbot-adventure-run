@@ -52,17 +52,32 @@ describe('rollRarity', () => {
 });
 
 describe('rollStats', () => {
-    it('rolls equipment stats within the baseStatsRange for the rarity', () => {
-        const stats = rollStats('salvaged_wrench', Rarity.N);
-        expect(stats.ATK).toBeGreaterThanOrEqual(5);
-        expect(stats.ATK).toBeLessThanOrEqual(10);
-        expect(stats.healPercent).toBeUndefined();
+    it('rolls equipment stats within the baseStatsRange pool for the rarity', () => {
+        // baseStatsRange is now a *pool* — only a random subset of its keys is
+        // rolled as a bonus, so ATK isn't guaranteed on any single roll, and N
+        // may additionally roll it as a negative "拖累" (always < 0, so it's
+        // distinguishable from a bonus roll which is always within [5, 10]).
+        let sawAtkBonus = false;
+        for (let i = 0; i < 100; i++) {
+            const stats = rollStats('salvaged_wrench', Rarity.N);
+            expect(stats.healPercent).toBeUndefined();
+            if (stats.ATK !== undefined && stats.ATK > 0) {
+                sawAtkBonus = true;
+                expect(stats.ATK).toBeGreaterThanOrEqual(5);
+                expect(stats.ATK).toBeLessThanOrEqual(10);
+            }
+        }
+        expect(sawAtkBonus).toBe(true);
     });
 
     it('rolls higher stat ranges for higher rarities', () => {
-        const nStats = rollStats('salvaged_wrench', Rarity.N);
-        const lStats = rollStats('salvaged_wrench', Rarity.L);
-        expect(lStats.ATK as number).toBeGreaterThan(nStats.ATK as number);
+        // Compares the template's own N/L pool ranges directly rather than two
+        // rollStats() outputs, since a subset-picked key may not appear on either roll.
+        const template = getItemTemplate('salvaged_wrench');
+        const nRange = template?.baseStatsRange?.[Rarity.N]?.ATK;
+        const lRange = template?.baseStatsRange?.[Rarity.L]?.ATK;
+        expect(lRange?.min).toBeGreaterThan(nRange?.min ?? 0);
+        expect(lRange?.max).toBeGreaterThan(nRange?.max ?? 0);
     });
 
     it('rolls healPercent within range for POTION templates', () => {
@@ -119,17 +134,35 @@ describe('generateItemInstance', () => {
         expect(instance.weaponWeightClass).toBeUndefined();
     });
 
-    it('rolls a negative dodgeChanceMod for a HEAVY item, within the rarity range', () => {
-        const instance = generateItemInstance('riot_shield_scrap', {
-            source: ItemSource.DROP, maxRarity: Rarity.N,
-        });
-        expect(instance.weaponWeightClass).toBe(WeaponWeightClass.HEAVY);
-        expect(instance.stats.dodgeChanceMod).toBeLessThan(0);
+    it('rolls a negative dodgeChanceMod for a HEAVY item when picked, within the rarity range', () => {
+        // dodgeChanceMod is part of the pool now, not guaranteed on every roll —
+        // loop until it's picked at least once.
+        let sawDodgeMod = false;
+        for (let i = 0; i < 100; i++) {
+            const instance = generateItemInstance('riot_shield_scrap', {
+                source: ItemSource.DROP, maxRarity: Rarity.N,
+            });
+            expect(instance.weaponWeightClass).toBe(WeaponWeightClass.HEAVY);
+            if (instance.stats.dodgeChanceMod !== undefined) {
+                sawDodgeMod = true;
+                expect(instance.stats.dodgeChanceMod).toBeLessThan(0);
+            }
+        }
+        expect(sawDodgeMod).toBe(true);
     });
 
-    it('does not roll dodgeChanceMod for a non-HEAVY item', () => {
-        const instance = generateItemInstance('salvaged_wrench', { source: ItemSource.SHOP });
-        expect(instance.stats.dodgeChanceMod).toBeUndefined();
+    it('rolls a positive dodgeChanceMod for a MEDIUM item when picked, never negative', () => {
+        // MEDIUM items now carry a mild positive dodgeChanceMod in their pool
+        // (as opposed to HEAVY's negative tradeoff) — it just isn't guaranteed on every roll.
+        let sawDodgeMod = false;
+        for (let i = 0; i < 100; i++) {
+            const instance = generateItemInstance('salvaged_wrench', { source: ItemSource.SHOP });
+            if (instance.stats.dodgeChanceMod !== undefined) {
+                sawDodgeMod = true;
+                expect(instance.stats.dodgeChanceMod).toBeGreaterThan(0);
+            }
+        }
+        expect(sawDodgeMod).toBe(true);
     });
 
     it('resolves name/description from the template on an EQUIPMENT instance', () => {

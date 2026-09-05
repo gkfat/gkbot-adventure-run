@@ -2,22 +2,140 @@
  * Item templates (equipment/potion static definitions)
  */
 
-import type { ItemTemplate } from '../../../shared/types';
+import type {
+    ItemTemplate, ItemStats, StatRange,
+} from '../../../shared/types';
 import {
     ItemType, EquipmentSlot, Rarity, WeaponWeightClass,
 } from '../../../shared/types';
 
 /**
  * Shared rarity weight curve for all equipment/potion templates below
- * (N/R/SR/SSR/L = 50/30/15/4/1).
+ * (N/R/SR/SSR/L = 50.89/30.54/15.27/3/0.3).
  */
 const STANDARD_RARITY_WEIGHTS = {
-    [Rarity.N]: 50,
-    [Rarity.R]: 30,
-    [Rarity.SR]: 15,
-    [Rarity.SSR]: 4,
-    [Rarity.L]: 1,
+    [Rarity.N]: 50.89,
+    [Rarity.R]: 30.54,
+    [Rarity.SR]: 15.27,
+    [Rarity.SSR]: 3,
+    [Rarity.L]: 0.3,
 };
+
+/**
+ * Growth curve for primary/HP stats (ATK/DEF/HP), applied to each template's
+ * N-tier baseline to derive R/SR/SSR/L. Kept steep (~2.5-3x per step) so L —
+ * now a 0.3% roll — reads as a genuine jackpot rather than a marginal upgrade.
+ */
+const PRIMARY_STAT_MULTIPLIER: Record<Rarity, number> = {
+    [Rarity.N]: 1,
+    [Rarity.R]: 2.5,
+    [Rarity.SR]: 6,
+    [Rarity.SSR]: 15,
+    [Rarity.L]: 35,
+};
+
+/**
+ * Growth curve for percentage-based mods (actionSpeedMod/dodgeChanceMod).
+ * These are bounded fractions (e.g. -0.4..0.4), so they use a gentler curve
+ * than PRIMARY_STAT_MULTIPLIER to avoid absurd swings (e.g. -900% dodge) at L.
+ */
+const MOD_STAT_MULTIPLIER: Record<Rarity, number> = {
+    [Rarity.N]: 1,
+    [Rarity.R]: 1.8,
+    [Rarity.SR]: 3,
+    [Rarity.SSR]: 4.6,
+    [Rarity.L]: 6.5,
+};
+
+/** One pool stat key's N-tier baseline range, used as input to `buildStatsRange`. */
+type StatBaseline = {
+    key: keyof ItemStats;
+    base: StatRange;
+    /** actionSpeedMod/dodgeChanceMod — scaled by MOD_STAT_MULTIPLIER instead of PRIMARY_STAT_MULTIPLIER. */
+    fractional?: boolean;
+};
+
+function roundTo(value: number, decimals: number): number {
+    const factor = 10 ** decimals;
+    return Math.round(value * factor) / factor;
+}
+
+/**
+ * Builds a full N/R/SR/SSR/L `baseStatsRange` pool for one equipment template
+ * from its N-tier baseline per stat key, scaling each rarity by the shared
+ * growth curves above. Centralizing the curve here keeps every template's
+ * relative power ordering intact even when the curve itself is retuned.
+ */
+function buildStatsRange(
+    baselines: StatBaseline[],
+): Partial<Record<Rarity, Partial<Record<keyof ItemStats, StatRange>>>> {
+    const result: Partial<Record<Rarity, Partial<Record<keyof ItemStats, StatRange>>>> = {};
+    for (const rarity of [
+        Rarity.N,
+        Rarity.R,
+        Rarity.SR,
+        Rarity.SSR,
+        Rarity.L,
+    ]) {
+        const layer: Partial<Record<keyof ItemStats, StatRange>> = {};
+        for (const {
+            key, base, fractional, 
+        } of baselines) {
+            const multiplier = fractional ? MOD_STAT_MULTIPLIER[rarity] : PRIMARY_STAT_MULTIPLIER[rarity];
+            layer[key] = fractional
+                ? {
+                    min: roundTo(base.min * multiplier, 3),
+                    max: roundTo(base.max * multiplier, 3),
+                }
+                : {
+                    min: Math.round(base.min * multiplier),
+                    max: Math.round(base.max * multiplier),
+                };
+        }
+        result[rarity] = layer;
+    }
+    return result;
+}
+
+/**
+ * Weight-class signature mods for actionSpeedMod/dodgeChanceMod, shared across
+ * all templates of that class so the tradeoff identity (LIGHT = faster + more
+ * evasive, HEAVY = slower + less evasive in exchange for higher ATK/DEF/HP,
+ * MEDIUM = mild version of both) stays consistent item to item.
+ */
+const LIGHT_MODS: StatBaseline[] = [
+    {
+        key: 'actionSpeedMod', base: {
+            min: -0.03, max: -0.015, 
+        }, fractional: true,
+    }, {
+        key: 'dodgeChanceMod', base: {
+            min: 0.01, max: 0.02, 
+        }, fractional: true,
+    },
+];
+const MEDIUM_MODS: StatBaseline[] = [
+    {
+        key: 'actionSpeedMod', base: {
+            min: -0.015, max: -0.008, 
+        }, fractional: true,
+    }, {
+        key: 'dodgeChanceMod', base: {
+            min: 0.005, max: 0.01, 
+        }, fractional: true,
+    },
+];
+const HEAVY_MODS: StatBaseline[] = [
+    {
+        key: 'actionSpeedMod', base: {
+            min: 0.03, max: 0.06, 
+        }, fractional: true,
+    }, {
+        key: 'dodgeChanceMod', base: {
+            min: -0.03, max: -0.015, 
+        }, fractional: true,
+    },
+];
 
 /**
  * Shared price curve for equipment templates (identical across all EQUIPMENT
@@ -121,33 +239,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.RIGHT_HAND,
         weaponWeightClass: WeaponWeightClass.MEDIUM,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                ATK: {
-                    min: 5, max: 10,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'ATK', base: {
+                    min: 5, max: 10, 
+                }, 
             },
-            [Rarity.R]: {
-                ATK: {
-                    min: 10, max: 20,
-                },
+            {
+                key: 'HP', base: {
+                    min: 15, max: 30, 
+                }, 
             },
-            [Rarity.SR]: {
-                ATK: {
-                    min: 20, max: 35,
-                },
-            },
-            [Rarity.SSR]: {
-                ATK: {
-                    min: 35, max: 55,
-                },
-            },
-            [Rarity.L]: {
-                ATK: {
-                    min: 55, max: 80,
-                },
-            },
-        },
+            ...MEDIUM_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -160,53 +264,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.LEFT_HAND,
         weaponWeightClass: WeaponWeightClass.HEAVY,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                DEF: {
-                    min: 4, max: 8,
-                }, actionSpeedMod: {
-                    min: 0.05, max: 0.1,
-                }, dodgeChanceMod: {
-                    min: -0.03, max: -0.015,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 4, max: 8, 
+                }, 
             },
-            [Rarity.R]: {
-                DEF: {
-                    min: 8, max: 16,
-                }, actionSpeedMod: {
-                    min: 0.1, max: 0.18,
-                }, dodgeChanceMod: {
-                    min: -0.05, max: -0.03,
-                },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 24, 
+                }, 
             },
-            [Rarity.SR]: {
-                DEF: {
-                    min: 16, max: 28,
-                }, actionSpeedMod: {
-                    min: 0.18, max: 0.28,
-                }, dodgeChanceMod: {
-                    min: -0.08, max: -0.05,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 28, max: 42,
-                }, actionSpeedMod: {
-                    min: 0.28, max: 0.4,
-                }, dodgeChanceMod: {
-                    min: -0.12, max: -0.08,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 42, max: 60,
-                }, actionSpeedMod: {
-                    min: 0.4, max: 0.55,
-                }, dodgeChanceMod: {
-                    min: -0.16, max: -0.12,
-                },
-            },
-        },
+            ...HEAVY_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -219,33 +289,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.LEFT_HAND,
         weaponWeightClass: WeaponWeightClass.MEDIUM,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                DEF: {
-                    min: 3, max: 6,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 3, max: 6, 
+                }, 
             },
-            [Rarity.R]: {
-                DEF: {
-                    min: 6, max: 12,
-                },
+            {
+                key: 'HP', base: {
+                    min: 9, max: 18, 
+                }, 
             },
-            [Rarity.SR]: {
-                DEF: {
-                    min: 12, max: 20,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 20, max: 30,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 30, max: 42,
-                },
-            },
-        },
+            ...MEDIUM_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -258,37 +314,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.LEFT_HAND,
         weaponWeightClass: WeaponWeightClass.LIGHT,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                actionSpeedMod: {
-                    min: -0.04, max: -0.02,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 2, max: 4, 
+                }, 
             },
-            [Rarity.R]: {
-                actionSpeedMod: {
-                    min: -0.08, max: -0.04,
-                },
+            {
+                key: 'HP', base: {
+                    min: 6, max: 12, 
+                }, 
             },
-            [Rarity.SR]: {
-                actionSpeedMod: {
-                    min: -0.14, max: -0.08,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 5, max: 8,
-                }, actionSpeedMod: {
-                    min: -0.22, max: -0.14,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 8, max: 13,
-                }, actionSpeedMod: {
-                    min: -0.32, max: -0.22,
-                },
-            },
-        },
+            ...LIGHT_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -301,43 +339,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.HEAD,
         weaponWeightClass: WeaponWeightClass.MEDIUM,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                DEF: {
-                    min: 3, max: 6,
-                }, HP: {
-                    min: 10, max: 20,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 3, max: 6, 
+                }, 
             },
-            [Rarity.R]: {
-                DEF: {
-                    min: 6, max: 12,
-                }, HP: {
-                    min: 20, max: 40,
-                },
+            {
+                key: 'HP', base: {
+                    min: 10, max: 20, 
+                }, 
             },
-            [Rarity.SR]: {
-                DEF: {
-                    min: 12, max: 20,
-                }, HP: {
-                    min: 40, max: 70,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 20, max: 30,
-                }, HP: {
-                    min: 70, max: 110,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 30, max: 45,
-                }, HP: {
-                    min: 110, max: 160,
-                },
-            },
-        },
+            ...MEDIUM_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -350,37 +364,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.HEAD,
         weaponWeightClass: WeaponWeightClass.LIGHT,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                actionSpeedMod: {
-                    min: -0.04, max: -0.02,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 2, max: 4, 
+                }, 
             },
-            [Rarity.R]: {
-                actionSpeedMod: {
-                    min: -0.08, max: -0.04,
-                },
+            {
+                key: 'HP', base: {
+                    min: 6, max: 12, 
+                }, 
             },
-            [Rarity.SR]: {
-                actionSpeedMod: {
-                    min: -0.14, max: -0.08,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 5, max: 8,
-                }, actionSpeedMod: {
-                    min: -0.22, max: -0.14,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 8, max: 13,
-                }, actionSpeedMod: {
-                    min: -0.32, max: -0.22,
-                },
-            },
-        },
+            ...LIGHT_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -393,63 +389,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.HEAD,
         weaponWeightClass: WeaponWeightClass.HEAVY,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                DEF: {
-                    min: 5, max: 9,
-                }, HP: {
-                    min: 15, max: 25,
-                }, actionSpeedMod: {
-                    min: 0.04, max: 0.08,
-                }, dodgeChanceMod: {
-                    min: -0.02, max: -0.01,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 5, max: 9, 
+                }, 
             },
-            [Rarity.R]: {
-                DEF: {
-                    min: 9, max: 16,
-                }, HP: {
-                    min: 25, max: 50,
-                }, actionSpeedMod: {
-                    min: 0.08, max: 0.14,
-                }, dodgeChanceMod: {
-                    min: -0.04, max: -0.02,
-                },
+            {
+                key: 'HP', base: {
+                    min: 15, max: 25, 
+                }, 
             },
-            [Rarity.SR]: {
-                DEF: {
-                    min: 16, max: 26,
-                }, HP: {
-                    min: 50, max: 85,
-                }, actionSpeedMod: {
-                    min: 0.14, max: 0.22,
-                }, dodgeChanceMod: {
-                    min: -0.07, max: -0.04,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 26, max: 38,
-                }, HP: {
-                    min: 85, max: 130,
-                }, actionSpeedMod: {
-                    min: 0.22, max: 0.32,
-                }, dodgeChanceMod: {
-                    min: -0.1, max: -0.07,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 38, max: 55,
-                }, HP: {
-                    min: 130, max: 190,
-                }, actionSpeedMod: {
-                    min: 0.32, max: 0.45,
-                }, dodgeChanceMod: {
-                    min: -0.14, max: -0.1,
-                },
-            },
-        },
+            ...HEAVY_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -462,63 +414,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.BODY,
         weaponWeightClass: WeaponWeightClass.HEAVY,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                DEF: {
-                    min: 5, max: 9,
-                }, HP: {
-                    min: 15, max: 25,
-                }, actionSpeedMod: {
-                    min: 0.04, max: 0.08,
-                }, dodgeChanceMod: {
-                    min: -0.02, max: -0.01,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 5, max: 9, 
+                }, 
             },
-            [Rarity.R]: {
-                DEF: {
-                    min: 9, max: 16,
-                }, HP: {
-                    min: 25, max: 50,
-                }, actionSpeedMod: {
-                    min: 0.08, max: 0.14,
-                }, dodgeChanceMod: {
-                    min: -0.04, max: -0.02,
-                },
+            {
+                key: 'HP', base: {
+                    min: 15, max: 25, 
+                }, 
             },
-            [Rarity.SR]: {
-                DEF: {
-                    min: 16, max: 26,
-                }, HP: {
-                    min: 50, max: 85,
-                }, actionSpeedMod: {
-                    min: 0.14, max: 0.22,
-                }, dodgeChanceMod: {
-                    min: -0.07, max: -0.04,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 26, max: 38,
-                }, HP: {
-                    min: 85, max: 130,
-                }, actionSpeedMod: {
-                    min: 0.22, max: 0.32,
-                }, dodgeChanceMod: {
-                    min: -0.1, max: -0.07,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 38, max: 55,
-                }, HP: {
-                    min: 130, max: 190,
-                }, actionSpeedMod: {
-                    min: 0.32, max: 0.45,
-                }, dodgeChanceMod: {
-                    min: -0.14, max: -0.1,
-                },
-            },
-        },
+            ...HEAVY_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -531,43 +439,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.BODY,
         weaponWeightClass: WeaponWeightClass.MEDIUM,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                DEF: {
-                    min: 3, max: 6,
-                }, HP: {
-                    min: 12, max: 20,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 3, max: 6, 
+                }, 
             },
-            [Rarity.R]: {
-                DEF: {
-                    min: 6, max: 12,
-                }, HP: {
-                    min: 20, max: 38,
-                },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 20, 
+                }, 
             },
-            [Rarity.SR]: {
-                DEF: {
-                    min: 12, max: 20,
-                }, HP: {
-                    min: 38, max: 65,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 20, max: 30,
-                }, HP: {
-                    min: 65, max: 100,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 30, max: 42,
-                }, HP: {
-                    min: 100, max: 145,
-                },
-            },
-        },
+            ...MEDIUM_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -580,41 +464,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.BODY,
         weaponWeightClass: WeaponWeightClass.LIGHT,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                actionSpeedMod: {
-                    min: -0.05, max: -0.02,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 4, max: 6, 
+                }, 
             },
-            [Rarity.R]: {
-                actionSpeedMod: {
-                    min: -0.1, max: -0.05,
-                },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 18, 
+                }, 
             },
-            [Rarity.SR]: {
-                actionSpeedMod: {
-                    min: -0.18, max: -0.1,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 12, max: 18,
-                }, HP: {
-                    min: 40, max: 65,
-                }, actionSpeedMod: {
-                    min: -0.28, max: -0.18,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 18, max: 25,
-                }, HP: {
-                    min: 65, max: 95,
-                }, actionSpeedMod: {
-                    min: -0.4, max: -0.28,
-                },
-            },
-        },
+            ...LIGHT_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -627,37 +489,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.SHOES,
         weaponWeightClass: WeaponWeightClass.LIGHT,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                actionSpeedMod: {
-                    min: -0.05, max: -0.02,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 5, max: 7, 
+                }, 
             },
-            [Rarity.R]: {
-                actionSpeedMod: {
-                    min: -0.1, max: -0.05,
-                },
+            {
+                key: 'HP', base: {
+                    min: 15, max: 21, 
+                }, 
             },
-            [Rarity.SR]: {
-                actionSpeedMod: {
-                    min: -0.18, max: -0.1,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 14, max: 20,
-                }, actionSpeedMod: {
-                    min: -0.28, max: -0.18,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 20, max: 28,
-                }, actionSpeedMod: {
-                    min: -0.4, max: -0.28,
-                },
-            },
-        },
+            ...LIGHT_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -670,53 +514,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.SHOES,
         weaponWeightClass: WeaponWeightClass.HEAVY,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                DEF: {
-                    min: 4, max: 8,
-                }, actionSpeedMod: {
-                    min: 0.05, max: 0.1,
-                }, dodgeChanceMod: {
-                    min: -0.03, max: -0.015,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 4, max: 8, 
+                }, 
             },
-            [Rarity.R]: {
-                DEF: {
-                    min: 8, max: 16,
-                }, actionSpeedMod: {
-                    min: 0.1, max: 0.18,
-                }, dodgeChanceMod: {
-                    min: -0.05, max: -0.03,
-                },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 24, 
+                }, 
             },
-            [Rarity.SR]: {
-                DEF: {
-                    min: 16, max: 28,
-                }, actionSpeedMod: {
-                    min: 0.18, max: 0.28,
-                }, dodgeChanceMod: {
-                    min: -0.08, max: -0.05,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 28, max: 42,
-                }, actionSpeedMod: {
-                    min: 0.28, max: 0.4,
-                }, dodgeChanceMod: {
-                    min: -0.12, max: -0.08,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 42, max: 60,
-                }, actionSpeedMod: {
-                    min: 0.4, max: 0.55,
-                }, dodgeChanceMod: {
-                    min: -0.16, max: -0.12,
-                },
-            },
-        },
+            ...HEAVY_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -729,33 +539,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.SHOES,
         weaponWeightClass: WeaponWeightClass.MEDIUM,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                DEF: {
-                    min: 4, max: 7,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 4, max: 7, 
+                }, 
             },
-            [Rarity.R]: {
-                DEF: {
-                    min: 7, max: 13,
-                },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 21, 
+                }, 
             },
-            [Rarity.SR]: {
-                DEF: {
-                    min: 13, max: 22,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 22, max: 32,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 32, max: 45,
-                },
-            },
-        },
+            ...MEDIUM_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -768,37 +564,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.RING,
         weaponWeightClass: WeaponWeightClass.LIGHT,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                actionSpeedMod: {
-                    min: -0.04, max: -0.02,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 2, max: 3, 
+                }, 
             },
-            [Rarity.R]: {
-                actionSpeedMod: {
-                    min: -0.08, max: -0.04,
-                },
+            {
+                key: 'HP', base: {
+                    min: 6, max: 9, 
+                }, 
             },
-            [Rarity.SR]: {
-                actionSpeedMod: {
-                    min: -0.14, max: -0.08,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 6, max: 10,
-                }, actionSpeedMod: {
-                    min: -0.22, max: -0.14,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 10, max: 16,
-                }, actionSpeedMod: {
-                    min: -0.32, max: -0.22,
-                },
-            },
-        },
+            ...LIGHT_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -811,33 +589,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.RING,
         weaponWeightClass: WeaponWeightClass.MEDIUM,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                DEF: {
-                    min: 2, max: 4,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 2, max: 4, 
+                }, 
             },
-            [Rarity.R]: {
-                DEF: {
-                    min: 4, max: 8,
-                },
+            {
+                key: 'HP', base: {
+                    min: 6, max: 12, 
+                }, 
             },
-            [Rarity.SR]: {
-                DEF: {
-                    min: 8, max: 14,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 14, max: 20,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 20, max: 28,
-                },
-            },
-        },
+            ...MEDIUM_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -850,53 +614,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.RING,
         weaponWeightClass: WeaponWeightClass.HEAVY,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                DEF: {
-                    min: 2, max: 4,
-                }, actionSpeedMod: {
-                    min: 0.03, max: 0.06,
-                }, dodgeChanceMod: {
-                    min: -0.02, max: -0.01,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 2, max: 4, 
+                }, 
             },
-            [Rarity.R]: {
-                DEF: {
-                    min: 4, max: 8,
-                }, actionSpeedMod: {
-                    min: 0.06, max: 0.11,
-                }, dodgeChanceMod: {
-                    min: -0.035, max: -0.02,
-                },
+            {
+                key: 'HP', base: {
+                    min: 6, max: 12, 
+                }, 
             },
-            [Rarity.SR]: {
-                DEF: {
-                    min: 8, max: 14,
-                }, actionSpeedMod: {
-                    min: 0.11, max: 0.18,
-                }, dodgeChanceMod: {
-                    min: -0.06, max: -0.035,
-                },
-            },
-            [Rarity.SSR]: {
-                DEF: {
-                    min: 14, max: 20,
-                }, actionSpeedMod: {
-                    min: 0.18, max: 0.26,
-                }, dodgeChanceMod: {
-                    min: -0.09, max: -0.06,
-                },
-            },
-            [Rarity.L]: {
-                DEF: {
-                    min: 20, max: 28,
-                }, actionSpeedMod: {
-                    min: 0.26, max: 0.36,
-                }, dodgeChanceMod: {
-                    min: -0.12, max: -0.09,
-                },
-            },
-        },
+            ...HEAVY_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -909,43 +639,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.RIGHT_HAND,
         weaponWeightClass: WeaponWeightClass.LIGHT,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                ATK: {
-                    min: 3, max: 6,
-                }, actionSpeedMod: {
-                    min: -0.05, max: -0.02,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'ATK', base: {
+                    min: 3, max: 6, 
+                }, 
             },
-            [Rarity.R]: {
-                ATK: {
-                    min: 6, max: 12,
-                }, actionSpeedMod: {
-                    min: -0.1, max: -0.05,
-                },
+            {
+                key: 'HP', base: {
+                    min: 9, max: 18, 
+                }, 
             },
-            [Rarity.SR]: {
-                ATK: {
-                    min: 12, max: 20,
-                }, actionSpeedMod: {
-                    min: -0.18, max: -0.1,
-                },
-            },
-            [Rarity.SSR]: {
-                ATK: {
-                    min: 20, max: 30,
-                }, actionSpeedMod: {
-                    min: -0.28, max: -0.18,
-                },
-            },
-            [Rarity.L]: {
-                ATK: {
-                    min: 30, max: 42,
-                }, actionSpeedMod: {
-                    min: -0.4, max: -0.28,
-                },
-            },
-        },
+            ...LIGHT_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
@@ -958,53 +664,19 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         equipSlot: EquipmentSlot.RIGHT_HAND,
         weaponWeightClass: WeaponWeightClass.HEAVY,
         rarityWeights: STANDARD_RARITY_WEIGHTS,
-        baseStatsRange: {
-            [Rarity.N]: {
-                ATK: {
-                    min: 7, max: 14,
-                }, actionSpeedMod: {
-                    min: 0.05, max: 0.1,
-                }, dodgeChanceMod: {
-                    min: -0.03, max: -0.015,
-                },
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'ATK', base: {
+                    min: 7, max: 14, 
+                }, 
             },
-            [Rarity.R]: {
-                ATK: {
-                    min: 14, max: 26,
-                }, actionSpeedMod: {
-                    min: 0.1, max: 0.18,
-                }, dodgeChanceMod: {
-                    min: -0.05, max: -0.03,
-                },
+            {
+                key: 'HP', base: {
+                    min: 21, max: 42, 
+                }, 
             },
-            [Rarity.SR]: {
-                ATK: {
-                    min: 26, max: 45,
-                }, actionSpeedMod: {
-                    min: 0.18, max: 0.28,
-                }, dodgeChanceMod: {
-                    min: -0.08, max: -0.05,
-                },
-            },
-            [Rarity.SSR]: {
-                ATK: {
-                    min: 45, max: 70,
-                }, actionSpeedMod: {
-                    min: 0.28, max: 0.4,
-                }, dodgeChanceMod: {
-                    min: -0.12, max: -0.08,
-                },
-            },
-            [Rarity.L]: {
-                ATK: {
-                    min: 70, max: 100,
-                }, actionSpeedMod: {
-                    min: 0.4, max: 0.55,
-                }, dodgeChanceMod: {
-                    min: -0.16, max: -0.12,
-                },
-            },
-        },
+            ...HEAVY_MODS,
+        ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 

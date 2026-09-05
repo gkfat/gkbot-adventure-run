@@ -60,8 +60,62 @@ export function rollRarity(templateId: string, context: ItemGenerationContext): 
 }
 
 /**
+ * How many of the template's pool stat keys are rolled as positive bonuses,
+ * per rarity — counts are clamped to the pool size when the pool is smaller.
+ * Higher rarities guarantee more simultaneous bonus stats.
+ */
+const RARITY_STAT_PICK_COUNT: Partial<Record<Rarity, StatRange>> = {
+    [Rarity.N]: {
+        min: 1, max: 2, 
+    },
+    [Rarity.R]: {
+        min: 1, max: 2, 
+    },
+    [Rarity.SR]: {
+        min: 2, max: 2, 
+    },
+    [Rarity.SSR]: {
+        min: 2, max: 3, 
+    },
+    [Rarity.L]: {
+        min: 3, max: 4, 
+    },
+};
+
+/**
+ * Chance of an extra negative "拖累" stat being rolled alongside the positive
+ * bonuses — only low rarities carry this risk; SR and above never roll one.
+ */
+const RARITY_DEBUFF_CHANCE: Partial<Record<Rarity, number>> = {
+    [Rarity.N]: 0.3,
+    [Rarity.R]: 0.3,
+    [Rarity.SR]: 0,
+    [Rarity.SSR]: 0,
+    [Rarity.L]: 0,
+};
+
+/** A debuff shaves off this fraction of the rolled rarity's own min value for that key. */
+const DEBUFF_MAGNITUDE_RATIO = 0.35;
+
+/**
+ * Only ATK/DEF/HP can carry a debuff — actionSpeedMod/dodgeChanceMod already
+ * encode weight-class tradeoffs (e.g. HEAVY's built-in speed/dodge penalty),
+ * so reusing them for a random debuff would double up on existing sign meaning.
+ */
+const DEBUFFABLE_STAT_KEYS = new Set<keyof ItemStats>([
+    'ATK',
+    'DEF',
+    'HP',
+]);
+
+/**
  * Roll stats for a given template + rarity. Uses `baseStatsRange` for EQUIPMENT
  * and `healPercentRange` for POTION — the two never overlap on a single template.
+ *
+ * For EQUIPMENT, `baseStatsRange[rarity]` is a *pool* of possible stat keys —
+ * only a random subset (sized by `RARITY_STAT_PICK_COUNT`) is rolled as a
+ * positive bonus, and low rarities may additionally roll one negative "拖累"
+ * stat from the unpicked remainder (`RARITY_DEBUFF_CHANCE`).
  */
 export function rollStats(templateId: string, rarity: Rarity): ItemStats {
     const template = getTemplateOrThrow(templateId);
@@ -72,10 +126,33 @@ export function rollStats(templateId: string, rarity: Rarity): ItemStats {
     }
 
     const statRanges = template.baseStatsRange?.[rarity] ?? {};
+    const pool = Object.entries(statRanges) as [keyof ItemStats, StatRange][];
+
+    const pickCountRange = RARITY_STAT_PICK_COUNT[rarity];
+    const pickCount = pickCountRange ? Math.min(rollInRange(pickCountRange), pool.length) : pool.length;
+
+    const shuffledPool = shuffle(pool);
+    const pickedEntries = shuffledPool.slice(0, pickCount);
+    const remainingEntries = shuffledPool.slice(pickCount);
+
     const stats: ItemStats = {};
-    for (const [key, range] of Object.entries(statRanges) as [keyof ItemStats, StatRange][]) {
+    for (const [key, range] of pickedEntries) {
         stats[key] = FRACTIONAL_STAT_KEYS.has(key) ? rollInRangeFractional(range) : rollInRange(range);
     }
+
+    const debuffChance = RARITY_DEBUFF_CHANCE[rarity] ?? 0;
+    if (debuffChance > 0 && Math.random() < debuffChance) {
+        // Only drawn from keys NOT already picked as a bonus — stacking a debuff
+        // onto an already-buffed stat would just muddy that stat's own roll range.
+        const candidates = remainingEntries.filter(([key]) => DEBUFFABLE_STAT_KEYS.has(key));
+
+        if (candidates.length > 0) {
+            const [key, range] = candidates[Math.floor(Math.random() * candidates.length)] as [keyof ItemStats, StatRange];
+            const magnitude = Math.max(1, Math.round(range.min * DEBUFF_MAGNITUDE_RATIO));
+            stats[key] = -magnitude;
+        }
+    }
+
     return stats;
 }
 
@@ -85,6 +162,15 @@ export function rollStats(templateId: string, rarity: Rarity): ItemStats {
  * `rollInRange` would collapse every roll to 0.
  */
 const FRACTIONAL_STAT_KEYS = new Set<keyof ItemStats>(['actionSpeedMod', 'dodgeChanceMod']);
+
+function shuffle<T>(items: T[]): T[] {
+    const result = [...items];
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+}
 
 /**
  * Generate a full item instance: rolls rarity + stats and assigns a unique itemId.
