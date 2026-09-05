@@ -190,7 +190,26 @@ export function useCombat(
             bannerAt, textEnterAt, textExitAt, goneAt,
         };
     });
-    const visibleGroupCount = ref(0);
+    // nowMs：從播放開始算起的毫秒數，用 requestAnimationFrame 每一幀更新，驅動
+    // 充能條平滑地畫出來；跟 schedule/unitCycles 共用同一份「絕對時間」定義。
+    // 宣告要放在 visibleGroupCount 之前——下面 watch(visibleGroupCount, ...)
+    // 會在 useCombat() 執行當下就同步讀一次 visibleGroupCount.value 來取得初始
+    // 值，若 nowMs 宣告在後面，這個讀取會在 nowMs 的 const 初始化完成前發生，
+    // 直接丟出 TDZ ReferenceError（本地測試用假時鐘重播一次完整戰鬥時發現）。
+    const nowMs = ref(0);
+
+    // 揭露批次數改成跟充能條共用同一顆時鐘（nowMs，由 rAF 逐幀更新）反算，不再
+    // 用獨立的 setTimeout 各自到期觸發——兩條時鐘各走各的，setTimeout 到期把
+    // 攻擊動畫揭露出來的那一刻，充能條可能還沒被下一次 rAF 追上算到 100%，
+    // 玩家因此看到「攻擊已經在播，行動條卻還沒充滿」（見 known-issue.md）。
+    const visibleGroupCount = computed(() => {
+        let count = 0;
+        for (const { displayAt } of schedule.value) {
+            if (displayAt > nowMs.value) break;
+            count += 1;
+        }
+        return count;
+    });
     const playbackDone = computed(() => (
         visibleGroupCount.value >= groups.value.length
         && groups.value.length > 0
@@ -634,10 +653,12 @@ export function useCombat(
     // 找出某個時間點 nowMs 落在哪個充能週期，並算出目前的百分比：
     // - 週期內每一段命中時間窗（[hitAt, hitAt+STUN_MS)，裁切到週期範圍內、合併重疊
     //   區間）都會讓百分比原地暫停，時間窗結束後才繼續累加。
-    // - 分母固定用整個週期的實際長度（total，已經包含 stun 造成的延後），不會在
-    //   暫停之後把分母縮小、逼百分比在 end 那一刻精準補回 100%——那樣做等於是
-    //   暫停結束後「加速趕上原本進度」。停頓時間就應該算進總長度裡，充能速度全程
-    //   維持同一個節奏，不因為中途被打斷而變快。
+    // - 分母（total）要扣掉這些暫停時間才能跟分子（effectiveElapsed，同樣扣掉暫停）
+    //   對齊——分母若不扣，週期內只要發生過命中，百分比在 atMs === end（行動真正
+    //   觸發）那一刻就永遠補不滿 100%，短少的量正好等於暫停時長／週期總長，跟
+    //   stunEnd 有沒有真的把 end 往後推無關（見使用者回報：凍結後行動條沒等到滿
+    //   就出手）。犧牲的是「暫停結束後充能速度會看起來加快一點點」，但比起「行動
+    //   條到不了 100% 就出手」這個更根本的問題（known-issue.md），這個取捨是必要的。
     const gaugeAt = (unitId: string, atMs: number): UnitGauge => {
         const list = unitCycles.value.get(unitId);
         if (!list || list.length === 0) return {
@@ -688,6 +709,9 @@ export function useCombat(
             else merged.push(window);
         }
 
+        const totalPaused = merged.reduce((sum, [from, to]) => sum + (to - from), 0);
+        const effectiveTotal = total - totalPaused;
+
         let pausedSoFar = 0;
         let paused = false;
         for (const [from, to] of merged) {
@@ -699,16 +723,13 @@ export function useCombat(
         }
 
         const effectiveElapsed = Math.max(0, (atMs - start) - pausedSoFar);
-        const percent = Math.min(100, (effectiveElapsed / total) * 100);
+        const percent = effectiveTotal > 0 ? Math.min(100, (effectiveElapsed / effectiveTotal) * 100) : 100;
 
         return {
-            percent, paused, 
+            percent, paused,
         };
     };
 
-    // nowMs：從播放開始算起的毫秒數，用 requestAnimationFrame 每一幀更新，驅動
-    // 充能條平滑地畫出來；跟 schedule/unitCycles 共用同一份「絕對時間」定義。
-    const nowMs = ref(0);
     let rafHandle: number | null = null;
     let playbackStartedAt = 0;
     const stopGaugeClock = () => {
@@ -746,16 +767,10 @@ export function useCombat(
         clearTimers();
         stopGaugeClock();
         clearFxTimers();
-        visibleGroupCount.value = 0;
         nowMs.value = 0;
         if (!getResult() || schedule.value.length === 0) return;
 
         playbackStartedAt = performance.now();
-        schedule.value.forEach(({ displayAt }, index) => {
-            timers.push(setTimeout(() => {
-                visibleGroupCount.value = index + 1;
-            }, displayAt));
-        });
         rafHandle = requestAnimationFrame(tickGaugeClock);
     };
 

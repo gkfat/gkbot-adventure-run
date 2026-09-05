@@ -207,7 +207,7 @@ export class CombatService extends BaseService implements CombatResolver {
             critChance: modifiedStats.critChance,
             critMultiplier: modifiedStats.critMultiplier,
             dodgeChance: modifiedStats.dodgeChance,
-            nextAttackAt: 0,
+            nextAttackAt: modifiedStats.actionIntervalSec * 1000,
             archetypeIndex: -1,
             archetypeSlug: '',
             isBoss: false,
@@ -221,14 +221,22 @@ export class CombatService extends BaseService implements CombatResolver {
         for (let wave = 0; wave < context.waveCount && player.hp > 0; wave++) {
             // Each wave is its own discrete-event window: every unit — including
             // the player, who otherwise persists across waves — starts this
-            // wave's action gauge from 0, matching freshly spawned enemies
-            // (buildEnemyUnit always sets nextAttackAt: 0). Without this reset,
-            // the player's nextAttackAt would keep accumulating from the
-            // previous wave while new enemies restart at 0, making combatLog
+            // wave needing a full action-interval charge before its first
+            // action, matching freshly spawned enemies (buildEnemyUnit always
+            // sets nextAttackAt: archetype.actionIntervalSec * 1000). A flat 0
+            // would let whoever's picked on the reduce() tie (always the
+            // player) get a free first hit with no charge-up and no real
+            // speed comparison; charging everyone the same way makes the
+            // fastest unit act first on genuine merit, and keeps the pacing
+            // consistent with every subsequent action in the fight (see
+            // known-issue.md — first-attack-of-wave visually fired instantly
+            // after the wave banner). Without resetting the player's own
+            // nextAttackAt here, it would keep accumulating from the previous
+            // wave while new enemies restart fresh, making combatLog
             // timestamps jump backwards at the wave boundary (see
             // combat-log-sequential-playback design.md — the frontend relies on
             // per-wave timestamps to build its playback schedule).
-            player.nextAttackAt = 0;
+            player.nextAttackAt = player.actionIntervalSec * 1000;
 
             const enemies = this.spawnWave(
                 cursor, context, mobArchetypes, bossArchetypes, severityTier,
@@ -399,7 +407,7 @@ export class CombatService extends BaseService implements CombatResolver {
             critChance: archetype.critChanceOverride ?? ENEMY_COMBAT_STATS.critChance,
             critMultiplier: ENEMY_COMBAT_STATS.critMultiplier,
             dodgeChance: archetype.dodgeChanceOverride ?? ENEMY_COMBAT_STATS.dodgeChance,
-            nextAttackAt: 0,
+            nextAttackAt: archetype.actionIntervalSec * 1000,
             level: enemyLevel,
             archetypeIndex,
             archetypeSlug: archetype.slug,

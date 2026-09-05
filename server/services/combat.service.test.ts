@@ -238,11 +238,12 @@ describe('CombatService.resolve', () => {
         expect(wave1Entries.length).toBeGreaterThan(0);
         expect(result.combatLog).toHaveLength(wave0Entries.length + wave1Entries.length);
         // Player one-shots every enemy (ATK=1000 vs low-level DEF), so the
-        // player's very first action in each wave happens at timestamp 0 —
+        // player's very first action in each wave happens once its own action
+        // gauge (actionIntervalSec=1s → 1000ms) charges up from wave start —
         // if nextAttackAt carried over from wave 0, wave 1's first player
-        // action would start at a non-zero offset instead.
-        expect(wave0Entries[0]?.timestamp).toBe(0);
-        expect(wave1Entries[0]?.timestamp).toBe(0);
+        // action would start at a different offset instead.
+        expect(wave0Entries[0]?.timestamp).toBe(1000);
+        expect(wave1Entries[0]?.timestamp).toBe(1000);
     });
 
     it('loses when the player is defeated and grants no rewards', async () => {
@@ -300,8 +301,10 @@ describe('CombatService.resolve', () => {
 
     it('logs a DODGE event with no damage when the dodge roll succeeds', async () => {
         // sequence: spawnWave archetype pick (0.99), then the first attack's
-        // dodge roll forced low (0 < any dodgeChance > 0) — player acts first
-        // on a nextAttackAt tie, so this dodge belongs to the enemy.
+        // dodge roll forced low (0 < any dodgeChance > 0) — player's default
+        // actionIntervalSec (1s) charges faster than any level-1 enemy
+        // archetype (>=2s), so the player acts first and this dodge belongs
+        // to the enemy.
         rollQueue = [0.99, 0];
 
         const service = new CombatService();
@@ -699,16 +702,22 @@ describe('CombatService.resolve', () => {
         });
 
         it('still records kills made before the player is defeated mid-combat', async () => {
-            // Player one-shots the first enemy (ATK 1000 vs a low-level DEF);
-            // any enemy attack deals >=1 damage (computeDamage floors at 1),
-            // which instantly kills the 1-HP player back on the second enemy's turn.
+            // Player one-shots the first enemy (ATK 1000 vs a low-level DEF).
+            // actionIntervalSec=2s puts the player's first action (2000ms)
+            // ahead of both enemy archetypes' first action (index0=2500ms,
+            // index1=3000ms — see server/constants/templates/enemies.ts), so
+            // the player still strikes first; but the second enemy's own
+            // first action (3000ms) lands before the player's second action
+            // (4000ms), so it gets to hit back — any enemy attack deals >=1
+            // damage (computeDamage floors at 1), which instantly kills the
+            // 1-HP player before the player can act again.
             getCharacterWithStatsMock.mockResolvedValue({
                 nickname: 'Tester',
                 attributes: { LUCK: 0 },
                 encounteredArchetypeSlugs: [],
                 defeatedArchetypeCounts: {},
                 stats: {
-                    ATK: 1000, DEF: 0, HP_MAX: 1, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+                    ATK: 1000, DEF: 0, HP_MAX: 1, actionIntervalSec: 2, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
                 },
             });
             const service = new CombatService();
