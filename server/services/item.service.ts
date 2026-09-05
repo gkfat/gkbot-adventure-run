@@ -98,24 +98,23 @@ const RARITY_DEBUFF_CHANCE: Partial<Record<Rarity, number>> = {
 const DEBUFF_MAGNITUDE_RATIO = 0.35;
 
 /**
- * Only ATK/DEF/HP can carry a debuff — actionSpeedMod/dodgeChanceMod already
- * encode weight-class tradeoffs (e.g. HEAVY's built-in speed/dodge penalty),
- * so reusing them for a random debuff would double up on existing sign meaning.
+ * A weapon's ATK / an armor piece's DEF is the item's defining stat — it must
+ * always be present and always positive, at every rarity, so gear never reads
+ * as "worse than bare-handed". Only HP may carry a debuff.
  */
-const DEBUFFABLE_STAT_KEYS = new Set<keyof ItemStats>([
-    'ATK',
-    'DEF',
-    'HP',
-]);
+const PRIMARY_STAT_KEYS = new Set<keyof ItemStats>(['ATK', 'DEF']);
+const DEBUFFABLE_STAT_KEYS = new Set<keyof ItemStats>(['HP']);
 
 /**
  * Roll stats for a given template + rarity. Uses `baseStatsRange` for EQUIPMENT
  * and `healPercentRange` for POTION — the two never overlap on a single template.
  *
  * For EQUIPMENT, `baseStatsRange[rarity]` is a *pool* of possible stat keys —
- * only a random subset (sized by `RARITY_STAT_PICK_COUNT`) is rolled as a
- * positive bonus, and low rarities may additionally roll one negative "拖累"
- * stat from the unpicked remainder (`RARITY_DEBUFF_CHANCE`).
+ * the pool's ATK/DEF entry (whichever the template has) is always rolled as a
+ * guaranteed positive bonus, a further random subset (sized by
+ * `RARITY_STAT_PICK_COUNT`) is rolled from the rest of the pool, and low
+ * rarities may additionally roll one negative "拖累" to HP
+ * (`RARITY_DEBUFF_CHANCE`) — never to ATK/DEF.
  */
 export function rollStats(templateId: string, rarity: Rarity): ItemStats {
     const template = getTemplateOrThrow(templateId);
@@ -128,12 +127,16 @@ export function rollStats(templateId: string, rarity: Rarity): ItemStats {
     const statRanges = template.baseStatsRange?.[rarity] ?? {};
     const pool = Object.entries(statRanges) as [keyof ItemStats, StatRange][];
 
-    const pickCountRange = RARITY_STAT_PICK_COUNT[rarity];
-    const pickCount = pickCountRange ? Math.min(rollInRange(pickCountRange), pool.length) : pool.length;
+    const guaranteedEntries = pool.filter(([key]) => PRIMARY_STAT_KEYS.has(key));
+    const restPool = pool.filter(([key]) => !PRIMARY_STAT_KEYS.has(key));
 
-    const shuffledPool = shuffle(pool);
-    const pickedEntries = shuffledPool.slice(0, pickCount);
-    const remainingEntries = shuffledPool.slice(pickCount);
+    const pickCountRange = RARITY_STAT_PICK_COUNT[rarity];
+    const totalPickCount = pickCountRange ? Math.min(rollInRange(pickCountRange), pool.length) : pool.length;
+    const restPickCount = Math.max(0, totalPickCount - guaranteedEntries.length);
+
+    const shuffledRest = shuffle(restPool);
+    const pickedEntries = [...guaranteedEntries, ...shuffledRest.slice(0, restPickCount)];
+    const remainingEntries = shuffledRest.slice(restPickCount);
 
     const stats: ItemStats = {};
     for (const [key, range] of pickedEntries) {

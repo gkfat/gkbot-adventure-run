@@ -21,13 +21,15 @@ afterEach(() => {
 describe('rollRarity', () => {
     it('distributes rolls across all weighted rarities of a template', () => {
         const counts: Record<string, number> = {};
-        for (let i = 0; i < 500; i++) {
+        // L is now a 0.3% weight — 500 rolls has a ~22% chance of never hitting it.
+        // 20000 rolls keeps that failure chance astronomically small (~1e-26).
+        for (let i = 0; i < 20000; i++) {
             const rarity = rollRarity('salvaged_wrench', { source: ItemSource.SHOP });
             counts[rarity] = (counts[rarity] ?? 0) + 1;
         }
 
-        // salvaged_wrench has weights on N/R/SR/SSR/L (50/30/15/4/1) — over 500 rolls
-        // every rarity should appear at least once, and none outside that set.
+        // salvaged_wrench has weights on N/R/SR/SSR/L — every rarity should
+        // appear at least once, and none outside that set.
         expect(Object.keys(counts).sort()).toEqual([
             Rarity.L,
             Rarity.N,
@@ -53,21 +55,30 @@ describe('rollRarity', () => {
 
 describe('rollStats', () => {
     it('rolls equipment stats within the baseStatsRange pool for the rarity', () => {
-        // baseStatsRange is now a *pool* — only a random subset of its keys is
-        // rolled as a bonus, so ATK isn't guaranteed on any single roll, and N
-        // may additionally roll it as a negative "拖累" (always < 0, so it's
-        // distinguishable from a bonus roll which is always within [5, 10]).
-        let sawAtkBonus = false;
+        // ATK is the template's primary/guaranteed stat — always present and
+        // always within its rarity range, on every single roll.
         for (let i = 0; i < 100; i++) {
             const stats = rollStats('salvaged_wrench', Rarity.N);
             expect(stats.healPercent).toBeUndefined();
-            if (stats.ATK !== undefined && stats.ATK > 0) {
-                sawAtkBonus = true;
-                expect(stats.ATK).toBeGreaterThanOrEqual(5);
-                expect(stats.ATK).toBeLessThanOrEqual(10);
+            expect(stats.ATK).toBeGreaterThanOrEqual(5);
+            expect(stats.ATK).toBeLessThanOrEqual(10);
+        }
+    });
+
+    it('never rolls a negative ATK/DEF — only HP may carry a "拖累" debuff', () => {
+        // salvaged_wrench's pool also has HP, so N/R's 30% debuff chance has
+        // somewhere to land besides ATK — loop enough times to observe it.
+        let sawNegativeHp = false;
+        for (let i = 0; i < 200; i++) {
+            const stats = rollStats('salvaged_wrench', Rarity.N);
+            expect(stats.ATK).toBeGreaterThan(0);
+            if (stats.HP !== undefined && stats.HP < 0) {
+                sawNegativeHp = true;
+            } else if (stats.HP !== undefined) {
+                expect(stats.HP).toBeGreaterThan(0);
             }
         }
-        expect(sawAtkBonus).toBe(true);
+        expect(sawNegativeHp).toBe(true);
     });
 
     it('rolls higher stat ranges for higher rarities', () => {
