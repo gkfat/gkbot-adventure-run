@@ -4,15 +4,15 @@
             選擇角色
         </div>
 
-        <div class="character-roster__list">
+        <div class="character-roster__list d-flex flex-column">
             <div
                 v-for="entry in roster"
                 :key="entry.characterId"
-                class="character-roster__row"
+                class="character-roster__row d-flex align-stretch ga-2"
             >
                 <button
                     type="button"
-                    class="character-roster__entry pixel-press"
+                    class="character-roster__entry pixel-press d-flex align-center ga-3"
                     @click="handleSelect(entry.characterId)"
                 >
                     <img
@@ -59,7 +59,7 @@
 
                 <button
                     type="button"
-                    class="character-roster__delete pixel-press"
+                    class="character-roster__delete pixel-press d-flex align-center justify-center"
                     aria-label="刪除角色"
                     @click.stop="openDeleteDialog(entry.characterId)"
                 >
@@ -115,21 +115,10 @@ const openDeleteDialog = (characterId: string) => {
 
     &__list {
         width: 100%;
-        display: flex;
-        flex-direction: column;
         gap: 10px;
     }
 
-    &__row {
-        display: flex;
-        align-items: stretch;
-        gap: 8px;
-    }
-
     &__entry {
-        display: flex;
-        align-items: center;
-        gap: 12px;
         flex: 1 1 auto;
         min-width: 0;
         padding: 10px 12px;
@@ -154,9 +143,6 @@ const openDeleteDialog = (characterId: string) => {
     }
 
     &__delete {
-        display: flex;
-        align-items: center;
-        justify-content: center;
         flex: 0 0 auto;
         width: 44px;
         background: rgba(196, 203, 219, 0.05);

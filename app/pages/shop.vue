@@ -67,53 +67,57 @@
                 <div class="shop-page__tier-label font-pixel text-caption">
                     {{ tier.label }}
                 </div>
-                <div class="shop-page__grid">
-                    <button
+                <v-row dense>
+                    <v-col
                         v-for="slot in tier.items"
                         :key="slot.slotId"
-                        type="button"
-                        class="pixel-slot pixel-slot--item pixel-press"
-                        :class="{ 'pixel-slot--sold': slot.sold }"
-                        :style="{ borderColor: RARITY_COLOR[slot.item.rarity] }"
-                        :disabled="slot.sold"
-                        @click="openPurchase(slot)"
+                        cols="4"
                     >
-                        <span
-                            class="pixel-slot__rarity font-pixel"
-                            :style="{ background: RARITY_COLOR[slot.item.rarity] }"
+                        <button
+                            type="button"
+                            class="pixel-slot pixel-slot--item pixel-press d-flex flex-column align-center justify-center"
+                            :class="{ 'pixel-slot--sold': slot.sold }"
+                            :style="{ borderColor: RARITY_COLOR[slot.item.rarity] }"
+                            :disabled="slot.sold"
+                            @click="openPurchase(slot)"
                         >
-                            {{ slot.item.rarity }}
-                        </span>
-                        <GameCommonPixelIcon
-                            :name="resolvePixelIcon(slot.item)"
-                            :size="32"
-                        />
-                        <span class="shop-page__name text-caption">
-                            {{ slot.item.name }}
-                        </span>
-                        <span
-                            v-if="primaryStatValue(slot.item)"
-                            class="shop-page__stat font-pixel"
-                            :style="{ color: RARITY_COLOR[slot.item.rarity] }"
-                        >
-                            {{ primaryStatValue(slot.item) }}
-                        </span>
-                        <span class="shop-page__price font-pixel">
-                            <GameCommonCurrencyIcon
-                                :type="activeTab"
-                                :size="10"
+                            <span
+                                class="pixel-slot__rarity font-pixel"
+                                :style="{ background: RARITY_COLOR[slot.item.rarity] }"
+                            >
+                                {{ slot.item.rarity }}
+                            </span>
+                            <GameCommonPixelIcon
+                                :name="resolvePixelIcon(slot.item)"
+                                :size="32"
                             />
-                            {{ activeTab === 'GOLD' ? slot.priceGold : slot.priceGems }}
-                        </span>
+                            <span class="shop-page__name text-caption">
+                                {{ slot.item.name }}
+                            </span>
+                            <span
+                                v-if="primaryStatValue(slot.item)"
+                                class="shop-page__stat font-pixel"
+                                :style="{ color: RARITY_COLOR[slot.item.rarity] }"
+                            >
+                                {{ primaryStatValue(slot.item) }}
+                            </span>
+                            <span class="shop-page__price font-pixel d-flex align-center">
+                                <GameCommonCurrencyIcon
+                                    :type="activeTab"
+                                    :size="10"
+                                />
+                                {{ activeTab === 'GOLD' ? slot.priceGold : slot.priceGems }}
+                            </span>
 
-                        <div
-                            v-if="slot.sold"
-                            class="pixel-slot__sold-badge font-pixel text-caption"
-                        >
-                            已售出
-                        </div>
-                    </button>
-                </div>
+                            <div
+                                v-if="slot.sold"
+                                class="pixel-slot__sold-badge font-pixel text-caption d-flex align-center justify-center"
+                            >
+                                已售出
+                            </div>
+                        </button>
+                    </v-col>
+                </v-row>
             </div>
         </div>
 
@@ -219,12 +223,6 @@ onMounted(loadCurrent);
         opacity: 0.85;
     }
 
-    &__grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 10px;
-    }
-
     &__name {
         max-width: 100%;
         padding: 0 4px;
@@ -239,8 +237,6 @@ onMounted(loadCurrent);
     }
 
     &__price {
-        display: flex;
-        align-items: center;
         gap: 2px;
         font-size: 9px;
         color: rgb(var(--v-theme-secondary));
@@ -249,10 +245,6 @@ onMounted(loadCurrent);
 
 .pixel-slot {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
     gap: 3px;
     width: 100%;
     min-width: 0;
@@ -320,9 +312,6 @@ onMounted(loadCurrent);
     &__sold-badge {
         position: absolute;
         inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         font-size: 10px;
         background: rgba(0, 0, 0, 0.55);
         color: rgb(var(--v-theme-secondary));

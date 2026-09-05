@@ -10,8 +10,8 @@
         </div>
 
         <!-- 上半部：目前選取敵人的大方框 -->
-        <div class="bestiary-dialog__preview">
-            <div class="bestiary-dialog__preview-avatar">
+        <div class="bestiary-dialog__preview d-flex flex-column align-center text-center flex-grow-0">
+            <div class="bestiary-dialog__preview-avatar d-flex align-center justify-center">
                 <img
                     v-if="selected?.encountered"
                     :src="selected.portraitUrl"
@@ -41,29 +41,33 @@
 
         <!-- 下半部：可捲動的敵人格狀清單，一列 5 個 -->
         <div class="bestiary-dialog__grid-scroll flex-grow-1">
-            <div class="bestiary-dialog__grid">
-                <button
+            <v-row dense>
+                <v-col
                     v-for="entry in archetypes"
                     :key="entry.slug"
-                    type="button"
-                    class="bestiary-dialog__cell"
-                    :class="{ 'bestiary-dialog__cell--active': entry.slug === selectedSlug }"
-                    @click="selectedSlug = entry.slug"
+                    cols="2.4"
                 >
-                    <img
-                        v-if="entry.encountered"
-                        :src="entry.portraitUrl"
-                        :alt="entry.name"
-                        class="bestiary-dialog__cell-img"
+                    <button
+                        type="button"
+                        class="bestiary-dialog__cell d-flex align-center justify-center"
+                        :class="{ 'bestiary-dialog__cell--active': entry.slug === selectedSlug }"
+                        @click="selectedSlug = entry.slug"
                     >
-                    <v-icon
-                        v-else
-                        :icon="UNKNOWN_ENEMY_ICON"
-                        size="18"
-                        color="primary"
-                    />
-                </button>
-            </div>
+                        <img
+                            v-if="entry.encountered"
+                            :src="entry.portraitUrl"
+                            :alt="entry.name"
+                            class="bestiary-dialog__cell-img"
+                        >
+                        <v-icon
+                            v-else
+                            :icon="UNKNOWN_ENEMY_ICON"
+                            size="18"
+                            color="primary"
+                        />
+                    </button>
+                </v-col>
+            </v-row>
         </div>
 
         <SystemBtn
@@ -116,11 +120,6 @@ watch(() => props.modelValue, (open) => {
 // their elements ARE defined in this SFC's own <slot> content.
 .bestiary-dialog {
     &__preview {
-        flex: 0 0 auto;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
         padding: 16px;
         background: #14171c;
         border: 1px solid rgba(196, 203, 219, 0.15);
@@ -131,9 +130,6 @@ watch(() => props.modelValue, (open) => {
     &__preview-avatar {
         width: 96px;
         height: 96px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         background: rgba(196, 203, 219, 0.04);
         border: 2px solid rgba(196, 203, 219, 0.25);
         border-radius: 3px;
@@ -152,18 +148,9 @@ watch(() => props.modelValue, (open) => {
         min-height: 0;
     }
 
-    &__grid {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        gap: 6px;
-    }
-
     &__cell {
         width: 100%;
         aspect-ratio: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         background: #14171c;
         border: 1px solid rgba(196, 203, 219, 0.25);
         border-radius: 3px;

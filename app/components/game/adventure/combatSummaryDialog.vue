@@ -13,7 +13,7 @@
         </div>
 
         <div class="d-flex flex-wrap justify-center ga-4 mb-3">
-            <div class="combat-summary-dialog__stat">
+            <div class="combat-summary-dialog__stat d-flex flex-column align-center">
                 <div class="text-caption text-medium-emphasis">回合</div>
                 <div
                     class="font-pixel combat-summary-dialog__stat-value"
@@ -24,7 +24,7 @@
             </div>
             <div
                 v-if="expGained"
-                class="combat-summary-dialog__stat"
+                class="combat-summary-dialog__stat d-flex flex-column align-center"
             >
                 <div class="text-caption text-medium-emphasis">EXP</div>
                 <div
@@ -36,7 +36,7 @@
             </div>
             <div
                 v-if="goldDropped"
-                class="combat-summary-dialog__stat"
+                class="combat-summary-dialog__stat d-flex flex-column align-center"
             >
                 <div class="text-caption text-medium-emphasis">金幣</div>
                 <div
@@ -48,7 +48,7 @@
             </div>
             <div
                 v-if="gemsDropped"
-                class="combat-summary-dialog__stat"
+                class="combat-summary-dialog__stat d-flex flex-column align-center"
             >
                 <div class="text-caption text-medium-emphasis">寶石</div>
                 <div
@@ -64,14 +64,14 @@
             <div class="text-caption text-medium-emphasis text-left mb-1">
                 掉落物品
             </div>
-            <div class="combat-summary-dialog__items">
+            <div class="combat-summary-dialog__items d-flex flex-column ga-2">
                 <div
                     v-for="item in droppedItems"
                     :key="item.itemId"
-                    class="combat-summary-dialog__item"
+                    class="combat-summary-dialog__item d-flex align-center"
                 >
                     <div
-                        class="pixel-slot pixel-slot--item"
+                        class="pixel-slot pixel-slot--item d-flex align-center justify-center flex-grow-0"
                         :style="{ borderColor: RARITY_COLOR[item.rarity] }"
                     >
                         <span
@@ -122,9 +122,6 @@ defineProps<{
     text-align: center;
 
     &__stat {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
         gap: 2px;
     }
 
@@ -134,9 +131,6 @@ defineProps<{
     }
 
     &__items {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
         padding: 10px;
         background: rgba(196, 203, 219, 0.04);
         border: 1px solid rgba(196, 203, 219, 0.15);
@@ -144,8 +138,6 @@ defineProps<{
     }
 
     &__item {
-        display: flex;
-        align-items: center;
         gap: 10px;
         text-align: left;
     }
@@ -159,10 +151,6 @@ defineProps<{
 // （目前專案沒有抽出共用元件，各處各自維護一份 scoped 樣式）。
 .pixel-slot {
     position: relative;
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
     width: 48px;
     height: 48px;
     border: 2px solid rgba(196, 203, 219, 0.25);

@@ -3,16 +3,16 @@
         <!-- 戰場：敵人單排橫向卡片（不換行，過多時橫向捲動）。玩家不再是這裡的一張小卡，
              改由 adventure.vue 的持久化「大角色 stage」承接（見該檔案），這裡只負責
              banner + 敵方卡片 + 結算文字。 -->
-        <div class="combat-result-panel__arena">
+        <div class="combat-result-panel__arena d-flex flex-column">
             <div
                 v-if="displayedBanner"
-                class="combat-result-panel__wave-banner"
+                class="combat-result-panel__wave-banner d-flex align-center justify-center"
                 :class="{ 'combat-result-panel__wave-banner--exit': displayedBanner.containerExiting }"
             >
                 <div
                     v-if="displayedBanner.showText"
                     :key="displayedBanner.textKey"
-                    class="combat-result-panel__wave-banner-text"
+                    class="combat-result-panel__wave-banner-text d-flex flex-column align-center"
                     :class="{ 'combat-result-panel__wave-banner-text--exit': displayedBanner.textExiting }"
                 >
                     <span class="font-pixel combat-result-panel__wave-banner-title">{{ displayedBanner.label }}</span>
@@ -24,7 +24,7 @@
                     </span>
                 </div>
             </div>
-            <div class="combat-result-panel__enemy-row">
+            <div class="combat-result-panel__enemy-row d-flex flex-nowrap justify-center">
                 <div
                     v-for="enemy in enemyCards"
                     :key="enemy.enemyId"
@@ -42,7 +42,7 @@
                                 alt=""
                                 class="combat-result-panel__avatar"
                             >
-                            <div class="combat-result-panel__unit-head">
+                            <div class="combat-result-panel__unit-head d-flex flex-column align-start">
                                 <span
                                     v-if="enemy.tierLabel"
                                     class="combat-result-panel__tier"
@@ -120,8 +120,6 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
 .combat-result-panel {
     &__arena {
         position: relative;
-        display: flex;
-        flex-direction: column;
         gap: 8px;
     }
 
@@ -136,9 +134,6 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
         position: absolute;
         inset: 0;
         z-index: 2;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         background: rgba(0, 0, 0, 0.72);
         border-block: 1px solid rgba(var(--v-theme-warning), 0.6);
         opacity: 0;
@@ -150,9 +145,6 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     }
 
     &__wave-banner-text {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
         gap: 4px;
         opacity: 0;
         animation: combat-result-panel-banner-text-in 0.2s ease-out forwards;
@@ -175,9 +167,6 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     }
 
     &__enemy-row {
-        display: flex;
-        flex-wrap: nowrap;
-        justify-content: center;
         // overflow-x/overflow-y 只要有一軸不是 visible，另一軸宣告成 visible
         // 會被瀏覽器強制轉成 auto（CSS Overflow 規格），所以這裡兩軸都明確宣告
         // 非 visible，改用 padding-block 預留 lunge/spark 特效的位移空間，
@@ -294,9 +283,6 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     }
 
     &__unit-head {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
         gap: 2px;
         min-width: 0;
     }

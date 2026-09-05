@@ -9,7 +9,7 @@
 
         <div class="d-flex align-center ga-3 mb-3">
             <div
-                class="pixel-slot pixel-slot--item pixel-slot--detail"
+                class="pixel-slot pixel-slot--item pixel-slot--detail d-flex align-center justify-center"
                 :style="{ borderColor: RARITY_COLOR[item.rarity] }"
             >
                 <span
@@ -44,12 +44,12 @@
 
         <div
             v-if="effects.length > 0"
-            class="item-detail__effects mb-3"
+            class="item-detail__effects d-flex flex-column mb-3"
         >
             <div
                 v-for="effect in effects"
                 :key="effect.label"
-                class="item-detail__effect-row text-body-2"
+                class="item-detail__effect-row d-flex align-baseline justify-space-between text-body-2"
             >
                 <span>{{ effect.label }}</span>
                 <span
@@ -87,9 +87,6 @@ defineProps<{
 <style scoped lang="scss">
 .pixel-slot {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     border: 2px solid rgba(196, 203, 219, 0.25);
     border-radius: 3px;
     background: #14171c;
@@ -160,15 +157,10 @@ defineProps<{
     }
 
     &__effects {
-        display: flex;
-        flex-direction: column;
         gap: 4px;
     }
 
     &__effect-row {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
         gap: 12px;
     }
 

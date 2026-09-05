@@ -57,7 +57,7 @@
             <!-- 天賦樹：由下而上分層，畫面上由上（Tier 5）往下（Tier 1）排列；
                  只有這個區塊可以捲動，進入頁面時預設捲動到 Tier 1 或最新一個已投入的天賦所在層 -->
             <div class="talents-page__scroll">
-                <div class="talents-page__tree">
+                <div class="talents-page__tree d-flex flex-column">
                     <div
                         v-for="tier in tiers"
                         :key="tier.tier"
@@ -68,14 +68,14 @@
                             Tier {{ tier.tier }}
                         </div>
                         <div
-                            class="talents-page__tier-nodes"
-                            :class="{ 'talents-page__tier-nodes--branch': tier.nodes.length > 1 }"
+                            class="talents-page__tier-nodes d-flex ga-2"
+                            :class="tier.nodes.length > 1 ? 'justify-space-between' : 'justify-center'"
                         >
                             <button
                                 v-for="node in tier.nodes"
                                 :key="node.nodeId"
                                 type="button"
-                                class="talent-node pixel-press"
+                                class="talent-node pixel-press d-flex flex-column align-center justify-center"
                                 :class="nodeClass(node)"
                                 @click="selectNode(node)"
                             >
@@ -122,22 +122,29 @@
 
                 <!-- 3 階段進度：每個節點固定 3 級，每一格代表一級，已投入的級數
                      呈現充能光暈感；格內文字是「該級為止累積的加成」（{stat}+N）。 -->
-                <div class="talents-page__stage-row mb-3">
-                    <div
+                <v-row
+                    dense
+                    class="mb-3"
+                >
+                    <v-col
                         v-for="stage in 3"
                         :key="stage"
-                        class="talents-page__stage"
-                        :class="{ 'talents-page__stage--charged': stage <= rankOf(selectedNode.nodeId) }"
+                        cols="4"
                     >
                         <div
-                            v-for="effect in selectedNode.effect"
-                            :key="effect.stat"
-                            class="talents-page__stage-line font-pixel"
+                            class="talents-page__stage d-flex flex-column align-center justify-center"
+                            :class="{ 'talents-page__stage--charged': stage <= rankOf(selectedNode.nodeId) }"
                         >
-                            {{ STAT_LABEL[effect.stat] }}{{ formatEffectAtRank(effect, stage) }}
+                            <div
+                                v-for="effect in selectedNode.effect"
+                                :key="effect.stat"
+                                class="talents-page__stage-line font-pixel"
+                            >
+                                {{ STAT_LABEL[effect.stat] }}{{ formatEffectAtRank(effect, stage) }}
+                            </div>
                         </div>
-                    </div>
-                </div>
+                    </v-col>
+                </v-row>
 
                 <div
                     v-if="nodeState(selectedNode) === 'locked'"
@@ -392,8 +399,6 @@ const invest = async (node: TalentNode) => {
     }
 
     &__tree {
-        display: flex;
-        flex-direction: column;
         gap: 10px;
         padding-bottom: 12px;
     }
@@ -404,27 +409,11 @@ const invest = async (node: TalentNode) => {
     }
 
     &__tier-nodes {
-        display: flex;
-        justify-content: center;
         gap: 8px;
-
-        &--branch {
-            justify-content: space-between;
-        }
-    }
-
-    &__stage-row {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 6px;
     }
 
     &__stage {
         padding: 8px 6px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
         gap: 2px;
         text-align: center;
         background: rgba(196, 203, 219, 0.04);
@@ -473,10 +462,6 @@ const invest = async (node: TalentNode) => {
     flex: 1 1 0;
     max-width: 220px;
     min-height: 92px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
     gap: 2px;
     padding: 10px 8px;
     border: 2px solid rgba(196, 203, 219, 0.25);

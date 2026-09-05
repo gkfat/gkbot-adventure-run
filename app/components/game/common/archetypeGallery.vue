@@ -11,7 +11,7 @@
                     v-for="(archetype, index) in archetypes"
                     :key="archetype.archetypeId"
                     type="button"
-                    class="archetype-carousel__card"
+                    class="archetype-carousel__card d-flex align-center justify-center"
                     :class="{ 'archetype-carousel__card--active': index === selectedIndex }"
                     :style="cardStyle(index)"
                     :disabled="loading"
@@ -31,7 +31,7 @@
         <!-- 角色說明欄 -->
         <div
             v-if="selected"
-            class="archetype-detail"
+            class="archetype-detail d-flex flex-column"
         >
             <div class="archetype-detail__panel">
                 <div class="text-body-1 font-weight-medium">
@@ -44,12 +44,12 @@
                 <div class="text-caption text-medium-emphasis mb-1">
                     初始配備
                 </div>
-                <div class="archetype-gallery__starter-row mb-3">
+                <div class="archetype-gallery__starter-row d-flex mb-3">
                     <button
                         v-for="preview in starterLoadoutPreview"
                         :key="preview.templateId"
                         type="button"
-                        class="pixel-slot pixel-slot--starter pixel-press"
+                        class="pixel-slot pixel-slot--starter pixel-press d-flex align-center justify-center"
                         :style="{ borderColor: RARITY_COLOR[preview.rarity] }"
                         @click="openStarterDetail(preview)"
                     >
@@ -66,7 +66,7 @@
                     </button>
                 </div>
 
-                <div class="archetype-gallery__stats">
+                <div class="archetype-gallery__stats d-flex flex-column">
                     <div
                         v-for="stat in statBars(selected.attributes)"
                         :key="stat.label"
@@ -83,10 +83,10 @@
                 </div>
             </div>
 
-            <div class="archetype-detail__nav-row">
+            <div class="archetype-detail__nav-row d-flex ga-2">
                 <button
                     type="button"
-                    class="archetype-detail__nav"
+                    class="archetype-detail__nav d-flex align-center justify-center"
                     aria-label="上一個職業"
                     :disabled="loading"
                     @click="step(-1)"
@@ -100,7 +100,7 @@
 
                 <button
                     type="button"
-                    class="archetype-detail__nav"
+                    class="archetype-detail__nav d-flex align-center justify-center"
                     aria-label="下一個職業"
                     :disabled="loading"
                     @click="step(1)"
@@ -254,13 +254,10 @@ const handleConfirm = () => {
     overflow-y: auto;
 
     &__starter-row {
-        display: flex;
         gap: 6px;
     }
 
     &__stats {
-        display: flex;
-        flex-direction: column;
         gap: 4px;
     }
 
@@ -311,9 +308,6 @@ const handleConfirm = () => {
         width: 120px;
         height: 120px;
         margin: -60px 0 0 -60px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         background: rgba(196, 203, 219, 0.04);
         border: 3px solid rgb(20, 20, 20);
         outline: 2px solid rgba(196, 203, 219, 0.25);
@@ -338,24 +332,14 @@ const handleConfirm = () => {
 
 .archetype-detail {
     width: 100%;
-    display: flex;
-    flex-direction: column;
     gap: 8px;
     padding: 12px 14px;
     background: #14171c;
     border: 1px solid rgba(196, 203, 219, 0.15);
     border-radius: 3px;
 
-    &__nav-row {
-        display: flex;
-        gap: 8px;
-    }
-
     &__nav {
         flex: 1 1 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         height: 40px;
         border-radius: 3px;
         background: rgba(196, 203, 219, 0.06);
@@ -392,9 +376,6 @@ const handleConfirm = () => {
 // cross component boundaries.
 .pixel-slot {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     border: 2px solid rgba(196, 203, 219, 0.25);
     border-radius: 3px;
     background: #14171c;

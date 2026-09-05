@@ -47,11 +47,11 @@
             <!-- 頂部：目前裝備總覽 -->
             <div class="inventory-page__box mb-3">
                 <div class="text-caption text-medium-emphasis mb-2">目前裝備</div>
-                <div class="inventory-page__equip-row">
+                <div class="d-flex flex-nowrap justify-space-between ga-1">
                     <div
                         v-for="slot in EQUIP_SLOTS_ALL"
                         :key="slot"
-                        class="equip-slot-wrap"
+                        class="d-flex flex-column align-center flex-grow-0 flex-shrink-0 equip-slot-wrap"
                     >
                         <button
                             type="button"
@@ -102,49 +102,53 @@
             </div>
 
             <!-- 格狀背包，一列 6 格，依稀有度由高到低排序 -->
-            <div
+            <v-row
                 v-if="sortedItems.length > 0"
-                class="inventory-page__grid"
+                dense
             >
-                <button
+                <v-col
                     v-for="item in sortedItems"
                     :key="item.itemId"
-                    type="button"
-                    class="pixel-slot pixel-slot--item pixel-press"
-                    :class="{ 'pixel-slot--equipped': isEquipped(item) }"
-                    :style="{ borderColor: RARITY_COLOR[item.rarity] }"
-                    @click="openDetail(item)"
+                    cols="2"
                 >
-                    <span
-                        class="pixel-slot__rarity font-pixel"
-                        :style="{ background: RARITY_COLOR[item.rarity] }"
+                    <button
+                        type="button"
+                        class="pixel-slot pixel-slot--item pixel-press"
+                        :class="{ 'pixel-slot--equipped': isEquipped(item) }"
+                        :style="{ borderColor: RARITY_COLOR[item.rarity] }"
+                        @click="openDetail(item)"
                     >
-                        {{ item.rarity }}
-                    </span>
-                    <GameCommonPixelIcon
-                        :name="resolvePixelIcon(item)"
-                        :size="32"
-                    />
-                    <span
-                        v-if="primaryStatValue(item)"
-                        class="pixel-slot__value font-pixel"
-                        :style="{ color: RARITY_COLOR[item.rarity] }"
-                    >
-                        {{ primaryStatValue(item) }}
-                    </span>
-
-                    <div
-                        v-if="isEquipped(item)"
-                        class="pixel-slot__badge"
-                        aria-label="裝備中"
-                    >
-                        <v-icon
-                            icon="mdi-check-bold"
-                            size="10"
+                        <span
+                            class="pixel-slot__rarity font-pixel"
+                            :style="{ background: RARITY_COLOR[item.rarity] }"
+                        >
+                            {{ item.rarity }}
+                        </span>
+                        <GameCommonPixelIcon
+                            :name="resolvePixelIcon(item)"
+                            :size="32"
                         />
-                    </div>
-                </button>
-            </div>
+                        <span
+                            v-if="primaryStatValue(item)"
+                            class="pixel-slot__value font-pixel"
+                            :style="{ color: RARITY_COLOR[item.rarity] }"
+                        >
+                            {{ primaryStatValue(item) }}
+                        </span>
+
+                        <div
+                            v-if="isEquipped(item)"
+                            class="pixel-slot__badge"
+                            aria-label="裝備中"
+                        >
+                            <v-icon
+                                icon="mdi-check-bold"
+                                size="10"
+                            />
+                        </div>
+                    </button>
+                </v-col>
+            </v-row>
             <div
                 v-else
                 class="text-center text-body-2 text-medium-emphasis mt-6"
@@ -277,26 +281,10 @@ onMounted(() => {
         border-radius: 3px;
     }
 
-    &__equip-row {
-        display: flex;
-        flex-wrap: nowrap;
-        justify-content: space-between;
-        gap: 4px;
-    }
-
-    &__grid {
-        display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        gap: 6px;
-    }
 }
 
 .equip-slot-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     gap: 10px;
-    flex: 0 0 auto;
 
     &__label {
         font-size: 10px;

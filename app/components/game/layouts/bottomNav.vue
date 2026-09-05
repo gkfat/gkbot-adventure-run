@@ -4,7 +4,7 @@
             v-for="item in leftItems"
             :key="item.key"
             type="button"
-            class="bottom-nav__item pixel-press"
+            class="bottom-nav__item pixel-press d-flex flex-column align-center justify-end"
             :aria-label="item.label"
             @click="handleTap(item)"
         >
@@ -15,10 +15,10 @@
             <span class="bottom-nav__label">{{ item.label }}</span>
         </button>
 
-        <div class="bottom-nav__home-slot">
+        <div class="bottom-nav__home-slot d-flex flex-column align-center">
             <button
                 type="button"
-                class="bottom-nav__home pixel-press"
+                class="bottom-nav__home pixel-press d-flex align-center justify-center"
                 aria-label="冒險"
                 :aria-current="isOnMainPage ? 'page' : undefined"
                 @click="handleHomeTap"
@@ -35,19 +35,19 @@
             v-for="item in rightItems"
             :key="item.key"
             type="button"
-            class="bottom-nav__item pixel-press"
+            class="bottom-nav__item pixel-press d-flex flex-column align-center justify-end"
             :class="{ 'bottom-nav__item--attention': item.key === 'talents' && hasAvailableTalentPoints }"
             :aria-label="item.key === 'talents' && hasAvailableTalentPoints ? `${item.label}（有可用天賦點）` : item.label"
             @click="handleTap(item)"
         >
-            <span class="bottom-nav__icon-wrap">
+            <span class="bottom-nav__icon-wrap d-inline-flex">
                 <v-icon
                     :icon="item.icon"
                     size="22"
                 />
                 <span
                     v-if="item.key === 'talents' && hasAvailableTalentPoints"
-                    class="bottom-nav__badge font-pixel"
+                    class="bottom-nav__badge font-pixel d-flex align-center justify-center"
                     aria-hidden="true"
                 >
                     {{ talentPointsBadgeText }}
@@ -125,10 +125,6 @@ $talent-point-color: #ffd166;
     border-top: 1px solid rgba(196, 203, 219, 0.12);
 
     &__item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: flex-end;
         gap: 5px;
         height: 100%;
         background: none;
@@ -157,7 +153,6 @@ $talent-point-color: #ffd166;
 
     &__icon-wrap {
         position: relative;
-        display: inline-flex;
     }
 
     &__badge {
@@ -167,9 +162,6 @@ $talent-point-color: #ffd166;
         min-width: 15px;
         height: 15px;
         padding: 0 3px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         border-radius: 8px;
         background: $talent-point-color;
         border: 1.5px solid rgb(var(--v-theme-background));
@@ -181,16 +173,10 @@ $talent-point-color: #ffd166;
     }
 
     &__home-slot {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
         gap: 2px;
     }
 
     &__home {
-        display: flex;
-        align-items: center;
-        justify-content: center;
         width: 46px;
         height: 46px;
         margin-top: -23px;

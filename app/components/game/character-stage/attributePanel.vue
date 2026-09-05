@@ -7,14 +7,14 @@
                         v-for="attr in attributeEntries"
                         :key="attr.key"
                         cols="6"
-                        class="character-stage__stat"
+                        class="character-stage__stat d-flex align-center"
                     >
                         <span class="text-caption text-medium-emphasis character-stage__stat-label">{{ attr.label }}</span>
                         <span class="d-flex align-center ga-1">
                             <button
                                 v-if="allocating"
                                 type="button"
-                                class="attr-step-btn pixel-press"
+                                class="attr-step-btn pixel-press d-flex align-center justify-center"
                                 :disabled="attr.pending <= 0"
                                 aria-label="減少"
                                 @click="emit('decrement', attr.key)"
@@ -30,7 +30,7 @@
                             <button
                                 v-if="allocating"
                                 type="button"
-                                class="attr-step-btn pixel-press"
+                                class="attr-step-btn pixel-press d-flex align-center justify-center"
                                 :disabled="remainingPoints <= 0"
                                 aria-label="增加"
                                 @click="emit('increment', attr.key)"
@@ -42,7 +42,7 @@
                 </v-row>
             </div>
 
-            <div class="character-stage__summary-col character-stage__col--divided character-stage__summary-col--points">
+            <div class="character-stage__summary-col character-stage__col--divided character-stage__summary-col--points d-flex flex-column align-center">
                 <span
                     class="font-pixel text-caption"
                     :style="{ color: remainingPoints > 0 ? 'rgb(var(--v-theme-warning))' : 'rgb(var(--v-theme-primary))' }"
@@ -65,7 +65,7 @@
                 >
                     <button
                         type="button"
-                        class="attr-allocation-btn pixel-press"
+                        class="attr-allocation-btn pixel-press d-flex align-center justify-center"
                         aria-label="儲存"
                         :disabled="totalPending === 0 || savingAllocation"
                         @click="emit('save-allocation')"
@@ -74,7 +74,7 @@
                     </button>
                     <button
                         type="button"
-                        class="attr-allocation-btn pixel-press"
+                        class="attr-allocation-btn pixel-press d-flex align-center justify-center"
                         aria-label="取消"
                         :disabled="savingAllocation"
                         @click="emit('cancel-allocating')"
@@ -155,9 +155,6 @@ const attributeEntries = computed(() => (
     min-width: 0;
 
     &--points {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
         gap: 2px;
         white-space: nowrap;
     }
@@ -169,8 +166,6 @@ const attributeEntries = computed(() => (
 }
 
 .character-stage__stat {
-    display: flex;
-    align-items: center;
     gap: 6px;
     min-width: 0;
 }
@@ -181,9 +176,6 @@ const attributeEntries = computed(() => (
 }
 
 .attr-allocation-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     width: 28px;
     height: 28px;
     padding: 0;
@@ -199,9 +191,6 @@ const attributeEntries = computed(() => (
 }
 
 .attr-step-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     width: 16px;
     height: 16px;
     padding: 0;

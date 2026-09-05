@@ -73,7 +73,7 @@
                     <div
                         v-for="item in lastSettlement.items"
                         :key="item.itemId"
-                        class="adventure-page__item-chip"
+                        class="adventure-page__item-chip d-inline-flex align-center"
                         :style="{ borderColor: RARITY_COLOR[item.rarity] }"
                     >
                         <span
@@ -116,7 +116,7 @@
                     <div
                         v-for="item in lastSettlement.forfeitedItems"
                         :key="item.itemId"
-                        class="adventure-page__item-chip adventure-page__item-chip--forfeited"
+                        class="adventure-page__item-chip adventure-page__item-chip--forfeited d-inline-flex align-center"
                     >
                         <span
                             class="adventure-page__item-chip-rarity font-pixel"
@@ -246,37 +246,37 @@
 
                     <v-divider class="my-2" />
                     <div class="d-flex flex-wrap ga-4">
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">EXP</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
                                 {{ currentRun.expEarned }}
                             </div>
                         </div>
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">金幣</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
                                 +{{ currentRun.goldEarned }}
                             </div>
                         </div>
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">寶石</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
                                 +{{ currentRun.gemsEarned }}
                             </div>
                         </div>
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">道具</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
                                 x{{ currentRun.runInventory.length }}
                             </div>
                         </div>
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">祝福</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
                                 x{{ currentRun.blessings.length }}
                             </div>
                         </div>
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">詛咒</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
                                 x{{ currentRun.curses.length }}
@@ -288,7 +288,7 @@
 
             <div
                 v-if="character"
-                class="adventure-page__stage"
+                class="adventure-page__stage d-flex flex-column align-center"
             >
                 <div class="adventure-page__stage-fx-anchor">
                     <div class="adventure-page__stage-sprite-wrap">
@@ -387,37 +387,37 @@
                          的說明，避免這一列在玩家還沒看完戰鬥結算前就先跳成戰後數字）。 -->
                     <v-divider class="my-2" />
                     <div class="d-flex flex-wrap ga-4">
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">EXP</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
                                 {{ displayedRunTotals.expEarned }}
                             </div>
                         </div>
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">金幣</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
                                 +{{ displayedRunTotals.goldEarned }}
                             </div>
                         </div>
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">寶石</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
                                 +{{ displayedRunTotals.gemsEarned }}
                             </div>
                         </div>
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">道具</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
                                 x{{ displayedRunTotals.itemCount }}
                             </div>
                         </div>
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">祝福</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
                                 x{{ displayedRunTotals.blessingCount }}
                             </div>
                         </div>
-                        <div class="adventure-page__loot-stat">
+                        <div class="adventure-page__loot-stat d-flex flex-column">
                             <div class="text-caption text-medium-emphasis">詛咒</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
                                 x{{ displayedRunTotals.curseCount }}
@@ -462,7 +462,7 @@
                          開戰，玩家不需再點擊按鈕。 -->
                     <div
                         v-else-if="combatIntroPhase === 'banner'"
-                        class="adventure-page__box adventure-page__encounter-banner mb-3"
+                        class="adventure-page__box adventure-page__encounter-banner d-flex flex-column align-center justify-center mb-3"
                     >
                         <div
                             v-if="currentRun.currentNodeType === NodeType.BOSS"
@@ -557,7 +557,7 @@
                     <div
                         v-for="potion in restPotions"
                         :key="potion.itemId"
-                        class="adventure-page__potion-row"
+                        class="adventure-page__potion-row d-flex align-center justify-space-between"
                     >
                         <div class="d-flex align-center ga-2">
                             <GameCommonPixelIcon
@@ -612,7 +612,7 @@
                 固定於頁面頂端的獨立 HP 區塊；戰鬥中額外疊加行動條/spark/傷害飄字。 -->
             <div
                 v-if="character"
-                class="adventure-page__stage"
+                class="adventure-page__stage d-flex flex-column align-center"
             >
                 <div class="adventure-page__stage-fx-anchor">
                     <img
@@ -1543,13 +1543,6 @@ onMounted(() => {
         border: 1px solid rgba(196, 203, 219, 0.15);
         border-radius: 3px;
 
-        &--center {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 80px;
-        }
-
         &--forfeited {
             border-color: rgba(255, 82, 82, 0.4);
         }
@@ -1564,9 +1557,6 @@ onMounted(() => {
     // 不論 scroll 內容多寡都固定在同一個畫面位置（見進場走路動畫的版面比照）。
     &__stage {
         flex: 0 0 auto;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
         gap: 8px;
         padding: 4px 0 12px;
     }
@@ -1736,8 +1726,6 @@ onMounted(() => {
     }
 
     &__loot-stat {
-        display: flex;
-        flex-direction: column;
         gap: 2px;
     }
 
@@ -1747,9 +1735,6 @@ onMounted(() => {
     }
 
     &__potion-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
         gap: 8px;
         padding: 6px 0;
 
@@ -1764,10 +1749,6 @@ onMounted(() => {
     // runCombatIntro），故獨立寫一份簡化樣式，不共用 combatResultPanel 的
     // scoped style。
     &__encounter-banner {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
         min-height: 64px;
         text-align: center;
         animation: adventure-page-encounter-banner-in 0.2s ease-out;
@@ -1796,8 +1777,6 @@ onMounted(() => {
 
     &__item-chip {
         position: relative;
-        display: inline-flex;
-        align-items: center;
         gap: 4px;
         padding: 4px 8px;
         font-size: 11px;
