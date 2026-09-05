@@ -326,14 +326,15 @@ export class CharacterService extends BaseService {
     }
 
     /**
-     * Permanently delete a character owned by the caller. Equipped/inventory
-     * items are released (their `items/{itemId}` documents are left intact —
-     * only the character's `equipment` map and the character-owned
-     * `inventories/{characterId}` reference list are removed, along with
-     * every adventure run the character has ever started, and its per-character
-     * shop documents — see ShopService.deleteShopsForCharacter, since once the
-     * character is gone the shop's own lazy-destroy on next generation will
-     * never run for it again) before the character document itself is removed.
+     * Permanently delete a character owned by the caller. All items it owns
+     * (equipped + permanent inventory) are permanently deleted from the
+     * top-level `items` collection, along with the character's `equipment`
+     * map and the character-owned `inventories/{characterId}` reference
+     * list, every adventure run the character has ever started, and its
+     * per-character shop documents — see ShopService.deleteShopsForCharacter,
+     * since once the character is gone the shop's own lazy-destroy on next
+     * generation will never run for it again — before the character
+     * document itself is removed.
      */
     async deleteCharacter(accountId: string, characterId: string): Promise<void> {
         const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
@@ -341,6 +342,10 @@ export class CharacterService extends BaseService {
             throw new NotFoundError('character');
         }
 
+        const inventory = await this.inventoryRepo.getByCharacterId(characterId);
+        const ownedItemIds = [...new Set([...Object.values(character.equipment), ...inventory.items])];
+
+        await this.itemRepo.deleteByIds(ownedItemIds);
         await this.adventureRunRepo.deleteAllByCharacterId(characterId);
         await this.inventoryRepo.delete(characterId);
         await this.shopService.deleteShopsForCharacter(characterId);

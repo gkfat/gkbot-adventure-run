@@ -6,8 +6,8 @@ import { CharacterService } from './character.service';
 
 const {
     listByAccountIdMock, createCharacterFromArchetypeMock, getByIdForAccountMock, characterDeleteMock,
-    grantItemMock, equipItemMock,
-    inventoryDeleteMock, deleteAllByCharacterIdMock, deleteShopsForCharacterMock, updateTalentsMock,
+    grantItemMock, equipItemMock, itemGetByIdsMock, itemDeleteByIdsMock,
+    inventoryDeleteMock, getByCharacterIdMock, deleteAllByCharacterIdMock, deleteShopsForCharacterMock, updateTalentsMock,
     addEncounteredArchetypeSlugsMock, updateDefeatedArchetypeCountsMock,
 } = vi.hoisted(() => ({
     listByAccountIdMock: vi.fn(),
@@ -16,7 +16,10 @@ const {
     characterDeleteMock: vi.fn(),
     grantItemMock: vi.fn(),
     equipItemMock: vi.fn(),
+    itemGetByIdsMock: vi.fn(),
+    itemDeleteByIdsMock: vi.fn(),
     inventoryDeleteMock: vi.fn(),
+    getByCharacterIdMock: vi.fn(),
     deleteAllByCharacterIdMock: vi.fn(),
     deleteShopsForCharacterMock: vi.fn(),
     updateTalentsMock: vi.fn(),
@@ -41,13 +44,19 @@ vi.mock('../repositories/character.repository', () => ({
 
 vi.mock('../repositories/item.repository', () => ({
     ItemRepository: vi.fn().mockImplementation(function ItemRepositoryMock() {
-        return { getByIds: vi.fn().mockResolvedValue([]) };
+        return {
+            getByIds: itemGetByIdsMock,
+            deleteByIds: itemDeleteByIdsMock,
+        };
     }),
 }));
 
 vi.mock('../repositories/inventory.repository', () => ({
     InventoryRepository: vi.fn().mockImplementation(function InventoryRepositoryMock() {
-        return { delete: inventoryDeleteMock };
+        return {
+            delete: inventoryDeleteMock,
+            getByCharacterId: getByCharacterIdMock,
+        };
     }),
 }));
 
@@ -211,7 +220,9 @@ describe('CharacterService.deleteCharacter', () => {
     beforeEach(() => {
         getByIdForAccountMock.mockReset();
         characterDeleteMock.mockReset();
+        itemDeleteByIdsMock.mockReset();
         inventoryDeleteMock.mockReset();
+        getByCharacterIdMock.mockReset();
         deleteAllByCharacterIdMock.mockReset();
         deleteShopsForCharacterMock.mockReset();
     });
@@ -222,19 +233,36 @@ describe('CharacterService.deleteCharacter', () => {
 
         await expect(service.deleteCharacter('account-1', 'char-1')).rejects.toThrow();
         expect(characterDeleteMock).not.toHaveBeenCalled();
+        expect(itemDeleteByIdsMock).not.toHaveBeenCalled();
         expect(inventoryDeleteMock).not.toHaveBeenCalled();
         expect(deleteAllByCharacterIdMock).not.toHaveBeenCalled();
         expect(deleteShopsForCharacterMock).not.toHaveBeenCalled();
     });
 
-    it('deletes adventure runs, the inventory reference list, the shop documents, then the character document — without touching item documents', async () => {
+    it('deletes equipped/inventory item documents, adventure runs, the inventory reference list, the shop documents, then the character document', async () => {
         getByIdForAccountMock.mockResolvedValue({
-            characterId: 'char-1', accountId: 'account-1',
+            characterId: 'char-1',
+            accountId: 'account-1',
+            equipment: {
+                WEAPON: 'item-weapon-1', ARMOR: 'item-armor-1',
+            },
+        });
+        getByCharacterIdMock.mockResolvedValue({
+            characterId: 'char-1', items: ['item-potion-1', 'item-armor-1'],
         });
         const service = new CharacterService();
 
         await service.deleteCharacter('account-1', 'char-1');
 
+        expect(itemDeleteByIdsMock).toHaveBeenCalledTimes(1);
+        expect(itemDeleteByIdsMock.mock.calls[0]?.[0]).toEqual(
+            expect.arrayContaining([
+                'item-weapon-1',
+                'item-armor-1',
+                'item-potion-1',
+            ]),
+        );
+        expect(itemDeleteByIdsMock.mock.calls[0]?.[0]).toHaveLength(3);
         expect(deleteAllByCharacterIdMock).toHaveBeenCalledWith('char-1');
         expect(inventoryDeleteMock).toHaveBeenCalledWith('char-1');
         expect(deleteShopsForCharacterMock).toHaveBeenCalledWith('char-1');

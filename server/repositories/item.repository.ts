@@ -57,6 +57,29 @@ export class ItemRepository extends BaseRepository<ItemInstance> {
             throw new DatabaseError(`Failed to batch get items: ${message}`);
         }
     }
+
+    /**
+     * Permanently delete a batch of item documents by id. Missing ids are
+     * silently ignored (Firestore batch delete is a no-op for a
+     * non-existent doc).
+     */
+    async deleteByIds(itemIds: string[]): Promise<void> {
+        if (itemIds.length === 0) {
+            return;
+        }
+
+        try {
+            const batches = chunk(itemIds, GET_BATCH_SIZE);
+            await Promise.all(batches.map(async (ids) => {
+                const batch = this.db.batch();
+                ids.forEach(id => batch.delete(this.getDocumentRef(id)));
+                await batch.commit();
+            }));
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new DatabaseError(`Failed to batch delete items: ${message}`);
+        }
+    }
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
