@@ -28,32 +28,37 @@
         </div>
 
         <template v-if="revealed && result">
-            <div
-                v-if="result.goldGained || result.gemsGained || result.itemsGained?.length"
-                class="d-flex flex-wrap justify-center ga-4 mb-3"
-            >
+            <template v-if="result.goldGained || result.gemsGained || result.itemsGained?.length">
                 <div
-                    v-if="result.goldGained"
-                    class="d-flex align-center ga-1"
+                    v-if="result.goldGained || result.gemsGained"
+                    class="d-flex flex-wrap justify-center ga-4 mb-3"
                 >
-                    <GameCommonCurrencyIcon type="GOLD" :size="18" />
-                    <span class="font-pixel text-body-1" style="color: #e0c063;">+{{ result.goldGained }}</span>
-                </div>
-                <div
-                    v-if="result.gemsGained"
-                    class="d-flex align-center ga-1"
-                >
-                    <GameCommonCurrencyIcon type="GEMS" :size="18" />
-                    <span class="font-pixel text-body-1" style="color: rgb(var(--v-theme-primary));">+{{ result.gemsGained }}</span>
+                    <div
+                        v-if="result.goldGained"
+                        class="d-flex align-center ga-1"
+                    >
+                        <GameCommonCurrencyIcon type="GOLD" :size="18" />
+                        <span class="font-pixel text-body-1" style="color: #e0c063;">+{{ result.goldGained }}</span>
+                    </div>
+                    <div
+                        v-if="result.gemsGained"
+                        class="d-flex align-center ga-1"
+                    >
+                        <GameCommonCurrencyIcon type="GEMS" :size="18" />
+                        <span class="font-pixel text-body-1" style="color: rgb(var(--v-theme-primary));">+{{ result.gemsGained }}</span>
+                    </div>
                 </div>
                 <div
                     v-if="result.itemsGained?.length"
-                    class="font-pixel text-body-1"
-                    style="color: rgb(var(--v-theme-green));"
+                    class="d-flex flex-column ga-2 mb-3"
                 >
-                    獲得物品 x{{ result.itemsGained.length }}
+                    <GameCommonItemRewardChip
+                        v-for="gainedItem in result.itemsGained"
+                        :key="gainedItem.itemId"
+                        :item="gainedItem"
+                    />
                 </div>
-            </div>
+            </template>
             <div
                 v-else
                 class="text-body-2 text-medium-emphasis mb-3"

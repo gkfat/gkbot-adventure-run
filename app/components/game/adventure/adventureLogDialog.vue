@@ -62,7 +62,16 @@
                         <span v-if="entry.data.gemsGained">寶石 +{{ entry.data.gemsGained }}</span>
                         <span v-if="entry.data.blessingGranted">獲得一個祝福</span>
                         <span v-if="entry.data.curseApplied">遭受一個詛咒</span>
-                        <span v-if="entry.data.itemsGained?.length">獲得物品 x{{ entry.data.itemsGained.length }}</span>
+                    </div>
+                    <div
+                        v-if="entry.data.itemsGained?.length"
+                        class="d-flex flex-column ga-2 mt-1"
+                    >
+                        <GameCommonItemRewardChip
+                            v-for="gainedItem in entry.data.itemsGained"
+                            :key="gainedItem.itemId"
+                            :item="gainedItem"
+                        />
                     </div>
                 </template>
 

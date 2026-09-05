@@ -55,18 +55,6 @@
                     </div>
                 </div>
                 <div
-                    v-if="result.itemsGained?.length"
-                    class="event-result-dialog__stat"
-                >
-                    <div class="text-caption text-medium-emphasis">道具</div>
-                    <div
-                        class="font-pixel event-result-dialog__stat-value"
-                        style="color: rgb(var(--v-theme-green));"
-                    >
-                        x{{ result.itemsGained.length }}
-                    </div>
-                </div>
-                <div
                     v-if="result.blessingGranted"
                     class="event-result-dialog__stat"
                 >
@@ -90,6 +78,17 @@
                         遭受
                     </div>
                 </div>
+            </div>
+
+            <div
+                v-if="result.itemsGained?.length"
+                class="d-flex flex-column ga-2 mb-3"
+            >
+                <GameCommonItemRewardChip
+                    v-for="gainedItem in result.itemsGained"
+                    :key="gainedItem.itemId"
+                    :item="gainedItem"
+                />
             </div>
         </template>
     </GameCommonDialogFrame>
