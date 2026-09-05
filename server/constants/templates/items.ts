@@ -680,6 +680,606 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
 
+    // Weapon (LIGHT) — RIGHT_HAND, 虛擬實境設施 (VR training facility)
+    'vr_training_bracer': {
+        templateId: 'vr_training_bracer',
+        name: 'VR 格鬥訓練護腕',
+        description: '虛擬訓練場遺留下來的體感護腕，原本用來讓學員在模擬環境裡練習格鬥。訊號早已錯亂閃爍，但戴上去的瞬間，你的拳頭還是照著它給的節奏出手，準得不像自己。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.RIGHT_HAND,
+        weaponWeightClass: WeaponWeightClass.LIGHT,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'ATK', base: {
+                    min: 3, max: 6,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 9, max: 18,
+                },
+            },
+            ...LIGHT_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Head (MEDIUM) — 虛擬實境設施
+    'vr_precognition_visor': {
+        templateId: 'vr_precognition_visor',
+        name: 'VR 預判感知頭盔',
+        description: '用來訓練 GkBot 表演反應速度的感知頭盔，鏡面畫面早已亂碼閃爍。奇怪的是，只要戴著它，你總能在對方出手前半拍就先閃開身子。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.HEAD,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 3, max: 6,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 10, max: 20,
+                },
+            },
+            ...MEDIUM_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Ring (MEDIUM) — 娛樂場所 (entertainment / casino facility)
+    'jackpot_token_ring': {
+        templateId: 'jackpot_token_ring',
+        name: '老虎機代幣戒指',
+        description: '拿賭場代幣手工磨成的戒指，邊緣還留著吐幣口的刮痕。你分不清是幸運還是巧合，但戴著它做的每個決定，結果總是比預期好一點。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.RING,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 2, max: 4,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 6, max: 12,
+                },
+            },
+            ...MEDIUM_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Off-hand (LIGHT) — 娛樂場所
+    'bartender_grip_gloves': {
+        templateId: 'bartender_grip_gloves',
+        name: '調酒師工作手套',
+        description: '娛樂場所吧台留下的止滑手套，原本用來甩瓶調酒。手感輕巧得誇張，你甚至能單手接住從天花板震落的零件，還不灑出一滴。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.LEFT_HAND,
+        weaponWeightClass: WeaponWeightClass.LIGHT,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 2, max: 4,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 6, max: 12,
+                },
+            },
+            ...LIGHT_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Body (MEDIUM) — 百貨商場
+    'department_store_uniform_vest': {
+        templateId: 'department_store_uniform_vest',
+        name: '百貨專櫃制服背心',
+        description: '百貨公司專櫃人員的制服背心，燙得筆挺，胸口別針還亮著「歡迎光臨」。穿上後你走路的姿態莫名端正，連被打飛時都下意識保持著微笑。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.BODY,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 3, max: 6,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 20,
+                },
+            },
+            ...MEDIUM_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Shoes (LIGHT) — 百貨商場
+    'limited_edition_sneakers': {
+        templateId: 'limited_edition_sneakers',
+        name: '絕版聯名球鞋',
+        description: '百貨商場過期促銷海報上還印著它的原價，鞋盒早被搶購的人潮踩爛。穿上去卻意外地合腳，彷彿它本來就是照著你的腳型做的。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.SHOES,
+        weaponWeightClass: WeaponWeightClass.LIGHT,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 5, max: 7,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 15, max: 21,
+                },
+            },
+            ...LIGHT_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Weapon (LIGHT) — RIGHT_HAND, 小賣店 (corner convenience store)
+    'convenience_store_bat': {
+        templateId: 'convenience_store_bat',
+        name: '收銀台防身球棒',
+        description: '小賣店收銀台底下常備的防身球棒，木頭紋理磨得發亮。掄起來的手感輕得不像話，速度卻快得連自己都嚇一跳。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.RIGHT_HAND,
+        weaponWeightClass: WeaponWeightClass.LIGHT,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'ATK', base: {
+                    min: 3, max: 6,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 9, max: 18,
+                },
+            },
+            ...LIGHT_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Off-hand (HEAVY) — 研究設施
+    'lab_serum_injector_brace': {
+        templateId: 'lab_serum_injector_brace',
+        name: '實驗藥劑注射護臂',
+        description: '研究設施留下的自動注射裝置，原本用來替 GkBot 樣本施打實驗藥劑。針頭早已鏽死不會再刺下來，但護臂內側傳來的微弱震動，讓你的手臂莫名感到踏實。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.LEFT_HAND,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 4, max: 8,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 24,
+                },
+            },
+            ...HEAVY_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Weapon (HEAVY) — RIGHT_HAND, 工廠 (production line, cyberpunk-industrial)
+    'quantum_breach_drill_arm': {
+        templateId: 'quantum_breach_drill_arm',
+        name: '量子鑽掘機械臂',
+        description: '從量產線末端拆下的破拆用機械臂，鑽頭上仍殘留著切開裝甲時濺出的火光痕跡。裝上手臂的瞬間，你聽見自己骨頭發出了一聲細微的、金屬般的回應。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.RIGHT_HAND,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'ATK', base: {
+                    min: 7, max: 14,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 21, max: 42,
+                },
+            },
+            ...HEAVY_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Weapon (MEDIUM) — RIGHT_HAND, 研究設施 (cyberpunk neural research)
+    'neural_pulse_gauntlet': {
+        templateId: 'neural_pulse_gauntlet',
+        name: '神經脈衝拳套',
+        description: '研究設施用來測試人體神經傳導極限的實驗拳套，指節內建的脈衝發射器早已失控。揮拳的瞬間，你的手臂比訊號燈還快出手。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.RIGHT_HAND,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'ATK', base: {
+                    min: 5, max: 10,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 15, max: 30,
+                },
+            },
+            ...MEDIUM_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Off-hand (MEDIUM) — LEFT_HAND, 虛擬實境設施 (cyberpunk hologram)
+    'holo_deflector_shield': {
+        templateId: 'holo_deflector_shield',
+        name: '全息偏導護盾',
+        description: '虛擬實境設施的展示用全息投影裝置，本該只是唬人的光影特效。可是每次舉起它擋下攻擊，你都能真實感覺到那股撞擊力道傳進手臂。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.LEFT_HAND,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 3, max: 6,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 9, max: 18,
+                },
+            },
+            ...MEDIUM_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Head (LIGHT) — 研究設施 / 駭客 (cyberpunk neural interface)
+    'neural_interface_circlet': {
+        templateId: 'neural_interface_circlet',
+        name: '神經連結頭環',
+        description: '駭進 GK 內網用的神經連結裝置，戴上後太陽穴會傳來規律的電流搏動。奇怪的是，這種感覺讓你莫名安心，彷彿早就習慣了。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.HEAD,
+        weaponWeightClass: WeaponWeightClass.LIGHT,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 2, max: 4,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 6, max: 12,
+                },
+            },
+            ...LIGHT_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Head (HEAVY) — 末世盜賊團 (cyberpunk military faceguard)
+    'tactical_faceguard': {
+        templateId: 'tactical_faceguard',
+        name: '戰術強化面罩',
+        description: '末世盜賊團私兵的制式面罩，內建的紅色瞄準熱顯像早已校正失準。你卻總能透過它精準看出敵人下一步要往哪裡動。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.HEAD,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 5, max: 9,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 15, max: 25,
+                },
+            },
+            ...HEAVY_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Body (LIGHT) — 百貨商場 (cyberpunk tech boutique)
+    'fiber_optic_bodysuit': {
+        templateId: 'fiber_optic_bodysuit',
+        name: '光纖強化緊身衣',
+        description: '百貨商場科技專櫃的展示品，內建光纖會隨心跳明滅閃爍。穿上後你的心跳莫名穩定得像是被什麼東西同步校正過。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.BODY,
+        weaponWeightClass: WeaponWeightClass.LIGHT,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 4, max: 6,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 18,
+                },
+            },
+            ...LIGHT_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Shoes (MEDIUM) — 工廠 / 物流 (cyberpunk mag-lev)
+    'maglev_sprint_boots': {
+        templateId: 'maglev_sprint_boots',
+        name: '磁浮助跑鞋',
+        description: '物流中心搬運機器人使用的磁浮輔助鞋，離地懸浮的瞬間會有微弱電流竄過腳底。你的步伐從此再也沒有踩空過一次。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.SHOES,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 4, max: 7,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 21,
+                },
+            },
+            ...MEDIUM_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Ring (HEAVY) — 娛樂場所 / 駭客地下經濟 (cyberpunk data chip)
+    'hacker_data_ring': {
+        templateId: 'hacker_data_ring',
+        name: '駭客資料指環',
+        description: '投機者圈子裡流通的地下資料指環，內嵌晶片還存著上一個主人沒來得及刪除的帳目。戴上它之後，你總能比對方早一步算出勝算。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.RING,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 2, max: 4,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 6, max: 12,
+                },
+            },
+            ...HEAVY_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Weapon (HEAVY) — RIGHT_HAND, 遊樂園「騎士競技場」表演道具
+    'jousting_arena_warhammer': {
+        templateId: 'jousting_arena_warhammer',
+        name: '競技場巨錘',
+        description: '遊樂園「騎士競技場」表演用的巨錘道具，錘頭本體其實是灌鉛的塑膠殼，重量卻扎實得不像道具。掄起來的瞬間，你甚至能感覺到金屬骨架該有的重心。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.RIGHT_HAND,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'ATK', base: {
+                    min: 7, max: 14,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 21, max: 42,
+                },
+            },
+            ...HEAVY_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Weapon (MEDIUM) — RIGHT_HAND, 遊樂園紀念品店
+    'crusader_replica_longsword': {
+        templateId: 'crusader_replica_longsword',
+        name: '十字軍複製長劍',
+        description: '遊樂園紀念品店販售的十字軍長劍複製品，包裝上還印著「純觀賞用，禁止實戰」。可是劍刃劈下去的手感，跟真劍幾乎沒有分別。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.RIGHT_HAND,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'ATK', base: {
+                    min: 5, max: 10,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 15, max: 30,
+                },
+            },
+            ...MEDIUM_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Off-hand (HEAVY) — LEFT_HAND, 遊樂園「騎士競技場」
+    'tournament_kite_shield': {
+        templateId: 'tournament_kite_shield',
+        name: '競技場鳶形盾',
+        description: '騎士競技場開幕典禮用的鳶形盾牌道具，塗裝的紋章早已斑駁脫落。舉起它擋下攻擊的瞬間，你的手臂穩得完全沒有後座力該有的顫抖。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.LEFT_HAND,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 4, max: 8,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 24,
+                },
+            },
+            ...HEAVY_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Off-hand (MEDIUM) — LEFT_HAND, 遊樂園「騎士競技場」
+    'plate_armor_gauntlet': {
+        templateId: 'plate_armor_gauntlet',
+        name: '板甲護手',
+        description: '競技場騎士造型的板甲護手，指節部位刻意做得誇張厚重只為了上鏡好看。實際握拳的觸感卻精準地卡進你的每一根手指關節。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.LEFT_HAND,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 3, max: 6,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 9, max: 18,
+                },
+            },
+            ...MEDIUM_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Head (HEAVY) — 遊樂園「騎士競技場」
+    'grand_tournament_helm': {
+        templateId: 'grand_tournament_helm',
+        name: '大型比武頭盔',
+        description: '騎士競技場主持人專用的誇張頭盔，面罩上的鍍金鷹徽已經氧化發黑。戴上後視野變得極窄，你卻莫名能準確聽出敵人腳步落在哪個方向。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.HEAD,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 5, max: 9,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 15, max: 25,
+                },
+            },
+            ...HEAVY_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Body (HEAVY) — 工廠（屠宰／裁切產線防護裝備）
+    'chainmail_cutting_vest': {
+        templateId: 'chainmail_cutting_vest',
+        name: '防切割鎖子甲背心',
+        description: '屠宰產線工人用來抵禦刀具意外的鏈甲防護背心，一環扣一環的金屬網重得驚人。穿上後你才發現，自己扛著它走路完全不喘。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.BODY,
+        weaponWeightClass: WeaponWeightClass.HEAVY,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 5, max: 9,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 15, max: 25,
+                },
+            },
+            ...HEAVY_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Shoes (MEDIUM) — GK 保全騎警隊
+    'mounted_patrol_riding_boots': {
+        templateId: 'mounted_patrol_riding_boots',
+        name: '騎警巡邏馬靴',
+        description: 'GK 保全騎警隊配發的高筒馬靴，馬鞍磨損的痕跡還留在靴身內側。踩上馬鐙的瞬間，你的腳踝穩得像是天生就該站在那裡。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.SHOES,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 4, max: 7,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 12, max: 21,
+                },
+            },
+            ...MEDIUM_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
+    // Ring (MEDIUM) — 遊樂園紀念品店
+    'knights_order_signet_ring': {
+        templateId: 'knights_order_signet_ring',
+        name: '騎士團紋章戒指',
+        description: '遊樂園紀念品店的鍍金紋章戒指，印花騎士團徽章其實是隨便設計的行銷符號。可是戴著它做出的每個格擋動作，總是精準得像被誰預先設計過。',
+        type: ItemType.EQUIPMENT,
+        equipSlot: EquipmentSlot.RING,
+        weaponWeightClass: WeaponWeightClass.MEDIUM,
+        rarityWeights: STANDARD_RARITY_WEIGHTS,
+        baseStatsRange: buildStatsRange([
+            {
+                key: 'DEF', base: {
+                    min: 2, max: 4,
+                },
+            },
+            {
+                key: 'HP', base: {
+                    min: 6, max: 12,
+                },
+            },
+            ...MEDIUM_MODS,
+        ]),
+        priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
+    },
+
     // Potions (consumable, used at REST nodes)
     'engine_oil_basic': {
         templateId: 'engine_oil_basic',
