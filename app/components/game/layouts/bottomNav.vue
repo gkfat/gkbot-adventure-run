@@ -55,16 +55,6 @@
             </span>
             <span class="bottom-nav__label">{{ item.label }}</span>
         </button>
-
-        <v-snackbar
-            v-model="snackbar"
-            timeout="1600"
-            location="top"
-            color="dark"
-            class="mt-13"
-        >
-            {{ snackbarText }}
-        </v-snackbar>
     </nav>
 </template>
 
@@ -84,9 +74,6 @@ const rightItems: NavItem[] = [
     { key: 'talents', label: '天賦', icon: 'mdi-star-four-points-outline' },
     { key: 'leaderboard', label: '排行', icon: 'mdi-trophy-outline' },
 ];
-
-const snackbar = ref(false);
-const snackbarText = ref('');
 
 const route = useRoute();
 const isOnMainPage = computed(() => route.path === '/main');
@@ -112,8 +99,6 @@ const handleTap = (item: NavItem) => {
         navigateTo('/talents');
         return;
     }
-    snackbarText.value = `${item.label}即將推出`;
-    snackbar.value = true;
 };
 
 const handleHomeTap = () => {

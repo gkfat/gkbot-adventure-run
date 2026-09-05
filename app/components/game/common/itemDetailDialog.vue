@@ -66,15 +66,6 @@
                 關閉
             </SystemBtn>
         </template>
-
-        <v-snackbar
-            v-model="soldSnackbar"
-            timeout="1600"
-            location="top"
-            color="dark"
-        >
-            {{ soldSnackbarText }}
-        </v-snackbar>
     </GameCommonDialogFrame>
 </template>
 
@@ -97,9 +88,6 @@ const detailInfo = computed(() => (item.value ? describeItem(item.value) : null)
 
 const equipActionLoading = ref(false);
 const equipActionError = ref<string | null>(null);
-
-const soldSnackbar = ref(false);
-const soldSnackbarText = ref('');
 
 const isEquipped = (target: { itemId: string }) => (
     Object.values(character.value?.equipment ?? {}).includes(target.itemId)
@@ -146,8 +134,6 @@ const handleSell = async (target: ItemLike & { itemId: string; sellPriceGold: nu
     const goldEarned = await sellItem(target.itemId);
     if (goldEarned !== null) {
         open.value = false;
-        soldSnackbarText.value = `已販售，獲得 ${goldEarned} 金幣`;
-        soldSnackbar.value = true;
     }
 };
 
