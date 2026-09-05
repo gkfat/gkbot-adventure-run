@@ -7,7 +7,7 @@ import type { Rarity } from '../../shared/types/common';
 import type { ItemInstance } from '../../shared/types/item';
 
 export type {
-    AdventureStateType, NodeType, ItemInstance,
+    AdventureStateType, NodeType,
 };
 
 function extractErrorMessage(err: unknown, fallback: string): string {

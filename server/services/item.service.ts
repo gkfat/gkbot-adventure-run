@@ -31,6 +31,7 @@ export const RARITY_ORDER: Rarity[] = [
  */
 export function rollRarity(templateId: string, context: ItemGenerationContext): Rarity {
     const template = getTemplateOrThrow(templateId);
+    const rarityWeights = context.rarityWeightsOverride ?? template.rarityWeights;
 
     const maxRarityIndex = context.maxRarity
         ? RARITY_ORDER.indexOf(context.maxRarity)
@@ -40,16 +41,16 @@ export function rollRarity(templateId: string, context: ItemGenerationContext): 
         : 0;
 
     const eligibleRarities = RARITY_ORDER.filter(
-        (rarity, index) => index >= minRarityIndex && index <= maxRarityIndex && template.rarityWeights[rarity] > 0,
+        (rarity, index) => index >= minRarityIndex && index <= maxRarityIndex && (rarityWeights[rarity] ?? 0) > 0,
     );
 
     const totalWeight = eligibleRarities.reduce(
-        (sum, rarity) => sum + template.rarityWeights[rarity], 0,
+        (sum, rarity) => sum + (rarityWeights[rarity] ?? 0), 0,
     );
 
     let roll = Math.random() * totalWeight;
     for (const rarity of eligibleRarities) {
-        roll -= template.rarityWeights[rarity];
+        roll -= rarityWeights[rarity] ?? 0;
         if (roll <= 0) {
             return rarity;
         }

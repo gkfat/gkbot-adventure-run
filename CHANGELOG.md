@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 新增機制：遇敵後才會出現休息節點
 - 實作天賦系統
 - 實作怪物圖鑑
+- 商店合併、實作老虎機抽道具
 
 ### Changed
 

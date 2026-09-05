@@ -4,7 +4,7 @@ import {
 import { requireAuth } from '../../../../utils/auth';
 import { ShopService } from '../../../../services/shop.service';
 import { CharacterRepository } from '../../../../repositories/character.repository';
-import { getGemsShopResponseSchema } from '../../../../../shared/schemas/api/shop.schema';
+import { getShopResponseSchema } from '../../../../../shared/schemas/api/shop.schema';
 import { toH3Error } from '../../../../utils/errorHandler';
 import {
     AppError, NotFoundError, ValidationError,
@@ -30,11 +30,11 @@ export default defineEventHandler(async (event) => {
         }
 
         const shopService = new ShopService();
-        const shop = await shopService.getOrGenerateGemsShop(characterId);
+        const shop = await shopService.getOrGenerateShop(characterId);
 
         logRequest({
             severity: 'INFO',
-            message: 'Gems shop retrieved',
+            message: 'Shop retrieved',
             method: event.method,
             path: event.path,
             status: 200,
@@ -51,11 +51,11 @@ export default defineEventHandler(async (event) => {
             },
         };
 
-        return getGemsShopResponseSchema.parse(response);
+        return getShopResponseSchema.parse(response);
     } catch (error: unknown) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to get gems shop',
+            message: 'Failed to get shop',
             method: event.method,
             path: event.path,
             status: error instanceof AppError ? error.statusCode : 500,

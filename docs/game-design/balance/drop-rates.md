@@ -77,7 +77,35 @@
 
 **待確認** —— 如前節所述，`shop` change 尚未實作 `shop.service.ts`，目前無法從程式碼確認「多少商品」「多久刷新」「稀有度上限對應表」等具體數值；`openspec/changes/shop/specs/shop/spec.md` 僅描述「每日懶生成、固定數量商品、金幣商店 per-account／紅寶石商店全服共享」的機制骨架，未落地明確機率/數量常數。此節內容全部屬於**規劃中**，待 `shop` change 實裝並 merge 進 `openspec/specs/` 後需回頭補完本節。
 
-## 4. 已知平衡風險／待調整項（僅列程式碼中明確存在的標註）
+## 4. 裝備老虎機（gacha）稀有度權重
+
+來源：`server/constants/gacha.ts`
+
+老虎機（`equipment-gacha` capability）花費固定金幣或寶石抽取一件裝備，稀有度 roll 使用 `rollRarity()` 的 `rarityWeightsOverride` 機制（見 `item-generation` capability），**不沿用**本文件第 1 節的 `STANDARD_RARITY_WEIGHTS`，兩份權重表各自獨立：
+
+### 4.1 金幣抽取（`GACHA_GOLD_RARITY_WEIGHTS`）— 100 金幣/次
+
+| 稀有度 | 權重 | 換算機率 |
+|---|---|---|
+| N | 60 | 60% |
+| R | 30 | 30% |
+| SR | 10 | 10% |
+| SSR | 0（不會出現） | 0% |
+| L | 0（不會出現） | 0% |
+
+### 4.2 寶石抽取（`GACHA_GEMS_RARITY_WEIGHTS`）— 5 寶石/次
+
+| 稀有度 | 權重 | 換算機率 |
+|---|---|---|
+| N | 0（不會出現） | 0% |
+| R | 0（不會出現） | 0% |
+| SR | 55 | 55% |
+| SSR | 35 | 35% |
+| L | 10 | 10% |
+
+金幣抽取的最高可能稀有度（SR）與寶石抽取的最低可能稀有度（SR）重疊於同一級距，但金幣抽取永遠無法觸及 SSR/L——體現「金幣抽取品質期望值明顯低於寶石抽取」的設計目標（見 `equipment-gacha` spec）。兩份權重表只套用於裝備模板（`ItemType.EQUIPMENT`），老虎機不會抽出藥水。
+
+## 5. 已知平衡風險／待調整項（僅列程式碼中明確存在的標註）
 
 - `server/services/combat.service.ts` `applyModifiers()` / `combinedDropRateMultiplier()` 的 code comment 明確標註：`events-and-blessings` change 尚未把真正的 Blessing/Curse `RunModifier` 餵進戰鬥流程，呼叫端目前永遠傳入 `[]`，因此 `dropRateMultiplier` 恆為 1——掉落率加成類 Blessing 的實際效果目前無法在戰鬥中生效，是明確的待接線項目。
 - `server/constants/combat.ts` 檔頭 comment 標註 `ENEMY_ARCHETYPES`（連帶影響掉落判定發生的敵人陣容/擊殺數）是 ASSUMPTION——`10_戰鬥模型.md` 不存在，數值為本 change 自行假設，非既有設計文件定案，日後如有正式數值表需回頭核對本文件的掉落次數推算是否仍成立。

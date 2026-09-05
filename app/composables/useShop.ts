@@ -26,11 +26,13 @@ interface ShopItemInstance {
     createdAt: number;
 }
 
+export type ShopType = 'GOLD' | 'GEMS';
+
 export interface ShopSlot {
     slotId: string;
     item: ShopItemInstance;
-    priceGold?: number;
-    priceGems?: number;
+    currency: ShopType;
+    price: number;
     sold: boolean;
     purchasedAt?: number;
 }
@@ -49,65 +51,40 @@ interface PurchaseResponse {
     };
 }
 
-export type ShopType = 'GOLD' | 'GEMS';
 export type PurchaseDestination = 'INVENTORY' | 'EQUIP';
 
-const goldItems = ref<ShopSlot[]>([]);
-const gemsItems = ref<ShopSlot[]>([]);
-const goldLoading = ref(false);
-const gemsLoading = ref(false);
-const goldLoaded = ref(false);
-const gemsLoaded = ref(false);
-const goldError = ref<string | null>(null);
-const gemsError = ref<string | null>(null);
+const items = ref<ShopSlot[]>([]);
+const loading = ref(false);
+const loaded = ref(false);
+const error = ref<string | null>(null);
 const purchaseLoading = ref(false);
 const purchaseError = ref<string | null>(null);
 
 /**
  * Shop Composable
- * 管理目前選定角色的每日金幣/紅寶石商店（GET .../shop/{gold,gems}）與購買流程（POST .../shop/purchase）
+ * 管理目前選定角色的每日商店（金幣/寶石商品合併為單一清單，GET .../shop）與購買流程（POST .../shop/purchase）
  */
 export const useShop = () => {
     const api = useApi();
     const { selectedCharacterId } = useCharacter();
 
-    const fetchGoldShop = async () => {
+    const fetchShop = async () => {
         if (!selectedCharacterId.value) return;
 
-        goldLoading.value = true;
-        goldError.value = null;
+        loading.value = true;
+        error.value = null;
 
         try {
             const response = await api.get<GetShopResponse>(
-                `/api/character/${selectedCharacterId.value}/shop/gold`,
+                `/api/character/${selectedCharacterId.value}/shop`,
             );
-            goldItems.value = response.data.items;
-            goldLoaded.value = true;
+            items.value = response.data.items;
+            loaded.value = true;
         } catch (err: any) {
-            console.error('[useShop] Failed to fetch gold shop:', err);
-            goldError.value = err.message || '無法取得金幣商店';
+            console.error('[useShop] Failed to fetch shop:', err);
+            error.value = err.message || '無法取得商店';
         } finally {
-            goldLoading.value = false;
-        }
-    };
-
-    const fetchGemsShop = async () => {
-        if (!selectedCharacterId.value) return;
-
-        gemsLoading.value = true;
-        gemsError.value = null;
-
-        try {
-            const response = await api.get<GetShopResponse>(
-                `/api/character/${selectedCharacterId.value}/shop/gems`,
-            );
-            gemsItems.value = response.data.items;
-            gemsLoaded.value = true;
-        } catch (err: any) {
-            console.error('[useShop] Failed to fetch gems shop:', err);
-            gemsError.value = err.message || '無法取得紅寶石商店';
-        } finally {
-            gemsLoading.value = false;
+            loading.value = false;
         }
     };
 
@@ -115,7 +92,6 @@ export const useShop = () => {
      * 購買一個商店格位；成功後將該格位標記為已售出（本地樂觀更新，不需要重新整理整個商店列表）。
      */
     const purchase = async (
-        shopType: ShopType,
         slotId: string,
         destination: PurchaseDestination,
         replaceSlot?: EquipmentSlot,
@@ -129,12 +105,11 @@ export const useShop = () => {
             await api.post<PurchaseResponse>(
                 `/api/character/${selectedCharacterId.value}/shop/purchase`,
                 {
-                    shopType, slotId, destination, replaceSlot,
+                    slotId, destination, replaceSlot,
                 },
             );
 
-            const list = shopType === 'GOLD' ? goldItems : gemsItems;
-            const target = list.value.find(slot => slot.slotId === slotId);
+            const target = items.value.find(slot => slot.slotId === slotId);
             if (target) target.sold = true;
 
             return true;
@@ -148,31 +123,22 @@ export const useShop = () => {
     };
 
     const reset = () => {
-        goldItems.value = [];
-        gemsItems.value = [];
-        goldLoaded.value = false;
-        gemsLoaded.value = false;
-        goldError.value = null;
-        gemsError.value = null;
-        goldLoading.value = false;
-        gemsLoading.value = false;
+        items.value = [];
+        loaded.value = false;
+        error.value = null;
+        loading.value = false;
         purchaseError.value = null;
         purchaseLoading.value = false;
     };
 
     return {
-        goldItems: computed(() => goldItems.value),
-        gemsItems: computed(() => gemsItems.value),
-        goldLoading: computed(() => goldLoading.value),
-        gemsLoading: computed(() => gemsLoading.value),
-        goldLoaded: computed(() => goldLoaded.value),
-        gemsLoaded: computed(() => gemsLoaded.value),
-        goldError: computed(() => goldError.value),
-        gemsError: computed(() => gemsError.value),
+        items: computed(() => items.value),
+        loading: computed(() => loading.value),
+        loaded: computed(() => loaded.value),
+        error: computed(() => error.value),
         purchaseLoading: computed(() => purchaseLoading.value),
         purchaseError: computed(() => purchaseError.value),
-        fetchGoldShop,
-        fetchGemsShop,
+        fetchShop,
         purchase,
         reset,
     };

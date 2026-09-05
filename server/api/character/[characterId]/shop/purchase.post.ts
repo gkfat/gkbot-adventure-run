@@ -35,7 +35,6 @@ export default defineEventHandler(async (event) => {
         const result = await shopService.purchaseItem(
             authUser.uid,
             characterId,
-            parseResult.data.shopType,
             parseResult.data.slotId,
             parseResult.data.destination,
             parseResult.data.replaceSlot as EquipmentSlot | undefined,

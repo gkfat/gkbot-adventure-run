@@ -63,11 +63,15 @@ import {
 } from '../../shared/schemas/api/inventory.schema';
 
 import {
-    getGoldShopResponseSchema,
-    getGemsShopResponseSchema,
+    getShopResponseSchema,
     purchaseItemRequestSchema,
     purchaseItemResponseSchema,
 } from '../../shared/schemas/api/shop.schema';
+
+import {
+    gachaPullRequestSchema,
+    gachaPullResponseSchema,
+} from '../../shared/schemas/api/gacha.schema';
 
 import { getBestiaryResponseSchema } from '../../shared/schemas/api/bestiary.schema';
 
@@ -132,10 +136,11 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         EquipItemResponse: equipItemResponseSchema,
         UnequipItemRequest: unequipItemRequestSchema,
         UnequipItemResponse: unequipItemResponseSchema,
-        GetGoldShopResponse: getGoldShopResponseSchema,
-        GetGemsShopResponse: getGemsShopResponseSchema,
+        GetShopResponse: getShopResponseSchema,
         PurchaseItemRequest: purchaseItemRequestSchema,
         PurchaseItemResponse: purchaseItemResponseSchema,
+        GachaPullRequest: gachaPullRequestSchema,
+        GachaPullResponse: gachaPullResponseSchema,
         ErrorResponse: errorResponseSchema,
     };
 
@@ -503,38 +508,15 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
     // Register Shop Endpoints
     registry.registerPath({
         method: 'get',
-        path: '/api/character/{characterId}/shop/gold',
-        description: 'Get the character\'s daily gold shop (N/R/SR items, priced in gold), lazily generating it if today\'s shop doesn\'t exist yet',
+        path: '/api/character/{characterId}/shop',
+        description: 'Get the character\'s daily shop (gold items capped at N/R/SR, gems items floored at SR/SSR/L, merged into a single list), lazily generating it if today\'s shop doesn\'t exist yet',
         tags: ['Shop'],
         security: [{ bearerAuth: [] }],
         request: { params: z.object({ characterId: z.string() }) },
         responses: {
             200: {
-                description: 'Gold shop retrieved',
-                content: { 'application/json': { schema: getGoldShopResponseSchema } },
-            },
-            401: {
-                description: 'Unauthorized',
-                content: { 'application/json': { schema: errorResponseSchema } },
-            },
-            404: {
-                description: 'Character not found or not owned by the caller',
-                content: { 'application/json': { schema: errorResponseSchema } },
-            },
-        },
-    });
-
-    registry.registerPath({
-        method: 'get',
-        path: '/api/character/{characterId}/shop/gems',
-        description: 'Get the character\'s daily gems shop (SR/SSR/L items, priced in gems), lazily generating it if today\'s shop doesn\'t exist yet',
-        tags: ['Shop'],
-        security: [{ bearerAuth: [] }],
-        request: { params: z.object({ characterId: z.string() }) },
-        responses: {
-            200: {
-                description: 'Gems shop retrieved',
-                content: { 'application/json': { schema: getGemsShopResponseSchema } },
+                description: 'Shop retrieved',
+                content: { 'application/json': { schema: getShopResponseSchema } },
             },
             401: {
                 description: 'Unauthorized',
@@ -576,6 +558,37 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             },
             409: {
                 description: 'Shop slot already sold',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    // Register Gacha Endpoint
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/gacha/pull',
+        description: 'Spend a fixed amount of gold (100) or gems (5) to roll one random equipment item using a currency-specific rarity weight table, delivered directly into the character\'s permanent inventory',
+        tags: ['Gacha'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: gachaPullRequestSchema } } },
+        },
+        responses: {
+            200: {
+                description: 'Pull completed',
+                content: { 'application/json': { schema: gachaPullResponseSchema } },
+            },
+            400: {
+                description: 'Insufficient gold/gems, or inventory full',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
         },

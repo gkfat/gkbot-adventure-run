@@ -13,7 +13,7 @@
             />
 
             <div class="d-flex align-center ga-1 mb-3">
-                <GameCommonCurrencyIcon :type="props.shopType" />
+                <GameCommonCurrencyIcon :type="currency" />
                 <span class="font-pixel text-body-2">{{ price }}</span>
                 <span
                     v-if="!canAfford"
@@ -59,9 +59,8 @@
 
 <script setup lang="ts">
 import { describeItem } from '../../../utils/equipmentDisplay';
-import type { ShopSlot, ShopType } from '../../../composables/useShop';
+import type { ShopSlot } from '../../../composables/useShop';
 
-const props = defineProps<{ shopType: ShopType }>();
 const emit = defineEmits<{ purchased: [] }>();
 
 const {
@@ -77,18 +76,17 @@ const slot = ref<ShopSlot | null>(null);
 
 const detailInfo = computed(() => (slot.value ? describeItem(slot.value.item) : null));
 
-const price = computed(() => (
-    props.shopType === 'GOLD' ? slot.value?.priceGold : slot.value?.priceGems
-) ?? 0);
+const currency = computed(() => slot.value?.currency ?? 'GOLD');
+const price = computed(() => slot.value?.price ?? 0);
 const balance = computed(() => (
-    props.shopType === 'GOLD' ? character.value?.gold : character.value?.gems
+    currency.value === 'GOLD' ? character.value?.gold : character.value?.gems
 ) ?? 0);
 const canAfford = computed(() => balance.value >= price.value);
 
 const handlePurchase = async () => {
     if (!slot.value) return;
 
-    const success = await purchase(props.shopType, slot.value.slotId, 'INVENTORY');
+    const success = await purchase(slot.value.slotId, 'INVENTORY');
     if (success) {
         await fetchCharacter();
         invalidateInventory();

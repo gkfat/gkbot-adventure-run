@@ -1,13 +1,13 @@
 /**
  * Shop Service
  *
- * Daily lazy-generated shops (gold + gems, both per-character — gold/gems
- * are Character fields, see shared/types/character.ts) and the purchase
- * flow. Generation does not use the deterministic RngService: that capability
- * is scoped to randomness inside a single adventure run (node generation,
- * combat, events) — shop content consistency across a day comes from
- * Firestore create-once persistence, not from a reproducible seed (see
- * design.md).
+ * Daily lazy-generated shop (gold + gems items merged into a single
+ * per-character list — gold/gems are Character fields, see
+ * shared/types/character.ts) and the purchase flow. Generation does not use
+ * the deterministic RngService: that capability is scoped to randomness
+ * inside a single adventure run (node generation, combat, events) — shop
+ * content consistency across a day comes from Firestore create-once
+ * persistence, not from a reproducible seed (see design.md).
  *
  * Purchase is the first 3-aggregate transaction in this codebase (Shop +
  * Character + Item/Inventory). It reads/writes `items`/`inventories` directly
@@ -24,16 +24,16 @@ import { getAdminFirestore } from '../utils/firebaseAdmin';
 import { generateItemInstance } from './item.service';
 import { getAllItemTemplates } from '../constants/templates';
 import type {
-    DailyGoldShop, DailyGemsShop, ShopItem,
+    DailyShop, ShopItem, CurrencyType,
 } from '../../shared/types/shop';
 import {
-    ShopType, PurchaseDestination, SHOP_CONFIG,
+    PurchaseDestination, SHOP_CONFIG, 
 } from '../../shared/types/shop';
 import type {
-    ItemInstance, ItemGenerationContext, Inventory, 
+    ItemInstance, ItemGenerationContext, Inventory,
 } from '../../shared/types/item';
 import {
-    ItemType, ItemSource, 
+    ItemType, ItemSource,
 } from '../../shared/types/item';
 import {
     Rarity, RESOURCE_LIMITS, HAND_SLOTS, type EquipmentSlot,
@@ -63,79 +63,69 @@ export class ShopService extends BaseService {
     }
 
     /**
-     * Get today's gold shop for a character, generating it (and best-effort
+     * Get today's shop for a character, generating it (and best-effort
      * deleting every other, stale shop document for this character) if it
      * doesn't exist yet.
      */
-    async getOrGenerateGoldShop(characterId: string): Promise<DailyGoldShop> {
+    async getOrGenerateShop(characterId: string): Promise<DailyShop> {
         const today = getTodayUtcDate();
-        const existing = await this.shopRepo.getGoldShop(characterId, today);
+        const existing = await this.shopRepo.getShop(characterId, today);
         if (existing) {
             return existing;
         }
 
-        const shop: DailyGoldShop = {
+        const shop: DailyShop = {
             characterId,
             date: today,
-            items: generateShopItems(ShopType.GOLD, characterId),
+            items: generateShopItems(characterId),
             generatedAt: Date.now(),
         };
-        const created = await this.shopRepo.createGoldShop(shop);
-        const result = created ?? await this.shopRepo.getGoldShop(characterId, today);
+        const created = await this.shopRepo.createShop(shop);
+        const result = created ?? await this.shopRepo.getShop(characterId, today);
         if (!result) {
-            throw new DatabaseError('Failed to generate gold shop');
+            throw new DatabaseError('Failed to generate shop');
         }
 
-        await this.shopRepo.deleteOldGoldShops(characterId, today);
-        return result;
-    }
-
-    /**
-     * Get today's gems shop for a character, generating it (and best-effort
-     * deleting every other, stale shop document for this character) if it
-     * doesn't exist yet.
-     */
-    async getOrGenerateGemsShop(characterId: string): Promise<DailyGemsShop> {
-        const today = getTodayUtcDate();
-        const existing = await this.shopRepo.getGemsShop(characterId, today);
-        if (existing) {
-            return existing;
-        }
-
-        const shop: DailyGemsShop = {
-            characterId,
-            date: today,
-            items: generateShopItems(ShopType.GEMS, characterId),
-            generatedAt: Date.now(),
-        };
-        const created = await this.shopRepo.createGemsShop(shop);
-        const result = created ?? await this.shopRepo.getGemsShop(characterId, today);
-        if (!result) {
-            throw new DatabaseError('Failed to generate gems shop');
-        }
-
-        await this.shopRepo.deleteOldGemsShops(characterId, today);
+        await this.shopRepo.deleteOldShops(characterId, today);
         return result;
     }
 
     /**
      * Best-effort delete a deleted character's shop documents so they don't
      * linger forever — once the character is gone, the lazy-destroy in
-     * getOrGenerateGoldShop/getOrGenerateGemsShop above will never run again
-     * for it, so today's and yesterday's documents (the only two dates that
-     * can plausibly still exist, per the same lazy-destroy tolerance) are
-     * cleaned up explicitly here instead.
+     * getOrGenerateShop above will never run again for it, so today's and
+     * yesterday's documents (the only two dates that can plausibly still
+     * exist, per the same lazy-destroy tolerance) are cleaned up explicitly
+     * here instead. Also best-effort cleans up the legacy `shopsGold`/
+     * `shopsGems` collections (pre-merge) so they don't become orphaned —
+     * see design.md's Migration Plan.
      */
     async deleteShopsForCharacter(characterId: string): Promise<void> {
         const today = getTodayUtcDate();
         const yesterday = getYesterdayUtcDate(today);
 
         await Promise.all([
-            this.shopRepo.deleteGoldShop(characterId, today),
-            this.shopRepo.deleteGoldShop(characterId, yesterday),
-            this.shopRepo.deleteGemsShop(characterId, today),
-            this.shopRepo.deleteGemsShop(characterId, yesterday),
+            this.shopRepo.deleteShop(characterId, today),
+            this.shopRepo.deleteShop(characterId, yesterday),
+            this.deleteLegacyShopDoc('shopsGold', characterId, today),
+            this.deleteLegacyShopDoc('shopsGold', characterId, yesterday),
+            this.deleteLegacyShopDoc('shopsGems', characterId, today),
+            this.deleteLegacyShopDoc('shopsGems', characterId, yesterday),
         ]);
+    }
+
+    /**
+     * Best-effort delete of a pre-merge `shopsGold`/`shopsGems` document —
+     * these collections are no longer written to, but may still hold
+     * documents from before this change shipped (see design.md's Migration
+     * Plan). A missing document is not an error.
+     */
+    private async deleteLegacyShopDoc(collectionName: string, characterId: string, date: string): Promise<void> {
+        try {
+            await this.db.collection(collectionName).doc(`${characterId}_${date}`).delete();
+        } catch {
+            // best-effort — ignore
+        }
     }
 
     /**
@@ -148,7 +138,6 @@ export class ShopService extends BaseService {
     async purchaseItem(
         accountId: string,
         characterId: string,
-        shopType: ShopType,
         slotId: string,
         destination: PurchaseDestination,
         requestedSlot?: EquipmentSlot,
@@ -159,8 +148,7 @@ export class ShopService extends BaseService {
         }
 
         const today = getTodayUtcDate();
-        const shopCollection = shopType === ShopType.GOLD ? 'shopsGold' : 'shopsGems';
-        const shopRef = this.db.collection(shopCollection).doc(`${characterId}_${today}`);
+        const shopRef = this.db.collection('dailyShops').doc(`${characterId}_${today}`);
         const characterRef = this.db.collection('characters').doc(characterId);
         const inventoryRef = this.db.collection('inventories').doc(characterId);
 
@@ -169,7 +157,7 @@ export class ShopService extends BaseService {
             if (!shopDoc.exists) {
                 throw new NotFoundError('shop');
             }
-            const shop = shopDoc.data() as DailyGoldShop | DailyGemsShop;
+            const shop = shopDoc.data() as DailyShop;
 
             const slotIndex = shop.items.findIndex(item => item.slotId === slotId);
             if (slotIndex === -1) {
@@ -180,17 +168,16 @@ export class ShopService extends BaseService {
                 throw new ConflictError('Item already sold');
             }
 
-            const price = shopType === ShopType.GOLD ? slot.priceGold : slot.priceGems;
-            if (price === undefined) {
-                throw new BusinessLogicError('Shop item has no price for this shop type');
-            }
+            const {
+                currency, price, 
+            } = slot;
 
             const characterDoc = await tx.get(characterRef);
             if (!characterDoc.exists) {
                 throw new NotFoundError('character');
             }
             const character = characterDoc.data() as Character;
-            const balance = shopType === ShopType.GOLD ? character.gold : character.gems;
+            const balance = currency === 'GOLD' ? character.gold : character.gems;
             if (balance < price) {
                 throw new BusinessLogicError('Insufficient resources');
             }
@@ -216,7 +203,7 @@ export class ShopService extends BaseService {
 
             const characterUpdate: Record<string, unknown> = {
                 updatedAt: Date.now(),
-                ...(shopType === ShopType.GOLD ? { gold: balance - price } : { gems: balance - price }),
+                ...(currency === 'GOLD' ? { gold: balance - price } : { gems: balance - price }),
             };
 
             let unequipped: ItemInstance | undefined;
@@ -251,8 +238,8 @@ export class ShopService extends BaseService {
 
             return {
                 item,
-                goldSpent: shopType === ShopType.GOLD ? price : undefined,
-                gemsSpent: shopType === ShopType.GEMS ? price : undefined,
+                goldSpent: currency === 'GOLD' ? price : undefined,
+                gemsSpent: currency === 'GEMS' ? price : undefined,
                 unequipped,
             };
         });
@@ -277,27 +264,21 @@ function rollPrice(min: number, max: number): number {
 }
 
 /**
- * Generate a fixed number of shop slots, laid out in two type-scoped tiers —
- * SHOP_CONFIG.EQUIPMENT_SLOTS equipment items followed by
- * SHOP_CONFIG.POTION_SLOTS potion items (each tier rolls only from its own
- * template pool). Gold shop caps at SR (N/R/SR); gems shop floors at SR
- * (SR/SSR/L) — see design.md's rarity tiers. `characterId` is set on the
- * embedded ItemInstance immediately since shop slots are already scoped to
- * one character; purchase delivers this exact item, never re-rolling it.
+ * Generate a fixed number of shop slots, laid out in two currency-scoped
+ * pools — gold pool (SHOP_CONFIG.EQUIPMENT_SLOTS equipment + SHOP_CONFIG.POTION_SLOTS
+ * potion, capped at SR) followed by gems pool (same counts, floored at SR) —
+ * then merged into a single list (see design.md's rarity tiers). `characterId`
+ * is set on the embedded ItemInstance immediately since shop slots are already
+ * scoped to one character; purchase delivers this exact item, never re-rolling it.
  */
-function generateShopItems(shopType: ShopType, characterId: string): ShopItem[] {
+function generateShopItems(characterId: string): ShopItem[] {
     const allTemplates = getAllItemTemplates();
     const equipmentTemplates = allTemplates.filter(t => t.type === ItemType.EQUIPMENT);
     const potionTemplates = allTemplates.filter(t => t.type === ItemType.POTION);
-    const context: ItemGenerationContext = shopType === ShopType.GOLD
-        ? {
-            source: ItemSource.SHOP, maxRarity: Rarity.SR,
-        }
-        : {
-            source: ItemSource.SHOP, minRarity: Rarity.SR,
-        };
 
-    const rollSlot = (templates: typeof allTemplates, index: number): ShopItem => {
+    const rollSlot = (
+        templates: typeof allTemplates, index: number, currency: CurrencyType, context: ItemGenerationContext,
+    ): ShopItem => {
         const template = templates[Math.floor(Math.random() * templates.length)];
         if (!template) {
             throw new DatabaseError('No item templates available for shop generation');
@@ -307,7 +288,7 @@ function generateShopItems(shopType: ShopType, characterId: string): ShopItem[] 
             ...rolled, characterId,
         };
 
-        const priceField = shopType === ShopType.GOLD ? 'gold' : 'gems';
+        const priceField = currency === 'GOLD' ? 'gold' : 'gems';
         const priceRange = template.priceRangeByRarity[rolled.rarity]?.[priceField];
         if (!priceRange) {
             throw new DatabaseError(
@@ -319,19 +300,41 @@ function generateShopItems(shopType: ShopType, characterId: string): ShopItem[] 
         return {
             slotId: `slot-${index}`,
             item,
+            currency,
+            price,
             sold: false,
-            ...(shopType === ShopType.GOLD ? { priceGold: price } : { priceGems: price }),
         };
     };
 
-    const equipmentSlots = Array.from(
+    const goldContext: ItemGenerationContext = {
+        source: ItemSource.SHOP, maxRarity: Rarity.SR,
+    };
+    const gemsContext: ItemGenerationContext = {
+        source: ItemSource.SHOP, minRarity: Rarity.SR,
+    };
+
+    let index = 0;
+    const goldEquipmentSlots = Array.from(
         { length: SHOP_CONFIG.EQUIPMENT_SLOTS },
-        (_, i) => rollSlot(equipmentTemplates, i),
+        () => rollSlot(equipmentTemplates, index++, 'GOLD', goldContext),
     );
-    const potionSlots = Array.from(
+    const goldPotionSlots = Array.from(
         { length: SHOP_CONFIG.POTION_SLOTS },
-        (_, i) => rollSlot(potionTemplates, SHOP_CONFIG.EQUIPMENT_SLOTS + i),
+        () => rollSlot(potionTemplates, index++, 'GOLD', goldContext),
+    );
+    const gemsEquipmentSlots = Array.from(
+        { length: SHOP_CONFIG.EQUIPMENT_SLOTS },
+        () => rollSlot(equipmentTemplates, index++, 'GEMS', gemsContext),
+    );
+    const gemsPotionSlots = Array.from(
+        { length: SHOP_CONFIG.POTION_SLOTS },
+        () => rollSlot(potionTemplates, index++, 'GEMS', gemsContext),
     );
 
-    return [...equipmentSlots, ...potionSlots];
+    return [
+        ...goldEquipmentSlots,
+        ...goldPotionSlots,
+        ...gemsEquipmentSlots,
+        ...gemsPotionSlots,
+    ];
 }

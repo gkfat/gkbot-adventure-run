@@ -3,11 +3,9 @@ import {
 } from 'vitest';
 
 import { ShopService } from './shop.service';
-import {
-    ShopType, PurchaseDestination,
-} from '../../shared/types/shop';
+import { PurchaseDestination } from '../../shared/types/shop';
 import type {
-    DailyGoldShop, ShopItem, 
+    DailyShop, ShopItem,
 } from '../../shared/types/shop';
 import { EquipmentSlot } from '../../shared/types/common';
 import {
@@ -117,13 +115,14 @@ function baseSlot(overrides: Partial<ShopItem> = {}): ShopItem {
     return {
         slotId: 'slot-0',
         item: baseItem(),
-        priceGold: 150,
+        currency: 'GOLD',
+        price: 150,
         sold: false,
         ...overrides,
     };
 }
 
-function baseShop(overrides: Partial<DailyGoldShop> = {}): DailyGoldShop {
+function baseShop(overrides: Partial<DailyShop> = {}): DailyShop {
     return {
         characterId: 'char-1',
         date: todayUtcDate(),
@@ -144,11 +143,11 @@ beforeEach(() => {
 describe('ShopService.purchaseItem', () => {
     it('delivers the exact pre-rolled item into the permanent inventory (INVENTORY destination)', async () => {
         setDoc('characters', 'char-1', baseCharacter());
-        setDoc('shopsGold', `char-1_${todayUtcDate()}`, baseShop());
+        setDoc('dailyShops', `char-1_${todayUtcDate()}`, baseShop());
 
         const service = new ShopService();
         const result = await service.purchaseItem(
-            'account-1', 'char-1', ShopType.GOLD, 'slot-0', PurchaseDestination.INVENTORY,
+            'account-1', 'char-1', 'slot-0', PurchaseDestination.INVENTORY,
         );
 
         expect(result.item.itemId).toBe('shop-item-1');
@@ -175,25 +174,25 @@ describe('ShopService.purchaseItem', () => {
         );
         expect(txSetMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                collectionName: 'shopsGold', id: `char-1_${todayUtcDate()}`, 
+                collectionName: 'dailyShops', id: `char-1_${todayUtcDate()}`,
             }),
             expect.objectContaining({
                 items: [
                     expect.objectContaining({
-                        slotId: 'slot-0', sold: true, 
+                        slotId: 'slot-0', sold: true,
                     }),
-                ], 
+                ],
             }),
         );
     });
 
     it('delivers into the permanent inventory AND the equipment slot (EQUIP destination)', async () => {
         setDoc('characters', 'char-1', baseCharacter());
-        setDoc('shopsGold', `char-1_${todayUtcDate()}`, baseShop());
+        setDoc('dailyShops', `char-1_${todayUtcDate()}`, baseShop());
 
         const service = new ShopService();
         const result = await service.purchaseItem(
-            'account-1', 'char-1', ShopType.GOLD, 'slot-0', PurchaseDestination.EQUIP,
+            'account-1', 'char-1', 'slot-0', PurchaseDestination.EQUIP,
         );
 
         expect(result.unequipped).toBeUndefined();
@@ -216,11 +215,11 @@ describe('ShopService.purchaseItem', () => {
         setDoc('items', 'old-item', baseItem({
             itemId: 'old-item', name: '舊扳手',
         }));
-        setDoc('shopsGold', `char-1_${todayUtcDate()}`, baseShop());
+        setDoc('dailyShops', `char-1_${todayUtcDate()}`, baseShop());
 
         const service = new ShopService();
         const result = await service.purchaseItem(
-            'account-1', 'char-1', ShopType.GOLD, 'slot-0', PurchaseDestination.EQUIP,
+            'account-1', 'char-1', 'slot-0', PurchaseDestination.EQUIP,
         );
 
         expect(result.unequipped?.itemId).toBe('old-item');
@@ -228,11 +227,11 @@ describe('ShopService.purchaseItem', () => {
 
     it('rejects purchasing an already-sold slot without charging', async () => {
         setDoc('characters', 'char-1', baseCharacter());
-        setDoc('shopsGold', `char-1_${todayUtcDate()}`, baseShop({ items: [baseSlot({ sold: true })] }));
+        setDoc('dailyShops', `char-1_${todayUtcDate()}`, baseShop({ items: [baseSlot({ sold: true })] }));
 
         const service = new ShopService();
         await expect(
-            service.purchaseItem('account-1', 'char-1', ShopType.GOLD, 'slot-0', PurchaseDestination.INVENTORY),
+            service.purchaseItem('account-1', 'char-1', 'slot-0', PurchaseDestination.INVENTORY),
         ).rejects.toThrow();
         expect(txUpdateMock).not.toHaveBeenCalled();
         expect(txSetMock).not.toHaveBeenCalled();
@@ -240,11 +239,11 @@ describe('ShopService.purchaseItem', () => {
 
     it('rejects when the character cannot afford the price', async () => {
         setDoc('characters', 'char-1', baseCharacter({ gold: 50 }));
-        setDoc('shopsGold', `char-1_${todayUtcDate()}`, baseShop());
+        setDoc('dailyShops', `char-1_${todayUtcDate()}`, baseShop());
 
         const service = new ShopService();
         await expect(
-            service.purchaseItem('account-1', 'char-1', ShopType.GOLD, 'slot-0', PurchaseDestination.INVENTORY),
+            service.purchaseItem('account-1', 'char-1', 'slot-0', PurchaseDestination.INVENTORY),
         ).rejects.toThrow();
         expect(txUpdateMock).not.toHaveBeenCalled();
         expect(txSetMock).not.toHaveBeenCalled();
@@ -257,11 +256,11 @@ describe('ShopService.purchaseItem', () => {
             items: Array.from({ length: 500 }, (_, i) => `existing-${i}`),
             updatedAt: Date.now(),
         });
-        setDoc('shopsGold', `char-1_${todayUtcDate()}`, baseShop());
+        setDoc('dailyShops', `char-1_${todayUtcDate()}`, baseShop());
 
         const service = new ShopService();
         await expect(
-            service.purchaseItem('account-1', 'char-1', ShopType.GOLD, 'slot-0', PurchaseDestination.INVENTORY),
+            service.purchaseItem('account-1', 'char-1', 'slot-0', PurchaseDestination.INVENTORY),
         ).rejects.toThrow();
         expect(txUpdateMock).not.toHaveBeenCalled();
         expect(txSetMock).not.toHaveBeenCalled();
@@ -269,10 +268,12 @@ describe('ShopService.purchaseItem', () => {
 });
 
 describe('ShopService.deleteShopsForCharacter', () => {
-    it('best-effort deletes today\'s and yesterday\'s gold/gems shop documents for the character', async () => {
+    it('best-effort deletes today\'s and yesterday\'s shop documents, plus legacy gold/gems shop documents, for the character', async () => {
         const service = new ShopService();
         await service.deleteShopsForCharacter('char-1');
 
+        expect(deleteMock).toHaveBeenCalledWith(`dailyShops:char-1_${todayUtcDate()}`);
+        expect(deleteMock).toHaveBeenCalledWith(`dailyShops:char-1_${yesterdayUtcDate()}`);
         expect(deleteMock).toHaveBeenCalledWith(`shopsGold:char-1_${todayUtcDate()}`);
         expect(deleteMock).toHaveBeenCalledWith(`shopsGold:char-1_${yesterdayUtcDate()}`);
         expect(deleteMock).toHaveBeenCalledWith(`shopsGems:char-1_${todayUtcDate()}`);

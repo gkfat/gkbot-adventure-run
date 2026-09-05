@@ -1,13 +1,14 @@
 import {
-    defineEventHandler, getRouterParam,
+    defineEventHandler, getRouterParam, readBody,
 } from 'h3';
 import { requireAuth } from '../../../../utils/auth';
-import { ShopService } from '../../../../services/shop.service';
-import { CharacterRepository } from '../../../../repositories/character.repository';
-import { getGoldShopResponseSchema } from '../../../../../shared/schemas/api/shop.schema';
+import { GachaService } from '../../../../services/gacha.service';
+import {
+    gachaPullRequestSchema, gachaPullResponseSchema,
+} from '../../../../../shared/schemas/api/gacha.schema';
 import { toH3Error } from '../../../../utils/errorHandler';
 import {
-    AppError, NotFoundError, ValidationError,
+    AppError, ValidationError,
 } from '../../../../../shared/types/errors';
 import { logRequest } from '../../../../utils/logger';
 
@@ -23,18 +24,18 @@ export default defineEventHandler(async (event) => {
             throw new ValidationError('characterId is required');
         }
 
-        const characterRepo = new CharacterRepository();
-        const character = await characterRepo.getByIdForAccount(characterId, authUser.uid);
-        if (!character) {
-            throw new NotFoundError('character');
+        const body = await readBody(event);
+        const parseResult = gachaPullRequestSchema.safeParse(body);
+        if (!parseResult.success) {
+            throw new ValidationError('Invalid request', parseResult.error.flatten());
         }
 
-        const shopService = new ShopService();
-        const shop = await shopService.getOrGenerateGoldShop(characterId);
+        const gachaService = new GachaService();
+        const result = await gachaService.pull(authUser.uid, characterId, parseResult.data.currency);
 
         logRequest({
             severity: 'INFO',
-            message: 'Gold shop retrieved',
+            message: 'Gacha pull completed',
             method: event.method,
             path: event.path,
             status: 200,
@@ -45,17 +46,14 @@ export default defineEventHandler(async (event) => {
 
         const response = {
             success: true,
-            data: {
-                date: shop.date,
-                items: shop.items,
-            },
+            data: result,
         };
 
-        return getGoldShopResponseSchema.parse(response);
+        return gachaPullResponseSchema.parse(response);
     } catch (error: unknown) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to get gold shop',
+            message: 'Failed to complete gacha pull',
             method: event.method,
             path: event.path,
             status: error instanceof AppError ? error.statusCode : 500,

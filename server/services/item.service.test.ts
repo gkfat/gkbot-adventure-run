@@ -51,6 +51,38 @@ describe('rollRarity', () => {
     it('throws for an unknown templateId', () => {
         expect(() => rollRarity('does_not_exist', { source: ItemSource.SHOP })).toThrow();
     });
+
+    it('uses rarityWeightsOverride instead of the template rarityWeights when provided', () => {
+        for (let i = 0; i < 200; i++) {
+            const rarity = rollRarity('salvaged_wrench', {
+                source: ItemSource.SHOP,
+                rarityWeightsOverride: {
+                    N: 0, R: 0, SR: 55, SSR: 35, L: 10,
+                },
+            });
+            expect([
+                Rarity.SR,
+                Rarity.SSR,
+                Rarity.L,
+            ]).toContain(rarity);
+        }
+    });
+
+    it('falls back to the template rarityWeights when no override is provided', () => {
+        const counts: Record<string, number> = {};
+        for (let i = 0; i < 20000; i++) {
+            const rarity = rollRarity('salvaged_wrench', { source: ItemSource.SHOP });
+            counts[rarity] = (counts[rarity] ?? 0) + 1;
+        }
+
+        expect(Object.keys(counts).sort()).toEqual([
+            Rarity.L,
+            Rarity.N,
+            Rarity.R,
+            Rarity.SR,
+            Rarity.SSR,
+        ].sort());
+    });
 });
 
 describe('rollStats', () => {

@@ -1,19 +1,42 @@
 <template>
     <div class="fill-height shop-page pa-3">
-        <!-- 分頁：金幣商店 / 寶石商店 -->
-        <div class="d-flex ga-2 mb-3">
-            <SystemBtn
-                v-for="option in TAB_OPTIONS"
-                :key="option.key"
-                :variant="activeTab === option.key ? 'flat' : 'outlined'"
-                :color="activeTab === option.key ? 'primary' : undefined"
-                class="text-none flex-grow-0"
-                size="small"
-                @click="activeTab = option.key"
-            >
-                {{ option.label }}
-            </SystemBtn>
-        </div>
+        <!-- 老虎機入口：沿用商品格位的卡片語彙（角標／分隔線／價格列），放大成橫幅 -->
+        <button
+            type="button"
+            class="shop-page__gacha-banner pixel-press"
+            @click="navigateTo('/gacha')"
+        >
+            <span class="shop-page__gacha-banner-badge font-pixel">老虎機</span>
+
+            <span class="shop-page__gacha-banner-flavor text-caption text-medium-emphasis">
+                福利社淘汰的賭博機具，投幣還會匡啷吐裝備
+            </span>
+
+            <div class="shop-page__gacha-banner-divider" />
+
+            <div class="shop-page__gacha-banner-costs d-flex align-center">
+                <span class="shop-page__gacha-banner-cost d-flex align-center">
+                    <GameCommonCurrencyIcon
+                        type="GOLD"
+                        :size="11"
+                    />
+                    <span class="font-pixel">100</span>
+                </span>
+                <span class="shop-page__gacha-banner-cost-divider" />
+                <span class="shop-page__gacha-banner-cost d-flex align-center">
+                    <GameCommonCurrencyIcon
+                        type="GEMS"
+                        :size="11"
+                    />
+                    <span class="font-pixel">5</span>
+                </span>
+                <v-icon
+                    icon="mdi-chevron-right"
+                    size="16"
+                    class="shop-page__gacha-banner-arrow ml-auto"
+                />
+            </div>
+        </button>
 
         <!-- 讀取中 -->
         <div
@@ -34,7 +57,7 @@
 
         <!-- 取得失敗 -->
         <div
-            v-else-if="currentError"
+            v-else-if="error"
             class="d-flex flex-column align-center justify-center fill-height px-6 text-center"
         >
             <v-icon
@@ -44,21 +67,85 @@
                 class="mb-3"
             />
             <div class="text-body-2 text-medium-emphasis mb-4">
-                {{ currentError }}
+                {{ error }}
             </div>
             <SystemBtn
                 variant="outlined"
                 color="primary"
                 class="text-none flex-grow-0"
                 prepend-icon="mdi-refresh"
-                @click="loadCurrent"
+                @click="loadShop"
             >
                 重試
             </SystemBtn>
         </div>
 
-        <!-- 商品分層：裝備 / 道具 -->
+        <!-- 商品分層：裝備（兩個補給櫃）/ 道具 -->
         <div v-else>
+            <div class="shop-page__tier">
+                <div class="shop-page__tier-label font-pixel text-caption">
+                    裝備
+                </div>
+
+                <!-- 機密授權補給櫃：寶石裝備，鎖具形同虛設，權限早就沒人管了 -->
+                <div class="shop-page__cabinet shop-page__cabinet--gems mb-3">
+                    <span class="shop-page__cabinet-badge font-pixel">授權</span>
+                    <div class="shop-page__cabinet-header d-flex align-center">
+                        <span class="shop-page__cabinet-led shop-page__cabinet-led--gems" />
+                        <span class="shop-page__cabinet-title font-pixel text-caption">機密授權補給櫃</span>
+                        <v-icon
+                            icon="mdi-lock-open-variant-outline"
+                            size="12"
+                            class="shop-page__cabinet-lock ml-auto"
+                        />
+                    </div>
+                    <div class="shop-page__cabinet-flavor text-caption text-medium-emphasis">
+                        特殊授權補給艙，鎖是壞的，反正也沒人管
+                    </div>
+                    <v-row
+                        dense
+                        class="mt-1"
+                    >
+                        <v-col
+                            v-for="slot in gemsEquipment"
+                            :key="slot.slotId"
+                            cols="4"
+                        >
+                            <GameCommonShopItemSlot
+                                :shop-slot="slot"
+                                @select="openPurchase"
+                            />
+                        </v-col>
+                    </v-row>
+                </div>
+
+                <!-- 常規補給櫃：金幣裝備，邏輯錯亂但照樣運作的日常補給機 -->
+                <div class="shop-page__cabinet shop-page__cabinet--gold">
+                    <div class="shop-page__cabinet-header d-flex align-center">
+                        <span class="shop-page__cabinet-led shop-page__cabinet-led--gold" />
+                        <span class="shop-page__cabinet-title font-pixel text-caption">常規補給櫃</span>
+                    </div>
+                    <div class="shop-page__cabinet-flavor text-caption text-medium-emphasis">
+                        還在正常運作的一般補給艙，邏輯亂了但照樣吐貨
+                    </div>
+                    <v-row
+                        dense
+                        class="mt-1"
+                    >
+                        <v-col
+                            v-for="slot in goldEquipment"
+                            :key="slot.slotId"
+                            cols="4"
+                        >
+                            <GameCommonShopItemSlot
+                                :shop-slot="slot"
+                                @select="openPurchase"
+                            />
+                        </v-col>
+                    </v-row>
+                </div>
+            </div>
+
             <div
                 v-for="tier in tiers"
                 :key="tier.key"
@@ -73,68 +160,23 @@
                         :key="slot.slotId"
                         cols="4"
                     >
-                        <button
-                            type="button"
-                            class="pixel-slot pixel-slot--item pixel-press d-flex flex-column align-center justify-center"
-                            :class="{ 'pixel-slot--sold': slot.sold }"
-                            :style="{ borderColor: RARITY_COLOR[slot.item.rarity] }"
-                            :disabled="slot.sold"
-                            @click="openPurchase(slot)"
-                        >
-                            <span
-                                class="pixel-slot__rarity font-pixel"
-                                :style="{ background: RARITY_COLOR[slot.item.rarity] }"
-                            >
-                                {{ slot.item.rarity }}
-                            </span>
-                            <GameCommonPixelIcon
-                                :name="resolvePixelIcon(slot.item)"
-                                :size="32"
-                            />
-                            <span class="shop-page__name text-caption">
-                                {{ slot.item.name }}
-                            </span>
-                            <span
-                                v-if="primaryStatValue(slot.item)"
-                                class="shop-page__stat font-pixel"
-                                :style="{ color: RARITY_COLOR[slot.item.rarity] }"
-                            >
-                                {{ primaryStatValue(slot.item) }}
-                            </span>
-                            <span class="shop-page__price font-pixel d-flex align-center">
-                                <GameCommonCurrencyIcon
-                                    :type="activeTab"
-                                    :size="10"
-                                />
-                                {{ activeTab === 'GOLD' ? slot.priceGold : slot.priceGems }}
-                            </span>
-
-                            <div
-                                v-if="slot.sold"
-                                class="pixel-slot__sold-badge font-pixel text-caption d-flex align-center justify-center"
-                            >
-                                已售出
-                            </div>
-                        </button>
+                        <GameCommonShopItemSlot
+                            :shop-slot="slot"
+                            @select="openPurchase"
+                        />
                     </v-col>
                 </v-row>
             </div>
         </div>
 
         <!-- 購買 dialog -->
-        <GameCommonShopPurchaseDialog
-            ref="purchaseDialogRef"
-            :shop-type="activeTab"
-        />
+        <GameCommonShopPurchaseDialog ref="purchaseDialogRef" />
     </div>
 </template>
 
 <script setup lang="ts">
-import {
-    RARITY_COLOR, RARITY_ORDER_DESC, resolvePixelIcon, primaryStatValue, primaryStatMagnitude,
-} from '../utils/equipmentDisplay';
 import { ItemType } from '../../shared/types/item';
-import type { ShopSlot, ShopType } from '../composables/useShop';
+import type { ShopSlot } from '../composables/useShop';
 
 definePageMeta({
     middleware: ['auth'],
@@ -146,45 +188,31 @@ useHead({
     meta: [{ name: 'description', content: 'GkBot Adventure Run 商店頁面' }],
 });
 
-const TAB_OPTIONS: { key: ShopType; label: string }[] = [
-    { key: 'GOLD', label: '金幣商店' },
-    { key: 'GEMS', label: '寶石商店' },
-];
-
-const activeTab = ref<ShopType>('GOLD');
-
 const {
-    goldItems, gemsItems,
-    goldLoading, gemsLoading,
-    goldLoaded, gemsLoaded,
-    goldError, gemsError,
-    fetchGoldShop, fetchGemsShop,
+    items, loading, loaded, error, fetchShop,
 } = useShop();
 
-// 稀有度高到低，同稀有度時主要能力值高到低
-const sortByRarityThenStat = (items: ShopSlot[]) => [...items].sort((a, b) => {
-    const rarityDiff = RARITY_ORDER_DESC.indexOf(a.item.rarity) - RARITY_ORDER_DESC.indexOf(b.item.rarity);
-    if (rarityDiff !== 0) return rarityDiff;
-    return primaryStatMagnitude(b.item) - primaryStatMagnitude(a.item);
+// 寶石商品排在前面（價格高到低），金幣商品排在後面（價格高到低）
+const sortByCurrencyThenPrice = (slots: ShopSlot[]) => [...slots].sort((a, b) => {
+    if (a.currency !== b.currency) return a.currency === 'GEMS' ? -1 : 1;
+    return b.price - a.price;
 });
 
-const currentItems = computed(() => (activeTab.value === 'GOLD' ? goldItems.value : gemsItems.value));
+const equipmentSlots = computed(() => items.value.filter(slot => slot.item.type === ItemType.EQUIPMENT));
+const gemsEquipment = computed(
+    () => sortByCurrencyThenPrice(equipmentSlots.value.filter(slot => slot.currency === 'GEMS')),
+);
+const goldEquipment = computed(
+    () => sortByCurrencyThenPrice(equipmentSlots.value.filter(slot => slot.currency === 'GOLD')),
+);
 
 const tiers = computed(() => [
     {
-        key: 'EQUIPMENT',
-        label: '裝備',
-        items: sortByRarityThenStat(currentItems.value.filter(slot => slot.item.type === ItemType.EQUIPMENT)),
-    },
-    {
         key: 'POTION',
         label: '道具',
-        items: sortByRarityThenStat(currentItems.value.filter(slot => slot.item.type === ItemType.POTION)),
+        items: sortByCurrencyThenPrice(items.value.filter(slot => slot.item.type === ItemType.POTION)),
     },
 ]);
-const loading = computed(() => (activeTab.value === 'GOLD' ? goldLoading.value : gemsLoading.value));
-const loaded = computed(() => (activeTab.value === 'GOLD' ? goldLoaded.value : gemsLoaded.value));
-const currentError = computed(() => (activeTab.value === 'GOLD' ? goldError.value : gemsError.value));
 
 // eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
 type PurchaseDialog = { open: (slot: ShopSlot) => void };
@@ -195,22 +223,90 @@ const openPurchase = (slot: ShopSlot) => {
     purchaseDialogRef.value?.open(slot);
 };
 
-const loadCurrent = () => {
-    if (activeTab.value === 'GOLD') {
-        if (!goldLoaded.value) fetchGoldShop();
-    } else if (!gemsLoaded.value) {
-        fetchGemsShop();
-    }
+const loadShop = () => {
+    if (!loaded.value) fetchShop();
 };
 
-watch(activeTab, loadCurrent);
-onMounted(loadCurrent);
+onMounted(loadShop);
 </script>
 
 <style scoped lang="scss">
 .shop-page {
     width: 100%;
     overflow-y: auto;
+
+    &__gacha-banner {
+        position: relative;
+        display: block;
+        width: 100%;
+        margin-bottom: 16px;
+        padding: 14px 14px 12px;
+        border: 2px solid rgba(196, 203, 219, 0.25);
+        border-radius: 3px;
+        background: #14171c;
+        color: rgb(var(--v-theme-primary));
+        text-align: left;
+        cursor: pointer;
+        box-shadow:
+            inset 2px 2px 0 rgba(255, 255, 255, 0.06),
+            inset -2px -2px 0 rgba(0, 0, 0, 0.55);
+        transition: transform 0.06s ease-out;
+
+        &:hover {
+            transform: translateY(-1px);
+        }
+
+        &:focus-visible {
+            outline: 2px solid rgb(var(--v-theme-primary));
+            outline-offset: 2px;
+        }
+    }
+
+    &__gacha-banner-badge {
+        position: absolute;
+        top: -6px;
+        left: -6px;
+        padding: 0 4px;
+        font-size: 7px;
+        line-height: 1.4;
+        color: #14171c;
+        background: #ab47bc;
+        border-radius: 2px;
+        white-space: nowrap;
+    }
+
+    &__gacha-banner-flavor {
+        display: block;
+        margin-top: 4px;
+    }
+
+    &__gacha-banner-divider {
+        width: 100%;
+        height: 1px;
+        margin: 10px 0 8px;
+        background: rgba(196, 203, 219, 0.15);
+    }
+
+    &__gacha-banner-costs {
+        gap: 6px;
+    }
+
+    &__gacha-banner-cost {
+        gap: 3px;
+        font-size: 11px;
+        color: rgb(var(--v-theme-secondary));
+    }
+
+    &__gacha-banner-cost-divider {
+        width: 1px;
+        height: 10px;
+        background: rgba(196, 203, 219, 0.2);
+    }
+
+    &__gacha-banner-arrow {
+        color: rgb(var(--v-theme-primary));
+        opacity: 0.5;
+    }
 
     &__tier {
         margin-bottom: 16px;
@@ -223,98 +319,88 @@ onMounted(loadCurrent);
         opacity: 0.85;
     }
 
-    &__name {
-        max-width: 100%;
-        padding: 0 4px;
-        font-size: 10px;
-        line-height: 1.2;
-        text-align: center;
-        color: rgb(var(--v-theme-primary));
+    &__cabinet {
+        position: relative;
+        padding: 8px 8px 10px;
+        border: 2px solid rgba(196, 203, 219, 0.25);
+        border-radius: 3px;
+        background: #14171c;
+        box-shadow:
+            inset 2px 2px 0 rgba(255, 255, 255, 0.06),
+            inset -2px -2px 0 rgba(0, 0, 0, 0.55);
+
+        &--gems::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            height: 4px;
+            background: repeating-linear-gradient(45deg, #ab47bc 0 6px, #14171c 6px 12px);
+            border-radius: 3px 3px 0 0;
+        }
     }
 
-    &__stat {
-        font-size: 9px;
-    }
-
-    &__price {
-        gap: 2px;
-        font-size: 9px;
-        color: rgb(var(--v-theme-secondary));
-    }
-}
-
-.pixel-slot {
-    position: relative;
-    gap: 3px;
-    width: 100%;
-    min-width: 0;
-    padding: 8px 2px 6px;
-    border: 2px solid rgba(196, 203, 219, 0.25);
-    border-radius: 3px;
-    background: #14171c;
-    color: rgb(var(--v-theme-primary));
-    cursor: pointer;
-    box-shadow:
-        inset 2px 2px 0 rgba(255, 255, 255, 0.06),
-        inset -2px -2px 0 rgba(0, 0, 0, 0.55);
-    transition: transform 0.06s ease-out;
-
-    &:hover:not(:disabled) {
-        transform: translateY(-1px);
-    }
-
-    &:focus-visible {
-        outline: 2px solid rgb(var(--v-theme-primary));
-        outline-offset: 2px;
-    }
-
-    &::before,
-    &::after {
-        content: '';
-        position: absolute;
-        width: 6px;
-        height: 6px;
-        pointer-events: none;
-        opacity: 0.55;
-    }
-
-    &::before {
-        top: -2px;
-        left: -2px;
-        border-top: 2px solid rgb(var(--v-theme-primary));
-        border-left: 2px solid rgb(var(--v-theme-primary));
-    }
-
-    &::after {
-        bottom: -2px;
-        right: -2px;
-        border-bottom: 2px solid rgb(var(--v-theme-primary));
-        border-right: 2px solid rgb(var(--v-theme-primary));
-    }
-
-    &--sold {
-        cursor: default;
-        opacity: 0.4;
-    }
-
-    &__rarity {
+    &__cabinet-badge {
         position: absolute;
         top: -6px;
-        left: -6px;
-        padding: 0 2px;
+        right: 8px;
+        padding: 0 4px;
         font-size: 7px;
         line-height: 1.4;
         color: #14171c;
+        background: #ab47bc;
         border-radius: 2px;
         white-space: nowrap;
     }
 
-    &__sold-badge {
-        position: absolute;
-        inset: 0;
-        font-size: 10px;
-        background: rgba(0, 0, 0, 0.55);
+    &__cabinet-header {
+        gap: 5px;
+        margin-top: 2px;
+    }
+
+    &__cabinet-led {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #81b29a;
+        box-shadow: 0 0 4px #81b29a;
+
+        &--gems {
+            background: #ab47bc;
+            box-shadow: 0 0 4px #ab47bc;
+            animation: shop-page-led-blink 1.6s ease-in-out infinite;
+        }
+    }
+
+    &__cabinet-title {
         color: rgb(var(--v-theme-secondary));
+    }
+
+    &__cabinet-lock {
+        color: #ab47bc;
+        opacity: 0.75;
+    }
+
+    &__cabinet-flavor {
+        display: block;
+        margin: 3px 0 2px;
+        font-size: 10px;
+    }
+}
+
+@keyframes shop-page-led-blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.35;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .shop-page__cabinet-led--gems {
+        animation: none;
     }
 }
 </style>
