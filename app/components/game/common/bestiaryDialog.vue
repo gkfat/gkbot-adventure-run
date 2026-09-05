@@ -45,7 +45,7 @@
                 <v-col
                     v-for="entry in archetypes"
                     :key="entry.slug"
-                    cols="2.4"
+                    cols="3"
                 >
                     <button
                         type="button"
