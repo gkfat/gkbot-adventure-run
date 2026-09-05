@@ -481,7 +481,7 @@
                      沒有 choices 時「繼續」改到下方固定的 __actions 區塊，跟角色 stage 對齊
                      （見下方 actions 的對應分支）。結果在 EVENT/RESOLUTION 都顯示，直到玩家繼續前進 -->
                 <div
-                    v-else-if="currentRun.state === AdventureStateType.EVENT || (currentRun.state === AdventureStateType.RESOLUTION && lastEventResult)"
+                    v-else-if="currentRun.state === AdventureStateType.EVENT || (currentRun.state === AdventureStateType.RESOLUTION && lastEventResult && !wheelResultPending)"
                     class="adventure-page__box mb-3"
                 >
                     <template v-if="lastEventResult">
