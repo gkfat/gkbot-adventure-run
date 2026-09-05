@@ -1,5 +1,5 @@
 import type {
-    EquipmentSlot, Rarity, 
+    EquipmentSlot, Rarity, WeaponWeightClass,
 } from '../../shared/types/common';
 
 interface ShopItemStats {
@@ -16,6 +16,7 @@ interface ShopItemInstance {
     templateId: string;
     type: 'EQUIPMENT' | 'POTION';
     equipSlot?: EquipmentSlot;
+    weaponWeightClass?: WeaponWeightClass;
     rarity: Rarity;
     stats: ShopItemStats;
     name: string;

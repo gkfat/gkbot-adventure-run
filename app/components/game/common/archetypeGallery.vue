@@ -140,45 +140,15 @@
         <!-- 初始配備詳情 dialog（唯讀預覽，尚未創建角色，不提供裝備/卸下操作） -->
         <GameCommonDialogFrame
             v-model="starterDetailOpen"
-            max-width="300"
-            content-class="item-detail"
+            max-width="320"
         >
             <template v-if="starterDetail">
-                <div class="d-flex align-center ga-3 mb-3">
-                    <div
-                        class="pixel-slot pixel-slot--detail"
-                        :style="{ borderColor: RARITY_COLOR[starterDetail.rarity] }"
-                    >
-                        <span
-                            class="pixel-slot__rarity font-pixel"
-                            :style="{ background: RARITY_COLOR[starterDetail.rarity] }"
-                        >
-                            {{ starterDetail.rarity }}
-                        </span>
-                        <GameCommonPixelIcon
-                            :name="resolvePixelIcon(starterDetail)"
-                            :size="40"
-                        />
-                    </div>
-                    <div>
-                        <div
-                            class="font-pixel text-subtitle-1"
-                            :style="{ color: RARITY_COLOR[starterDetail.rarity] }"
-                        >
-                            {{ starterDetail.name }}
-                        </div>
-                        <div class="text-caption text-medium-emphasis mb-1">
-                            稀有度 {{ starterDetail.rarity }}
-                        </div>
-                        <div class="text-body-2">
-                            {{ starterDetail.statLabel }}
-                        </div>
-                    </div>
-                </div>
-
-                <p class="text-body-2 text-medium-emphasis mb-3">
-                    {{ starterDetail.description }}
-                </p>
+                <GameCommonItemDetailPanel
+                    :item="starterDetail"
+                    :name="starterDetail.name"
+                    :effects="starterDetail.effects"
+                    :flavor="starterDetail.description"
+                />
 
                 <SystemBtn
                     block
@@ -472,12 +442,6 @@ const handleConfirm = () => {
             outline: 2px solid rgb(var(--v-theme-primary));
             outline-offset: 2px;
         }
-    }
-
-    &--detail {
-        width: 64px;
-        height: 64px;
-        flex: 0 0 auto;
     }
 
     &__rarity {

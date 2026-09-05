@@ -3,7 +3,7 @@
  * equipment mini-slots (game/character-stage/equipSlots.vue) and the inventory page.
  */
 import {
-    EquipmentSlot, Rarity, HAND_SLOTS,
+    EquipmentSlot, Rarity, HAND_SLOTS, WeaponWeightClass,
 } from '../../shared/types/common';
 import type { PixelIconName } from './pixelIcons';
 
@@ -53,6 +53,12 @@ export const SLOT_LABEL: Record<EquipmentSlot, string> = {
     [EquipmentSlot.RING]: '戒指',
 };
 
+export const WEIGHT_CLASS_LABEL: Record<WeaponWeightClass, string> = {
+    [WeaponWeightClass.LIGHT]: '輕型',
+    [WeaponWeightClass.MEDIUM]: '中等',
+    [WeaponWeightClass.HEAVY]: '重型',
+};
+
 export const RARITY_COLOR: Record<Rarity, string> = {
     [Rarity.N]: '#8a8f98',
     [Rarity.R]: '#4fc3f7',
@@ -96,6 +102,7 @@ export type ItemLike = {
     templateId: string;
     type: string;
     equipSlot?: EquipmentSlot;
+    weaponWeightClass?: WeaponWeightClass;
     rarity: Rarity;
     name?: string;
     description?: string;
@@ -104,6 +111,7 @@ export type ItemLike = {
         DEF?: number;
         HP?: number;
         actionSpeedMod?: number;
+        dodgeChanceMod?: number;
         healPercent?: number;
     };
 };
@@ -127,28 +135,46 @@ type StatKey = keyof ItemLike['stats'];
 
 // Single source of truth for stat display priority/formatting — used by both
 // primaryStatValue() (compact "+N" for the item grid) and describeItem()
-// (full effect text for the detail dialog), so the two can't drift apart.
+// (per-stat breakdown for the detail dialog), so the two can't drift apart.
+// `formatValue`/`compact` prepend '+' only for positive values — ATK/DEF/HP
+// can now roll as a negative "拖累" debuff, and a negative number's own '-'
+// sign already reads correctly without extra handling.
+// `isBeneficial` decides the green/red readout in the detail dialog — for
+// most stats a positive number is the good outcome, but actionSpeedMod is
+// inverted (a *lower* action interval means faster attacks, so negative is
+// the beneficial direction there).
 const STAT_DISPLAY_ORDER: {
     key: StatKey;
-    effectLabel: (value: number) => string;
+    label: string;
+    formatValue: (value: number) => string;
     compact: (value: number) => string;
+    isBeneficial: (value: number) => boolean;
 }[] = [
     {
-        key: 'ATK', effectLabel: v => `攻擊力 +${v}`, compact: v => `+${Math.round(v)}`, 
+        key: 'ATK', label: '攻擊力', formatValue: v => `${v > 0 ? '+' : ''}${Math.round(v)}`, compact: v => `${v > 0 ? '+' : ''}${Math.round(v)}`, isBeneficial: v => v > 0,
     },
     {
-        key: 'DEF', effectLabel: v => `防禦力 +${v}`, compact: v => `+${Math.round(v)}`, 
+        key: 'DEF', label: '防禦力', formatValue: v => `${v > 0 ? '+' : ''}${Math.round(v)}`, compact: v => `${v > 0 ? '+' : ''}${Math.round(v)}`, isBeneficial: v => v > 0,
     },
     {
-        key: 'HP', effectLabel: v => `生命上限 +${v}`, compact: v => `+${Math.round(v)}`, 
+        key: 'HP', label: '生命上限', formatValue: v => `${v > 0 ? '+' : ''}${Math.round(v)}`, compact: v => `${v > 0 ? '+' : ''}${Math.round(v)}`, isBeneficial: v => v > 0,
     },
     {
         key: 'actionSpeedMod',
-        effectLabel: v => `攻擊間隔 ${v > 0 ? '+' : ''}${v.toFixed(2)}s`,
+        label: '攻擊間隔',
+        formatValue: v => `${v > 0 ? '+' : ''}${v.toFixed(2)}s`,
         compact: v => `${v >= 0 ? '+' : '-'}${Math.abs(v).toFixed(2)}`,
+        isBeneficial: v => v < 0,
     },
     {
-        key: 'healPercent', effectLabel: v => `使用後回復 ${v}% 生命值`, compact: v => `+${Math.round(v)}`, 
+        key: 'dodgeChanceMod',
+        label: '閃避率',
+        formatValue: v => `${v > 0 ? '+' : ''}${(v * 100).toFixed(1)}%`,
+        compact: v => `${v > 0 ? '+' : ''}${(v * 100).toFixed(1)}%`,
+        isBeneficial: v => v > 0,
+    },
+    {
+        key: 'healPercent', label: '使用後回復', formatValue: v => `+${Math.round(v)}% 生命值`, compact: v => `+${Math.round(v)}`, isBeneficial: () => true,
     },
 ];
 
@@ -181,25 +207,37 @@ export function primaryStatMagnitude(item: ItemLike): number {
 }
 
 /**
- * Build the display name, the mechanical effect text (stat numbers), and a
- * flavor/lore line for an item, for the inventory detail dialog. Effect text
- * and flavor text are shown in separate places in the dialog by design.
+ * Build the display name, a per-stat effect breakdown (`effects`, one entry
+ * per bonus — for a one-row-per-stat detail dialog layout), the same
+ * breakdown flattened into a single line (`effectText` — for compact
+ * single-line summaries), and a flavor/lore line for an item.
  */
-export function describeItem(item: ItemLike): { name: string; effectText: string; flavor: string } {
+export function describeItem(item: ItemLike): {
+    name: string;
+    effects: { label: string; value: string; positive: boolean }[];
+    effectText: string;
+    flavor: string;
+} {
     const name = item.name ?? item.templateId;
 
     const effects = STAT_DISPLAY_ORDER
         .filter(({ key }) => item.stats[key])
         .map(({
-            key, effectLabel,
-        }) => effectLabel(item.stats[key] as number));
+            key, label, formatValue, isBeneficial,
+        }) => ({
+            label, value: formatValue(item.stats[key] as number), positive: isBeneficial(item.stats[key] as number),
+        }));
 
-    const effectText = effects.length > 0 ? effects.join('、') : '沒有額外效果';
+    const effectText = effects.length > 0
+        ? effects.map(({
+            label, value,
+        }) => `${label} ${value}`).join('、')
+        : '沒有額外效果';
     const flavor = item.description
         ?? (item.type === 'POTION' ? '一瓶用途不明的藥水。' : '一件來歷不明的裝備。');
 
     return {
-        name, effectText, flavor,
+        name, effects, effectText, flavor,
     };
 }
 

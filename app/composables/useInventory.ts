@@ -1,5 +1,5 @@
 import type {
-    EquipmentSlot, Rarity,
+    EquipmentSlot, Rarity, WeaponWeightClass,
 } from '../../shared/types/common';
 
 interface ItemStats {
@@ -7,6 +7,7 @@ interface ItemStats {
     DEF?: number;
     HP?: number;
     actionSpeedMod?: number;
+    dodgeChanceMod?: number;
     healPercent?: number;
 }
 
@@ -15,6 +16,7 @@ interface InventoryItem {
     templateId: string;
     type: 'EQUIPMENT' | 'POTION';
     equipSlot?: EquipmentSlot;
+    weaponWeightClass?: WeaponWeightClass;
     rarity: Rarity;
     stats: ItemStats;
     source: 'DROP' | 'SHOP' | 'EVENT';
