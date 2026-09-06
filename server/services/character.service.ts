@@ -10,6 +10,8 @@ import { sumEquipmentStats } from './item.service';
 import { InventoryService } from './inventory.service';
 import { EquipmentService } from './equipment.service';
 import { ShopService } from './shop.service';
+import { AchievementService } from './achievement.service';
+import { AchievementType } from '../../shared/types/quest';
 import { InventoryRepository } from '../repositories/inventory.repository';
 import { AdventureRunRepository } from '../repositories/adventure-run.repository';
 import {
@@ -69,6 +71,7 @@ export class CharacterService extends BaseService {
     private inventoryRepo: InventoryRepository;
     private adventureRunRepo: AdventureRunRepository;
     private shopService: ShopService;
+    private achievementService: AchievementService;
 
     constructor() {
         super();
@@ -79,6 +82,7 @@ export class CharacterService extends BaseService {
         this.inventoryRepo = new InventoryRepository();
         this.adventureRunRepo = new AdventureRunRepository();
         this.shopService = new ShopService();
+        this.achievementService = new AchievementService();
     }
 
     /**
@@ -119,6 +123,13 @@ export class CharacterService extends BaseService {
 
         const character = await this.characterRepo.createCharacterFromArchetype(accountId, archetype);
         await this.grantStarterLoadout(accountId, character.characterId, archetype.archetypeId);
+        // A brand-new character already starts inside chapterIndex 0's
+        // facility theme (getFacilityTheme) — that first chapter's "level
+        // generation" happens right here at creation, not at the character's
+        // first chapterAdvanced transition, so wasteland_cartographer must
+        // count it too (see achievement.ts's targetCount, which now spans
+        // the full FACILITY_THEMES list to match).
+        await this.achievementService.incrementProgress(character.characterId, AchievementType.DISCOVER_FACILITIES, 1);
 
         const withLoadout = await this.characterRepo.getByIdForAccount(character.characterId, accountId);
         if (!withLoadout) {

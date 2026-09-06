@@ -37,7 +37,7 @@
             type="button"
             class="bottom-nav__item pixel-press d-flex flex-column align-center justify-end"
             :class="{ 'bottom-nav__item--attention': item.key === 'talents' && hasAvailableTalentPoints }"
-            :aria-label="item.key === 'talents' && hasAvailableTalentPoints ? `${item.label}（有可用天賦點）` : item.label"
+            :aria-label="itemAriaLabel(item)"
             @click="handleTap(item)"
         >
             <span class="bottom-nav__icon-wrap d-inline-flex">
@@ -52,6 +52,11 @@
                 >
                     {{ talentPointsBadgeText }}
                 </span>
+                <span
+                    v-else-if="item.key === 'quests' && hasClaimableQuests"
+                    class="bottom-nav__dot-badge"
+                    aria-hidden="true"
+                />
             </span>
             <span class="bottom-nav__label">{{ item.label }}</span>
         </button>
@@ -72,7 +77,7 @@ const leftItems: NavItem[] = [
 
 const rightItems: NavItem[] = [
     { key: 'talents', label: '天賦', icon: 'mdi-star-four-points-outline' },
-    { key: 'leaderboard', label: '排行', icon: 'mdi-trophy-outline' },
+    { key: 'quests', label: '任務', icon: 'mdi-clipboard-check-outline' },
 ];
 
 const route = useRoute();
@@ -86,6 +91,19 @@ const talentPointsBadgeText = computed(() => {
     return points > 99 ? '99+' : String(points);
 });
 
+// 有可領取任務時,任務入口只用紅點提示(不顯示數字),進頁面前就先抓一次任務清單。
+const { hasClaimable: hasClaimableQuests, fetchDaily, fetchPersistent } = useQuests();
+onMounted(() => {
+    fetchDaily();
+    fetchPersistent();
+});
+
+const itemAriaLabel = (item: NavItem) => {
+    if (item.key === 'talents' && hasAvailableTalentPoints.value) return `${item.label}（有可用天賦點）`;
+    if (item.key === 'quests' && hasClaimableQuests.value) return `${item.label}（有可領取任務）`;
+    return item.label;
+};
+
 const handleTap = (item: NavItem) => {
     if (item.key === 'inventory') {
         navigateTo('/inventory');
@@ -97,6 +115,10 @@ const handleTap = (item: NavItem) => {
     }
     if (item.key === 'talents') {
         navigateTo('/talents');
+        return;
+    }
+    if (item.key === 'quests') {
+        navigateTo('/quests');
         return;
     }
 };
@@ -170,6 +192,17 @@ $talent-point-color: #ffd166;
         line-height: 1;
         white-space: nowrap;
         animation: bottom-nav-badge-pulse 1.4s ease-in-out infinite;
+    }
+
+    &__dot-badge {
+        position: absolute;
+        top: -2px;
+        right: -4px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgb(var(--v-theme-error));
+        border: 1.5px solid rgb(var(--v-theme-background));
     }
 
     &__home-slot {

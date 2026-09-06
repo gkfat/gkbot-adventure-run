@@ -75,6 +75,15 @@ import {
 
 import { getBestiaryResponseSchema } from '../../shared/schemas/api/bestiary.schema';
 
+import {
+    getDailyQuestsResponseSchema,
+    claimDailyQuestResponseSchema,
+    getPersistentQuestsResponseSchema,
+    claimPersistentQuestResponseSchema,
+    getAchievementsResponseSchema,
+    claimAchievementResponseSchema,
+} from '../../shared/schemas/api/quest.schema';
+
 // Extend Zod with OpenAPI methods
 extendZodWithOpenApi(z);
 
@@ -141,6 +150,12 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         PurchaseItemResponse: purchaseItemResponseSchema,
         GachaPullRequest: gachaPullRequestSchema,
         GachaPullResponse: gachaPullResponseSchema,
+        GetDailyQuestsResponse: getDailyQuestsResponseSchema,
+        ClaimDailyQuestResponse: claimDailyQuestResponseSchema,
+        GetPersistentQuestsResponse: getPersistentQuestsResponseSchema,
+        ClaimPersistentQuestResponse: claimPersistentQuestResponseSchema,
+        GetAchievementsResponse: getAchievementsResponseSchema,
+        ClaimAchievementResponse: claimAchievementResponseSchema,
         ErrorResponse: errorResponseSchema,
     };
 
@@ -821,6 +836,182 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         },
     });
 
+    // Register Quest Endpoints
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}/quests/daily',
+        description: 'Get (lazily generating if needed) today\'s 3 daily quests and progress for a character',
+        tags: ['Quests'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Daily quests retrieved',
+                content: { 'application/json': { schema: getDailyQuestsResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/quests/daily/claim/{questId}',
+        description: 'Claim a completed daily quest\'s reward (gold 10~50, gems 0~1)',
+        tags: ['Quests'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({
+                characterId: z.string(), questId: z.string(),
+            }),
+        },
+        responses: {
+            200: {
+                description: 'Quest claimed',
+                content: { 'application/json': { schema: claimDailyQuestResponseSchema } },
+            },
+            400: {
+                description: 'Quest not completed yet',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character or quest not found',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            409: {
+                description: 'Quest already claimed',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}/quests/persistent',
+        description: 'Get (lazily creating if needed) a character\'s persistent quests and progress — never reset, claimable once per character',
+        tags: ['Quests'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Persistent quests retrieved',
+                content: { 'application/json': { schema: getPersistentQuestsResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/quests/persistent/claim/{questId}',
+        description: 'Claim a completed persistent quest\'s reward (gold/gems, once per character)',
+        tags: ['Quests'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({
+                characterId: z.string(), questId: z.string(),
+            }),
+        },
+        responses: {
+            200: {
+                description: 'Quest claimed',
+                content: { 'application/json': { schema: claimPersistentQuestResponseSchema } },
+            },
+            400: {
+                description: 'Quest not completed yet',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character or quest not found',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            409: {
+                description: 'Quest already claimed',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    // Register Achievement Endpoints
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}/achievements',
+        description: 'Get a character\'s achievement list with progress and claim status (lazily creating missing entries)',
+        tags: ['Achievements'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Achievements retrieved',
+                content: { 'application/json': { schema: getAchievementsResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/achievements/claim/{achievementId}',
+        description: 'Claim a completed achievement\'s reward (gems 3~5, once per character, lifetime)',
+        tags: ['Achievements'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({
+                characterId: z.string(), achievementId: z.string(),
+            }),
+        },
+        responses: {
+            200: {
+                description: 'Achievement claimed',
+                content: { 'application/json': { schema: claimAchievementResponseSchema } },
+            },
+            400: {
+                description: 'Achievement not completed yet',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character or achievement not found',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            409: {
+                description: 'Achievement already claimed',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
     return registry;
 }
 
@@ -864,6 +1055,14 @@ export function generateOpenAPISpec() {
             {
                 name: 'Inventory',
                 description: 'Permanent inventory management',
+            },
+            {
+                name: 'Quests',
+                description: 'Daily and persistent quest progress and claiming',
+            },
+            {
+                name: 'Achievements',
+                description: 'Lifetime-once-per-character achievement progress and claiming',
             },
         ],
     });

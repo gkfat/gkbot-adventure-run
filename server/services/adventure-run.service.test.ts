@@ -21,6 +21,7 @@ const {
     addItemMock, removeItemMock,
     rngNextMock, combatResolveMock,
     selectEventMock, eventResolveMock, generateCandidatesMock,
+    incrementProgressMock,
 } = vi.hoisted(() => ({
     getActiveByCharacterIdMock: vi.fn(),
     createRunMock: vi.fn(),
@@ -39,6 +40,7 @@ const {
     selectEventMock: vi.fn(),
     eventResolveMock: vi.fn(),
     generateCandidatesMock: vi.fn(),
+    incrementProgressMock: vi.fn(),
 }));
 
 vi.mock('./combat.service', async (importOriginal) => {
@@ -65,6 +67,12 @@ vi.mock('./event.service', () => ({
 vi.mock('./blessing.service', () => ({
     BlessingService: vi.fn().mockImplementation(function BlessingServiceMock() {
         return { generateCandidates: generateCandidatesMock };
+    }),
+}));
+
+vi.mock('./progress-tracker.service', () => ({
+    QuestAchievementProgressTracker: vi.fn().mockImplementation(function QuestAchievementProgressTrackerMock() {
+        return { incrementProgress: incrementProgressMock };
     }),
 }));
 

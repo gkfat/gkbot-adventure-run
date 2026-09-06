@@ -3,6 +3,8 @@ import {
 } from 'h3';
 import { requireAuth } from '../../../utils/auth';
 import { CharacterService } from '../../../services/character.service';
+import { QuestService } from '../../../services/quest.service';
+import { QuestType } from '../../../../shared/types/quest';
 import { getCharacterResponseSchema } from '../../../../shared/schemas/api/character.schema';
 import { toH3Error } from '../../../utils/errorHandler';
 import { ValidationError } from '../../../../shared/types/errors';
@@ -22,6 +24,11 @@ export default defineEventHandler(async (event) => {
 
         const characterService = new CharacterService();
         const character = await characterService.getCharacterWithStats(authUser.uid, characterId);
+
+        // 每次成功取得角色資料視為一次「登入」，用於「每日登入」任務進度
+        // （已完成的任務會被 QuestService.incrementProgress 略過，重複呼叫是安全的）
+        const questService = new QuestService();
+        await questService.incrementProgress(characterId, QuestType.LOGIN, 1);
 
         logRequest({
             severity: 'INFO',

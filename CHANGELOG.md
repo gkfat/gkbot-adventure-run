@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 實作天賦系統
 - 實作怪物圖鑑
 - 商店合併、實作老虎機抽道具
+- 實作任務與成就系統
 
 ### Changed
 

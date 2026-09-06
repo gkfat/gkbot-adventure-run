@@ -5,6 +5,7 @@
 
 export * from './items';
 export * from './quests';
+export * from './persistentQuests';
 export * from './achievement';
 export * from './events';
 export * from './characterArchetypes';

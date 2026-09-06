@@ -30,9 +30,8 @@ import {
     findCurseTemplate, blessingLevelEffect,
 } from '../../shared/constants/blessings';
 import type { BlessingCandidate } from '../../shared/constants/blessings';
-import {
-    NoopLeaderboardUpdater, NoopProgressTracker,
-} from './adventure-run-stubs';
+import { NoopLeaderboardUpdater } from './adventure-run-stubs';
+import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import {
     getEnemyLevel, getStatMultipliers, rollWaveCount, rollEnemyCount,
 } from '../constants/difficulty';
@@ -214,7 +213,7 @@ export class AdventureRunService extends BaseService {
         this.inventoryRepo = new InventoryRepository();
         this.rngService = new RngService();
         this.leaderboardUpdater = new NoopLeaderboardUpdater();
-        this.progressTracker = new NoopProgressTracker();
+        this.progressTracker = new QuestAchievementProgressTracker();
         this.combatResolver = new CombatService();
         this.eventService = new EventService();
         this.blessingService = new BlessingService();
@@ -441,6 +440,12 @@ export class AdventureRunService extends BaseService {
             });
             await this.progressTracker.incrementProgress({
                 accountId: run.accountId, characterId: run.characterId, type: 'ENEMY_KILLED', amount: resolution.enemies.length,
+            });
+            await this.progressTracker.incrementProgress({
+                accountId: run.accountId,
+                characterId: run.characterId,
+                type: (run.factionType ?? 'GKBOT') === 'GKBOT' ? 'ENEMY_KILLED_GKBOT' : 'ENEMY_KILLED_HUMAN',
+                amount: resolution.enemies.length,
             });
             return {
                 combatLog: resolution.combatLog, summary,
@@ -873,6 +878,14 @@ export class AdventureRunService extends BaseService {
         await this.progressTracker.incrementProgress({
             accountId: run.accountId, characterId: run.characterId, type: 'ADVENTURE_COMPLETED', amount: 1,
         });
+        await this.progressTracker.incrementProgress({
+            accountId: run.accountId, characterId: run.characterId, type: 'CHARACTER_LEVEL_REACHED', amount: character.level,
+        });
+        if (chapterAdvanced) {
+            await this.progressTracker.incrementProgress({
+                accountId: run.accountId, characterId: run.characterId, type: 'FACILITY_DISCOVERED', amount: 1,
+            });
+        }
 
         const settlement: SettleSummary = {
             endReason,

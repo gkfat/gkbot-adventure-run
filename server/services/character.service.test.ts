@@ -8,7 +8,7 @@ const {
     listByAccountIdMock, createCharacterFromArchetypeMock, getByIdForAccountMock, characterDeleteMock,
     grantItemMock, equipItemMock, itemGetByIdsMock, itemDeleteByIdsMock,
     inventoryDeleteMock, getByCharacterIdMock, deleteAllByCharacterIdMock, deleteShopsForCharacterMock, updateTalentsMock,
-    addEncounteredArchetypeSlugsMock, updateDefeatedArchetypeCountsMock,
+    addEncounteredArchetypeSlugsMock, updateDefeatedArchetypeCountsMock, incrementProgressMock,
 } = vi.hoisted(() => ({
     listByAccountIdMock: vi.fn(),
     createCharacterFromArchetypeMock: vi.fn(),
@@ -25,6 +25,7 @@ const {
     updateTalentsMock: vi.fn(),
     addEncounteredArchetypeSlugsMock: vi.fn(),
     updateDefeatedArchetypeCountsMock: vi.fn(),
+    incrementProgressMock: vi.fn(),
 }));
 
 vi.mock('../repositories/character.repository', () => ({
@@ -84,6 +85,12 @@ vi.mock('./shop.service', () => ({
     }),
 }));
 
+vi.mock('./achievement.service', () => ({
+    AchievementService: vi.fn().mockImplementation(function AchievementServiceMock() {
+        return { incrementProgress: incrementProgressMock };
+    }),
+}));
+
 describe('CharacterService.getRoster', () => {
     beforeEach(() => {
         listByAccountIdMock.mockReset();
@@ -116,6 +123,32 @@ describe('CharacterService.createCharacterFromArchetype', () => {
         getByIdForAccountMock.mockReset();
         grantItemMock.mockReset();
         equipItemMock.mockReset();
+        incrementProgressMock.mockReset();
+    });
+
+    it('credits DISCOVER_FACILITIES for the starting chapter\'s facility theme', async () => {
+        const character = {
+            characterId: 'char-1',
+            accountId: 'account-1',
+            archetypeId: 'fighter',
+            className: '戰士',
+            attributes: {
+                STR: 4, AGI: 1, CON: 4, LUCK: 1,
+            },
+            talentPoints: 0,
+            talents: {},
+            equipment: {},
+        };
+
+        listByAccountIdMock.mockResolvedValue([]);
+        createCharacterFromArchetypeMock.mockResolvedValue(character);
+        getByIdForAccountMock.mockResolvedValue(character);
+        grantItemMock.mockResolvedValue({ itemId: 'item-1' });
+
+        const service = new CharacterService();
+        await service.createCharacterFromArchetype('account-1', 'fighter');
+
+        expect(incrementProgressMock).toHaveBeenCalledWith('char-1', 'DISCOVER_FACILITIES', 1);
     });
 
     it('rejects an unknown archetypeId', async () => {

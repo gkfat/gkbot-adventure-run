@@ -59,6 +59,12 @@ vi.mock('./shop.service', () => ({
     }),
 }));
 
+vi.mock('./achievement.service', () => ({
+    AchievementService: vi.fn().mockImplementation(function AchievementServiceMock() {
+        return {};
+    }),
+}));
+
 function fighterCharacter(overrides: Partial<Character> = {}): Character {
     return {
         characterId: 'char-1',
