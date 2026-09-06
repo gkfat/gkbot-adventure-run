@@ -204,6 +204,7 @@
 <script setup lang="ts">
 import { describeItem, resolvePixelIcon, RARITY_COLOR } from '../utils/equipmentDisplay';
 import { Rarity } from '../../shared/types/common';
+import { GACHA_CONFIG } from '../../shared/constants/gacha';
 import type { PixelIconName } from '../utils/pixelIcons';
 import type { GachaPullResponseData } from '../composables/useGacha';
 
@@ -217,8 +218,8 @@ useHead({
     meta: [{ name: 'description', content: 'GkBot Adventure Run 裝備老虎機' }],
 });
 
-const GOLD_COST = 100;
-const GEMS_COST = 5;
+const GOLD_COST = GACHA_CONFIG.GOLD_COST;
+const GEMS_COST = GACHA_CONFIG.GEMS_COST;
 
 const { character, fetchCharacter } = useCharacter();
 const { invalidate: invalidateInventory } = useInventory();

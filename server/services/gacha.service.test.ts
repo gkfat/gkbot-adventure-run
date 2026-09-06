@@ -80,34 +80,34 @@ beforeEach(() => {
 });
 
 describe('GachaService.pull', () => {
-    it('pulls with gold: deducts 100 gold, delivers an equipment item into the permanent inventory', async () => {
+    it('pulls with gold: deducts 500 gold, delivers an equipment item into the permanent inventory', async () => {
         setDoc('characters', 'char-1', baseCharacter());
 
         const service = new GachaService();
         const result = await service.pull('account-1', 'char-1', 'GOLD');
 
         expect(result.currency).toBe('GOLD');
-        expect(result.amountSpent).toBe(100);
-        expect(result.remainingBalance).toBe(900);
+        expect(result.amountSpent).toBe(500);
+        expect(result.remainingBalance).toBe(500);
         expect(result.item.type).toBe(ItemType.EQUIPMENT);
 
         expect(txSetMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                collectionName: 'items', id: result.item.itemId, 
+                collectionName: 'items', id: result.item.itemId,
             }),
             expect.objectContaining({ itemId: result.item.itemId }),
         );
         expect(txSetMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                collectionName: 'inventories', id: 'char-1', 
+                collectionName: 'inventories', id: 'char-1',
             }),
             expect.objectContaining({ items: [result.item.itemId] }),
         );
         expect(txUpdateMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                collectionName: 'characters', id: 'char-1', 
+                collectionName: 'characters', id: 'char-1',
             }),
-            expect.objectContaining({ gold: 900 }),
+            expect.objectContaining({ gold: 500 }),
         );
     });
 

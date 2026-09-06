@@ -1,19 +1,16 @@
 /**
- * Equipment gacha (老虎機) constants — independent of the shop/drop rarity
- * weights (`STANDARD_RARITY_WEIGHTS` in `constants/templates/items.ts`).
+ * Equipment gacha (老虎機) rarity weights — independent of the shop/drop
+ * rarity weights (`STANDARD_RARITY_WEIGHTS` in `constants/templates/items.ts`).
  * See design.md's "老虎機稀有度權重表" decision and
  * docs/game-design/balance/drop-rates.md for the rationale behind these values.
+ *
+ * The pull cost itself (GACHA_CONFIG) lives in `shared/constants/gacha.ts`
+ * so the app can display it without duplicating the numbers.
  */
 
 import { Rarity } from '../../shared/types/common';
 
-/**
- * Fixed cost per pull, one currency at a time (player picks which to spend).
- */
-export const GACHA_CONFIG = {
-    GOLD_COST: 100,
-    GEMS_COST: 5,
-} as const;
+export { GACHA_CONFIG } from '../../shared/constants/gacha';
 
 /**
  * Gold pull rarity weights — cheap, low ceiling (SSR/L unreachable).

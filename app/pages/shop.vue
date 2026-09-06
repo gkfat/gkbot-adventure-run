@@ -20,7 +20,7 @@
                         type="GOLD"
                         :size="11"
                     />
-                    <span class="font-pixel">100</span>
+                    <span class="font-pixel">{{ GOLD_COST }}</span>
                 </span>
                 <span class="shop-page__gacha-banner-cost-divider" />
                 <span class="shop-page__gacha-banner-cost d-flex align-center">
@@ -28,7 +28,7 @@
                         type="GEMS"
                         :size="11"
                     />
-                    <span class="font-pixel">5</span>
+                    <span class="font-pixel">{{ GEMS_COST }}</span>
                 </span>
                 <v-icon
                     icon="mdi-chevron-right"
@@ -175,6 +175,7 @@
 </template>
 
 <script setup lang="ts">
+import { GACHA_CONFIG } from '~~/shared/constants/gacha';
 import { ItemType } from '../../shared/types/item';
 import type { ShopSlot } from '../composables/useShop';
 
@@ -188,6 +189,8 @@ useHead({
     meta: [{ name: 'description', content: 'GkBot Adventure Run 商店頁面' }],
 });
 
+const GOLD_COST = GACHA_CONFIG.GOLD_COST;
+const GEMS_COST = GACHA_CONFIG.GEMS_COST;
 const {
     items, loading, loaded, error, fetchShop,
 } = useShop();
