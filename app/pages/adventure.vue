@@ -436,8 +436,14 @@
                     <!-- 戰鬥結束、玩家關掉結算 dialog 後會自動推進並播放走路動畫（見下方
                          RESOLUTION/EXPLORING 的 auto-advance watch），這段期間 lastCombatResult
                          還沒被下一個節點的回應取代，敵方 panel（此時只剩下已擊敗的敵人）
-                         應隨走路動畫隱藏，不要停留在畫面上（known-issue.md #2）。 -->
-                    <template v-if="lastCombatResult && !walkFrame.isWalking.value">
+                         應隨走路動畫隱藏，不要停留在畫面上（known-issue.md #2）。走路動畫本身
+                         是跟 advance() API 各自獨立的固定 WALK_BEAT_MS 計時器（見 handleAdvance
+                         註解），API 較慢時計時器會先跑完、walkFrame.isWalking 提早變回
+                         false——若只看這個旗標，畫面會在 API 還沒回來、lastCombatResult 還沒被
+                         換掉前，把已擊敗的敵人 panel 重新露出來一瞬間（見使用者回報 #11）。
+                         一併檢查 runLoading（advance() 的實際 API pending 狀態）才是真正判斷
+                         「已經真的離開這個節點」的依據。 -->
+                    <template v-if="lastCombatResult && !walkFrame.isWalking.value && !runLoading">
                         <GameAdventureCombatResultPanel
                             :displayed-banner="displayedBanner"
                             :enemy-cards="enemyCards"
