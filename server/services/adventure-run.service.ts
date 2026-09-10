@@ -730,10 +730,12 @@ export class AdventureRunService extends BaseService {
     /**
      * Boss composition (chapter-level-structure): 1 wave, 1 boss unit (NORMAL
      * tier stats) + the boss archetype's own `bossMinionCount` (0~2) escort
-     * minions (BOSS_MINION tier stats, kept below 1.0 since escorts share
-     * the boss's own boss-scale archetype) — all sharing the same archetype, so
-     * the preview and the actual fight (combat.service reuses this same
-     * archetypeIndex per slot via firstWaveArchetypeIndices) stay in sync.
+     * minions, each independently rolled from the faction's *mob* archetypes
+     * (known-issue.md #4 — escorts must not share the boss's own template)
+     * at BOSS_MINION tier stats. The preview and the actual fight
+     * (combat.service reuses these same per-slot archetypeIndex values via
+     * firstWaveArchetypeIndices, indexing into bossArchetypes for slot 0 and
+     * mobArchetypes for every other slot) stay in sync.
      * Whether the boss can reinforce fallen minions mid-fight is decided
      * entirely inside combat.service from the archetype's `canReinforce`
      * flag — nothing extra to preview here.
@@ -742,7 +744,9 @@ export class AdventureRunService extends BaseService {
         // enemy-factions-and-severity Migration Plan: fall back to the
         // pre-change defaults when missing (pre-migration run docs).
         const severityTier = run.severityTier ?? 'PARTIAL_ACTIVE';
-        const bossArchetypes = bossArchetypesFor(run.factionType ?? 'GKBOT');
+        const factionType = run.factionType ?? 'GKBOT';
+        const bossArchetypes = bossArchetypesFor(factionType);
+        const mobArchetypes = mobArchetypesFor(factionType);
 
         const archetypeRoll = await this.rngService.next(run.runId);
         const archetypeIndex = Math.floor(archetypeRoll * bossArchetypes.length);
@@ -752,8 +756,7 @@ export class AdventureRunService extends BaseService {
         // NORMAL tier for the boss's own stats (design.md 決策 4 — its
         // baseAtk/baseDef/baseHp is already a boss-scale value, not stacked
         // with the BOSS tier multiplier); escort minions use BOSS_MINION
-        // (kept below 1.0, since STRONG_ELITE would double-scale the
-        // already boss-scale baseHp/baseAtk/baseDef they share with the boss).
+        // tier on top of their own (mob-scale) baseHp/baseAtk/baseDef.
         const bossMultipliers = getStatMultipliers(enemyLevel, 'NORMAL', severityTier);
         const minionMultipliers = getStatMultipliers(enemyLevel, 'BOSS_MINION', severityTier);
 
@@ -769,13 +772,16 @@ export class AdventureRunService extends BaseService {
             },
         ];
         for (let i = 0; i < (archetype.bossMinionCount ?? 0); i++) {
+            const minionRoll = await this.rngService.next(run.runId);
+            const minionArchetypeIndex = Math.floor(minionRoll * mobArchetypes.length);
+            const minionArchetype = mobArchetypes[minionArchetypeIndex] as typeof mobArchetypes[number];
             firstWaveEnemies.push({
-                archetypeIndex,
-                archetypeSlug: archetype.slug,
-                name: archetype.name,
-                description: archetype.description,
+                archetypeIndex: minionArchetypeIndex,
+                archetypeSlug: minionArchetype.slug,
+                name: minionArchetype.name,
+                description: minionArchetype.description,
                 level: enemyLevel,
-                hp: Math.round(archetype.baseHp * minionMultipliers.hp),
+                hp: Math.round(minionArchetype.baseHp * minionMultipliers.hp),
                 isBoss: false,
             });
         }

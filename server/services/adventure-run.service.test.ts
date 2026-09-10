@@ -273,8 +273,9 @@ describe('AdventureRunService.advance — node generation priority', () => {
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
             state: AdventureStateType.COMBAT,
             currentNodeType: NodeType.BOSS,
-            // rngNextMock defaults to 0 -> archetypeIndex 0 ("維修型 GkBot",
-            // bossMinionCount=2) -> 1 boss + 2 minions.
+            // rngNextMock defaults to 0 -> boss archetypeIndex 0
+            // (bossMinionCount=2), each minion also rolled to index 0 in its
+            // own mob archetype list -> 1 boss + 2 minions.
             currentNodeData: expect.objectContaining({
                 tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 3, 
             }),

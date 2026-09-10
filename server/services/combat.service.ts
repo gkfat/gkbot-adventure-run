@@ -301,9 +301,14 @@ export class CombatService extends BaseService implements CombatResolver {
                     if (minionsAlive < 2) {
                         const reinforceRoll = cursor.next();
                         if (reinforceRoll < BOSS_REINFORCE_CONFIG.CHANCE) {
-                            const bossArchetype = bossArchetypes[bossUnit.archetypeIndex] as EnemyArchetype;
+                            // Reinforcements roll a fresh mob archetype too
+                            // (known-issue.md #4), matching the initial
+                            // escort composition rather than the boss's own.
+                            const minionArchetypeRoll = cursor.next();
+                            const minionArchetypeIndex = Math.floor(minionArchetypeRoll * mobArchetypes.length);
+                            const minionArchetype = mobArchetypes[minionArchetypeIndex] as EnemyArchetype;
                             const minionMultipliers = getStatMultipliers(context.enemyLevel, 'BOSS_MINION', severityTier);
-                            const minion = this.buildEnemyUnit(bossArchetype, bossUnit.archetypeIndex, minionMultipliers, context.enemyLevel, false);
+                            const minion = this.buildEnemyUnit(minionArchetype, minionArchetypeIndex, minionMultipliers, context.enemyLevel, false);
                             minion.nextAttackAt = eventTimestamp;
                             alive.push(minion);
                             encountered.push(minion);
@@ -348,16 +353,15 @@ export class CombatService extends BaseService implements CombatResolver {
      * each enemy slot to the archetype already decided and shown to the
      * player at node-generation time, instead of rolling a fresh one here.
      *
-     * BOSS tier (chapter-level-structure): slot 0 is the boss, every other
-     * slot is an escort minion (BOSS_MINION-tier stats, kept below the
-     * boss's own NORMAL-tier multiplier since both share the same
-     * boss-scale archetype baseHp/baseAtk/baseDef) —
-     * `adventure-run.service.buildBossNodeData` already sized
-     * `enemyCountPerWave`/`archetypeIndices` to match (same archetype for
-     * every slot), so this only needs to pick the right multiplier per slot.
-     * The boss slot itself uses NORMAL tier (enemy-factions-and-severity
-     * design.md 決策 4 — its own baseAtk/baseDef/baseHp is already a boss-scale
-     * value, no longer stacked with the BOSS tier multiplier).
+     * BOSS tier (chapter-level-structure): slot 0 is the boss (bossArchetypes,
+     * NORMAL-tier stats — enemy-factions-and-severity design.md 決策 4, its own
+     * baseAtk/baseDef/baseHp is already a boss-scale value, no longer stacked
+     * with the BOSS tier multiplier); every other slot is an escort minion
+     * rolled from the faction's *mob* archetypes at BOSS_MINION-tier stats
+     * (known-issue.md #4 — escorts must not share the boss's own template).
+     * `adventure-run.service.buildBossNodeData` already rolled
+     * `enemyCountPerWave`/`archetypeIndices` this same way, so this only
+     * needs to mirror the per-slot archetype-array choice.
      */
     private spawnWave(
         cursor: RngCursor,
@@ -369,20 +373,21 @@ export class CombatService extends BaseService implements CombatResolver {
     ): CombatUnit[] {
         const enemyLevel = context.enemyLevel;
         const isBossTier = context.tier === NodeType.BOSS;
-        const archetypes = isBossTier ? bossArchetypes : mobArchetypes;
         const uniformMultipliers = isBossTier ? undefined : getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier], severityTier);
         const bossMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'NORMAL', severityTier) : undefined;
         const minionMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'BOSS_MINION', severityTier) : undefined;
 
         const enemies: CombatUnit[] = [];
         for (let i = 0; i < context.enemyCountPerWave; i++) {
+            const isBossUnit = isBossTier && i === 0;
+            const archetypes = isBossUnit ? bossArchetypes : mobArchetypes;
+
             let archetypeIndex = archetypeIndices?.[i];
             if (archetypeIndex === undefined) {
                 const roll = cursor.next();
                 archetypeIndex = Math.floor(roll * archetypes.length);
             }
             const archetype = archetypes[archetypeIndex] as EnemyArchetype;
-            const isBossUnit = isBossTier && i === 0;
             const multipliers = isBossTier ? (isBossUnit ? bossMultipliers! : minionMultipliers!) : uniformMultipliers!;
 
             enemies.push(this.buildEnemyUnit(archetype, archetypeIndex, multipliers, enemyLevel, isBossUnit));
