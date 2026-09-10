@@ -13,9 +13,14 @@ import {
 } from '../../shared/types/adventure';
 
 describe('computeDamage', () => {
-    it('floors damage at 1 when ATK <= DEF', () => {
-        expect(computeDamage(5, 10, false, 1.5)).toBe(1);
+    it('floors damage at 1 when ATK <= DEF but DEF stays below 2x ATK', () => {
+        expect(computeDamage(5, 9, false, 1.5)).toBe(1);
         expect(computeDamage(5, 5, false, 1.5)).toBe(1);
+    });
+
+    it('zeroes damage when DEF is at least 2x ATK', () => {
+        expect(computeDamage(5, 10, false, 1.5)).toBe(0);
+        expect(computeDamage(5, 20, false, 1.5)).toBe(0);
     });
 
     it('applies critMultiplier on top of the base damage', () => {
@@ -739,13 +744,18 @@ describe('CombatService.resolve', () => {
         });
 
         it('calls recordDefeatedArchetypes with an empty list when nothing is killed', async () => {
+            // ATK 0 means the player's own hits always land as 0 damage under
+            // the DEF>=2*ATK rule (computeDamage), so nothing dies on the
+            // player's side of the fight; DEF 0 keeps the player from also
+            // being damage-immune to the enemy (known-issue.md #8), so the
+            // enemy's own hit still kills the 1-HP player and ends combat.
             getCharacterWithStatsMock.mockResolvedValue({
                 nickname: 'Tester',
                 attributes: { LUCK: 0 },
                 encounteredArchetypeSlugs: [],
                 defeatedArchetypeCounts: {},
                 stats: {
-                    ATK: 0, DEF: 1000, HP_MAX: 1, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+                    ATK: 0, DEF: 0, HP_MAX: 1, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
                 },
             });
             const service = new CombatService();

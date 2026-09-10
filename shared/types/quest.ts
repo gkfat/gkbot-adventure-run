@@ -100,6 +100,7 @@ export enum AchievementType {
   DISCOVER_FACILITIES = 'DISCOVER_FACILITIES', // Distinct facility themes encountered
   ATTACK_SPEED = 'ATTACK_SPEED',         // Character's computed actionIntervalSec crosses a threshold
   CHARACTER_LEVEL = 'CHARACTER_LEVEL',   // Character reaches level X
+  NO_DAMAGE_CLEAR = 'NO_DAMAGE_CLEAR',   // Complete a run without ever taking damage
 }
 
 /**

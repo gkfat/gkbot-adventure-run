@@ -4,8 +4,9 @@
  *
  * Wiring status (see server/services/progress-tracker.service.ts and
  * openspec/changes/quests-and-achievements/design.md's event type reference):
- * TOTAL_KILLS, TOTAL_RUNS, KILL_GKBOT, KILL_HUMAN, CHARACTER_LEVEL, and
- * DISCOVER_FACILITIES are wired to real adventure-run-core events. MAX_SCORE,
+ * TOTAL_KILLS, TOTAL_RUNS, KILL_GKBOT, KILL_HUMAN, CHARACTER_LEVEL,
+ * DISCOVER_FACILITIES, and NO_DAMAGE_CLEAR are wired to real adventure-run-core
+ * events. MAX_SCORE,
  * REACH_STEP, TOTAL_GOLD, EQUIP_LEGENDARY, and ATTACK_SPEED have no emitter
  * yet (no run "score" system, no per-run step reporting, and stat-threshold
  * checks would need hooking into every equip/attribute/talent call site) —
@@ -177,6 +178,14 @@ export const ACHIEVEMENT_TEMPLATES: Record<string, AchievementTemplate> = {
         targetCount: RESOURCE_LIMITS.LEVEL_MAX,
         mode: 'PEAK',
         rewardGems: 10,
+    },
+    'unscathed_clear': {
+        templateId: 'unscathed_clear',
+        type: AchievementType.NO_DAMAGE_CLEAR,
+        name: '無傷通關',
+        description: '完成一次冒險，且過程中不曾受到任何傷害',
+        targetCount: 1,
+        rewardGems: 5,
     },
 };
 

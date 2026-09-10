@@ -128,17 +128,26 @@ export function resolveActiveModifiers(run: Pick<AdventureRun, 'blessings' | 'cu
     return [...blessingModifiers, ...curseModifiers];
 }
 
+// 防禦壓倒性超過攻擊力時視為完全防禦成功（known-issue.md #8），門檻取
+// DEF >= 2 * ATK；否則沿用 max(1, ATK-DEF) 的傷害下限。
+const DAMAGE_ZERO_DEF_ATK_RATIO = 2;
+
 /**
- * `damage = max(1, ATK-DEF) * (crit ? critMultiplier : 1)` — combat-engine
- * spec.md "傷害與命中判定公式". Pure function, exported for direct testing.
+ * `damage = DEF >= 2*ATK ? 0 : max(1, ATK-DEF) * (crit ? critMultiplier : 1)`
+ * — combat-engine spec.md "傷害與命中判定公式". Pure function, exported for
+ * direct testing.
  */
 export function computeDamage(atk: number, def: number, isCrit: boolean, critMultiplier: number): number {
+    if (def >= atk * DAMAGE_ZERO_DEF_ATK_RATIO) return 0;
     return Math.max(1, atk - def) * (isCrit ? critMultiplier : 1);
 }
 
-// Safety cap on simulation loop iterations — HP is bounded and every attack
-// deals >=1 damage, so real combats terminate well under this; this only
-// guards against an unforeseen zero-progress bug turning into an infinite loop.
+// Safety cap on simulation loop iterations — HP is bounded and almost every
+// attack deals >=1 damage, so real combats terminate well under this; this
+// mainly guards against an unforeseen zero-progress bug turning into an
+// infinite loop. (A mutual DEF>=2*ATK immunity stalemate on both sides could
+// also reach this cap — computeDamage, known-issue.md #8 — in which case the
+// loop simply exits with the player still alive.)
 const MAX_ROUNDS = 500;
 
 type CombatUnit = {

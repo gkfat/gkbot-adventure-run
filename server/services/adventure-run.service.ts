@@ -425,9 +425,13 @@ export class AdventureRunService extends BaseService {
             .slice(0, RESOURCE_LIMITS.INVENTORY_RUN_MAX);
 
         if (resolution.victory) {
+            // 無傷通關成就追蹤（known-issue.md #8）：這場戰鬥只要扣血過一次就永久標記。
+            const damageTakenThisRun = run.damageTakenThisRun
+                || resolution.playerHpRemaining < run.playerHp;
             await this.runRepo.saveCheckpoint(run.runId, {
                 state: AdventureStateType.RESOLUTION,
                 playerHp: resolution.playerHpRemaining,
+                ...(damageTakenThisRun !== run.damageTakenThisRun ? { damageTakenThisRun } : {}),
                 expEarned: run.expEarned + resolution.expGained,
                 goldEarned: run.goldEarned + resolution.goldDropped,
                 gemsEarned: run.gemsEarned + resolution.gemsDropped,
@@ -878,6 +882,11 @@ export class AdventureRunService extends BaseService {
         await this.progressTracker.incrementProgress({
             accountId: run.accountId, characterId: run.characterId, type: 'ADVENTURE_COMPLETED', amount: 1,
         });
+        if (isSuccess && !run.damageTakenThisRun) {
+            await this.progressTracker.incrementProgress({
+                accountId: run.accountId, characterId: run.characterId, type: 'ADVENTURE_COMPLETED_NO_DAMAGE', amount: 1,
+            });
+        }
         await this.progressTracker.incrementProgress({
             accountId: run.accountId, characterId: run.characterId, type: 'CHARACTER_LEVEL_REACHED', amount: character.level,
         });

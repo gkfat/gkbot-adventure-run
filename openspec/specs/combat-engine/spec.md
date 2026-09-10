@@ -48,11 +48,15 @@
 - **THEN** 敵人從 `GKBOT_BOSS_ARCHETYPES` 抽取
 
 ### Requirement: 傷害與命中判定公式
-系統 SHALL 以 `damage = max(1, ATK-DEF) * (crit ? critMultiplier : 1)` 計算傷害；crit 機率以 `base + AGI * 係數` 計算並 clamp 至上限 35%；dodge 機率以 `base + AGI * 係數 + 裝備 dodgeChanceMod 加總` 計算並 clamp 至區間 [0%, 25%]，其中每件 `HEAVY` 分類裝備的 `dodgeChanceMod` 在加總前先依角色 `STR`+`CON` 套用負重折扣（見 `weapon-weight-class` capability「負重能力抑制 HEAVY 懲罰」）。
+系統 SHALL 以 `damage = (DEF >= 2 * ATK) ? 0 : max(1, ATK-DEF) * (crit ? critMultiplier : 1)` 計算傷害；crit 機率以 `base + AGI * 係數` 計算並 clamp 至上限 35%；dodge 機率以 `base + AGI * 係數 + 裝備 dodgeChanceMod 加總` 計算並 clamp 至區間 [0%, 25%]，其中每件 `HEAVY` 分類裝備的 `dodgeChanceMod` 在加總前先依角色 `STR`+`CON` 套用負重折扣（見 `weapon-weight-class` capability「負重能力抑制 HEAVY 懲罰」）。
 
 #### Scenario: 一般攻擊傷害下限
-- **WHEN** 攻擊方 ATK 小於等於防禦方 DEF
+- **WHEN** 攻擊方 ATK 小於等於防禦方 DEF，且防禦方 DEF 小於攻擊方 ATK 的 2 倍
 - **THEN** 造成的傷害固定為 1（不會是 0 或負數）
+
+#### Scenario: 防禦壓倒性超過攻擊力時完全免傷
+- **WHEN** 防禦方 DEF 大於等於攻擊方 ATK 的 2 倍
+- **THEN** 造成的傷害為 0
 
 #### Scenario: 暴擊傷害加成
 - **WHEN** 本次攻擊判定為 crit

@@ -123,7 +123,10 @@ export const adventureRunSchema = z.object({
     // Player state
     playerHp: z.number().min(0),
     playerHpMax: z.number().min(1),
-  
+
+    // 無傷通關成就追蹤（known-issue.md #8）
+    damageTakenThisRun: z.boolean().optional(),
+
     // Run-only modifiers
     blessings: z.array(blessingEntrySchema),
     curses: z.array(z.string()),

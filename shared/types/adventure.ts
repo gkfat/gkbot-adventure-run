@@ -362,7 +362,12 @@ export type AdventureRun = {
   // Player state
   playerHp: number;
   playerHpMax: number;
-  
+
+  // 「無傷通關」成就（known-issue.md #8）：run 期間玩家是否曾在戰鬥中受到
+  // 傷害過（只有戰鬥會扣血，事件只會治療，見 EventService.resolve）。一旦
+  // 設為 true 就不會再變回 false；settleRun 在 COMPLETED 結算時檢查此欄位。
+  damageTakenThisRun?: boolean;
+
   // Run-only modifiers
   blessings: BlessingEntry[]; // Owned Blessing families + their level (blessing-leveling)
   curses: string[];           // Curse modifier IDs

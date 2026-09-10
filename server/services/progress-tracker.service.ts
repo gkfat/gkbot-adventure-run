@@ -6,8 +6,8 @@
  *
  * Event name -> QuestType/AchievementType mapping only covers what
  * AdventureRunService actually emits today (`ADVENTURE_COMPLETED`,
- * `ENEMY_KILLED`, `ENEMY_KILLED_GKBOT`, `ENEMY_KILLED_HUMAN`,
- * `CHARACTER_LEVEL_REACHED`, `FACILITY_DISCOVERED`); other QuestType/
+ * `ADVENTURE_COMPLETED_NO_DAMAGE`, `ENEMY_KILLED`, `ENEMY_KILLED_GKBOT`,
+ * `ENEMY_KILLED_HUMAN`, `CHARACTER_LEVEL_REACHED`, `FACILITY_DISCOVERED`); other QuestType/
  * AchievementType values (EARN_GOLD, PURCHASE_SHOP, REACH_STEP, MAX_SCORE,
  * TOTAL_GOLD, EQUIP_LEGENDARY, ATTACK_SPEED) have no emitter yet and stay
  * dormant until their owning change (shop, equipment, leaderboard's score
@@ -33,6 +33,7 @@ const ACHIEVEMENT_EVENT_TYPE: Record<string, AchievementType> = {
     ENEMY_KILLED_HUMAN: AchievementType.KILL_HUMAN,
     CHARACTER_LEVEL_REACHED: AchievementType.CHARACTER_LEVEL,
     FACILITY_DISCOVERED: AchievementType.DISCOVER_FACILITIES,
+    ADVENTURE_COMPLETED_NO_DAMAGE: AchievementType.NO_DAMAGE_CLEAR,
 };
 
 export class QuestAchievementProgressTracker implements ProgressTracker {
