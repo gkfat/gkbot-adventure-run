@@ -205,6 +205,7 @@ const handleClaim = async (achievementId: string) => {
 
     &__grid-scroll {
         overflow-y: auto;
+        overflow-x: hidden;
         min-height: 0;
     }
 
