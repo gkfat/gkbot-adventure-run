@@ -20,3 +20,14 @@ seed+rngIndex 的決定性亂數服務，作為冒險 run 內所有隨機性（�
 #### Scenario: seed 不透過 API 回應暴露
 - **WHEN** client 呼叫任何冒險相關 API
 - **THEN** 回應內容不包含該 run 的 `seed` 欄位
+
+### Requirement: Seed 依角色、章節、關卡三者決定
+系統 SHALL 以 `characterId`、`chapterIndex`、`levelIndex` 三者組成 run 的 seed（`${characterId}:${chapterIndex}:${levelIndex}`），使同一角色重複進入同一章節的同一關卡（DEAD/DISCONNECT 重試）時 seed 不變、節點/敵人序列完全相同，而同一章節內不同關卡的 seed 不同，節點數量與序列不會重複。
+
+#### Scenario: 同章節同關卡重試得到相同流程
+- **WHEN** 角色在 `chapterIndex=2`、`levelIndex=1` 建立 run 後死亡，接著再次以相同 `chapterIndex`/`levelIndex` 建立新 run
+- **THEN** 兩次 run 的 seed 相同，`stageNodeCount`、`severityTier`、`factionType` 及後續節點序列完全一致
+
+#### Scenario: 同章節不同關卡得到不同流程
+- **WHEN** 角色在 `chapterIndex=2`、`levelIndex=0` 與 `chapterIndex=2`、`levelIndex=1` 分別建立 run
+- **THEN** 兩次 run 的 seed 不同，`stageNodeCount`、`severityTier`、`factionType` 及節點序列不保證相同

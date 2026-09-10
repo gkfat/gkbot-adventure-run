@@ -241,6 +241,7 @@ export class AdventureRunService extends BaseService {
             accountId,
             playerHpMax: characterWithStats.stats.HP_MAX,
             chapterIndex: characterWithStats.nextChapterIndex,
+            levelIndex: characterWithStats.currentLevelIndex,
             characterAttributes: characterWithStats.attributes,
         });
     }
@@ -686,7 +687,7 @@ export class AdventureRunService extends BaseService {
      * (see single-stage-run-settlement/design.md — "後續波次保持神秘").
      */
     private async buildCombatNodeData(run: AdventureRun, tier: CombatContext['tier']) {
-        const enemyLevel = getEnemyLevel(run.step);
+        const enemyLevel = getEnemyLevel(run.step, run.progressionFactor ?? 0);
 
         if (tier === NodeType.BOSS) {
             return this.buildBossNodeData(run, enemyLevel);

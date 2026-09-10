@@ -16,10 +16,17 @@ import { clamp } from '../../shared/types/common';
 export type EnemyTier = 'NORMAL' | 'ELITE' | 'STRONG_ELITE' | 'BOSS';
 
 /**
- * `enemyLevel = 1 + floor(step / ENEMY_LEVEL_STEP_DIVISOR)`
+ * `enemyLevel = 1 + floor(step / ENEMY_LEVEL_STEP_DIVISOR) + floor(progressionFactor * ENEMY_LEVEL_POWER_BONUS_MAX)`
+ *
+ * `progressionFactor` (0~1, snapshotted on the run at createRun — see
+ * AdventureRun.progressionFactor) adds a difficulty bonus on top of the
+ * existing step-based curve, so a character overpowered for their chapter
+ * faces tougher enemies throughout the run, not just a longer one.
  */
-export function getEnemyLevel(step: number): number {
-    return 1 + Math.floor(step / DIFFICULTY_CONFIG.ENEMY_LEVEL_STEP_DIVISOR);
+export function getEnemyLevel(step: number, progressionFactor = 0): number {
+    return 1
+        + Math.floor(step / DIFFICULTY_CONFIG.ENEMY_LEVEL_STEP_DIVISOR)
+        + Math.floor(progressionFactor * DIFFICULTY_CONFIG.ENEMY_LEVEL_POWER_BONUS_MAX);
 }
 
 /**

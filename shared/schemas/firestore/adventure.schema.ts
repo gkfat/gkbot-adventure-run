@@ -97,12 +97,16 @@ export const adventureRunSchema = z.object({
 
     // Stage progression (adventure-stage-progression)
     chapterIndex: z.number().int().min(0),
+    levelIndex: z.number().int().min(0),
     stageNodeIndex: z.number().int().min(0),
     stageNodeCount: z.number().int().min(0),
 
     // Facility severity / enemy faction (enemy-factions-and-severity)
     severityTier: facilitySeveritySchema,
     factionType: enemyFactionSchema,
+
+    // Character power vs. chapter's expected power, snapshotted at createRun
+    progressionFactor: z.number().min(0).max(1),
 
     startedAt: z.number(),
     endedAt: z.number().optional(),

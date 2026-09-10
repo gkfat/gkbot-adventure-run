@@ -11,7 +11,7 @@
 
 import { BaseRepository } from './base.repository';
 import {
-    AdventureStateType, STAGE_NODE_COUNT_FALLBACK, getStageNodeCountRange, rollSeverityTier, rollFactionType, type AdventureRun,
+    AdventureStateType, STAGE_NODE_COUNT_FALLBACK, getStageNodeCountRange, getProgressionFactor, rollSeverityTier, rollFactionType, type AdventureRun,
 } from '../../shared/types/adventure';
 import { adventureRunSchema } from '../../shared/schemas/firestore/adventure.schema';
 import {
@@ -41,6 +41,9 @@ function withStageDefaults(run: AdventureRun): AdventureRun {
     return {
         ...run,
         chapterIndex: run.chapterIndex ?? 0,
+        // chapter-level-node-diversity: missing on pre-migration run docs —
+        // 0 reproduces the pre-change seed shape (`characterId:chapterIndex`).
+        levelIndex: run.levelIndex ?? 0,
         stageNodeIndex: run.stageNodeIndex ?? 0,
         stageNodeCount: run.stageNodeCount ?? STAGE_NODE_COUNT_FALLBACK,
         // require-combat-before-rest: pre-migration run docs never fought
@@ -54,6 +57,9 @@ function withStageDefaults(run: AdventureRun): AdventureRun {
         // unadjusted pre-change behavior), no data backfill.
         severityTier: run.severityTier ?? 'PARTIAL_ACTIVE',
         factionType: run.factionType ?? 'GKBOT',
+        // chapter-level-node-diversity: missing on pre-migration run docs —
+        // 0 means no power-based enemy bonus, matching pre-change behavior.
+        progressionFactor: run.progressionFactor ?? 0,
     };
 }
 
@@ -69,17 +75,21 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
         accountId: string;
         playerHpMax: number;
         chapterIndex: number;
+        levelIndex: number;
         characterAttributes: Attributes;
     }): Promise<AdventureRun> {
         try {
             const docRef = this.collection.doc();
             const timestamp = Date.now();
-            // Deterministic per character+chapter (not per run attempt): a
-            // failed/abandoned run followed by a retry of the same chapter
+            // Deterministic per character+chapter+level (not per run attempt):
+            // a failed/abandoned run followed by a retry of the same Level
             // must reproduce the exact same node/enemy sequence, otherwise
-            // players could reroll a hard chapter into an easier one by
+            // players could reroll a hard level into an easier one by
             // repeatedly quitting and restarting (known-issue.md #8).
-            const seed = `${params.characterId}:${params.chapterIndex}`;
+            // levelIndex is folded in (chapter-level-node-diversity) so
+            // different Levels within the same Chapter don't replay the same
+            // node sequence (known-issue.md #7).
+            const seed = `${params.characterId}:${params.chapterIndex}:${params.levelIndex}`;
 
             // Roll the Stage's node count deterministically from the fresh
             // seed — no existing doc yet, so this can't go through
@@ -89,6 +99,12 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
             const characterPower = calculateAttributePower(params.characterAttributes);
             const stageNodeRange = getStageNodeCountRange(characterPower, params.chapterIndex);
             const stageNodeCount = rollInRange(random(seed, 0), stageNodeRange.min, stageNodeRange.max);
+
+            // Character power vs. this chapter's expected power (0~1),
+            // snapshotted here so enemy difficulty (getEnemyLevel) can scale
+            // with the player's actual strength, not just run.step
+            // (chapter-level-node-diversity, known-issue.md #7).
+            const progressionFactor = getProgressionFactor(characterPower, params.chapterIndex);
 
             // Facility severity / enemy faction (enemy-factions-and-severity
             // design.md 決策 1): rolled once here, same deterministic-seed
@@ -114,12 +130,14 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
                 lastRestStep: 0,
 
                 chapterIndex: params.chapterIndex,
+                levelIndex: params.levelIndex,
                 stageNodeIndex: 0,
                 stageNodeCount,
                 stageCombatEncountered: false,
 
                 severityTier,
                 factionType,
+                progressionFactor,
 
                 startedAt: timestamp,
 

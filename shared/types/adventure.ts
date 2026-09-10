@@ -326,6 +326,11 @@ export type AdventureRun = {
   // snapshot of the character's nextChapterIndex at run creation; the run
   // itself never advances it (single-stage-run-settlement/design.md).
   chapterIndex: number;          // 0-based, drives facility theme cycling
+  // Snapshot of the character's currentLevelIndex at run creation (see
+  // Character.currentLevelIndex) — folded into `seed` so different Levels
+  // within the same Chapter get different node sequences, while re-entering
+  // the same Level (DEAD/DISCONNECT retry) reproduces the same one.
+  levelIndex: number;
   stageNodeIndex: number;        // 0-based, resets to 0 on stage change
   stageNodeCount: number;        // node count for this stage, rolled once at stage start
 
@@ -335,6 +340,14 @@ export type AdventureRun = {
   // AdventureRunRepository.withStageDefaults.
   severityTier: FacilitySeverity;
   factionType: EnemyFaction;
+
+  // Character power vs. chapter's expected power (getProgressionFactor,
+  // 0~1), snapshotted at createRun so it stays fixed for the whole run
+  // (same determinism rule as severityTier/factionType). Drives extra enemy
+  // level bonus in getEnemyLevel — a character overpowered for their chapter
+  // faces tougher enemies, not just a longer run. Missing on pre-migration
+  // run docs — see AdventureRunRepository.withStageDefaults.
+  progressionFactor: number;
 
   startedAt: Timestamp;
   endedAt?: Timestamp;
@@ -485,9 +498,14 @@ export const NODE_CONFIG = {
  * Difficulty scaling configuration
  */
 export const DIFFICULTY_CONFIG = {
-    // Enemy level formula: 1 + floor(step / 2)
+    // Enemy level formula: 1 + floor(step / 2) + floor(progressionFactor * ENEMY_LEVEL_POWER_BONUS_MAX)
     ENEMY_LEVEL_STEP_DIVISOR: 2,
-  
+    // chapter-level-node-diversity: extra enemy levels for an overpowered
+    // character (progressionFactor near 1) vs. their chapter's expected
+    // power — so a stronger character faces tougher enemies, not just a
+    // longer run (known-issue.md #7).
+    ENEMY_LEVEL_POWER_BONUS_MAX: 3,
+
     // Base multipliers (per enemy level)
     HP_MULT_PER_LEVEL: 0.08,
     ATK_MULT_PER_LEVEL: 0.07,

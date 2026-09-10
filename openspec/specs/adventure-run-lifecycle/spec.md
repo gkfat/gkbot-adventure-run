@@ -7,7 +7,7 @@
 ## Requirements
 
 ### Requirement: 開始新的冒險 Run
-系統 SHALL 僅在角色沒有其他進行中（state != ENDED）的 run 時，允許建立新 run（seed、state=INIT、step=0、rngIndex=0）。
+系統 SHALL 僅在角色沒有其他進行中（state != ENDED）的 run 時，允許建立新 run（seed、state=INIT、step=0、rngIndex=0）。run 的 seed SHALL 依角色的 `characterId`、`chapterIndex`（角色目前的 `nextChapterIndex`）與 `levelIndex`（角色目前的 `currentLevelIndex`）三者決定（見 `deterministic-rng` spec），使同一章節內不同關卡各自產生不同的節點/敵人序列，而重試同一關卡仍重現相同序列。
 
 #### Scenario: 成功開始
 - **WHEN** 角色目前沒有進行中的 run，玩家呼叫 `POST /api/adventure/start`
@@ -70,6 +70,21 @@
 - **WHEN** 讀取一個在本 change 上線前建立、沒有 `severityTier`/`factionType` 欄位的既有 run
 - **THEN** 系統以 `PARTIAL_ACTIVE`/`GKBOT`（等同不調整的既有行為）作為預設值，不中斷該 run
 
+### Requirement: 玩家戰力對敵人難度的加成
+系統 SHALL 於 run 建立時（`createRun`），依角色屬性戰力（`calculateAttributePower`）相對於該 `chapterIndex` 的期望戰力，計算 `progressionFactor`（0~1，見 `getProgressionFactor`）並存入 run 文件，於整趟 run 內保持不變。`enemyLevel` 的計算 SHALL 在既有「依 `step` 遞增」的公式之上，額外疊加依 `progressionFactor` 換算的敵人等級加成，使戰力愈高於章節期望值的角色，即使 `step` 相同也面對更高等級的敵人。
+
+#### Scenario: run 建立時決定 progressionFactor
+- **WHEN** 呼叫 `createRun` 建立一筆新的 run 文件
+- **THEN** 系統依角色屬性戰力與 `chapterIndex` 算出 `progressionFactor` 並存入 run，本趟 run 結束前不再改變
+
+#### Scenario: 戰力愈高面臨愈高等級敵人
+- **WHEN** 兩個角色在相同 `chapterIndex`、相同 `step` 下分別建立 run，其中一個角色的屬性戰力遠高於該章節期望戰力（`progressionFactor` 較高）
+- **THEN** 該角色的 `enemyLevel` 不低於另一個角色的 `enemyLevel`
+
+#### Scenario: 缺少歷史欄位時的容錯
+- **WHEN** 讀取一個在本 change 上線前建立、沒有 `progressionFactor` 欄位的既有 run
+- **THEN** 系統以 `0`（等同不調整的既有行為）作為預設值，不中斷該 run
+
 ### Requirement: 節點生成優先序
 系統 SHALL 依序決定下一節點：目前節點是本 Stage 最後一個節點時強制為 BOSS（Stage 邊界，優先序最高）；否則距上次 Rest 節點 >= 4 step 時強制為 Rest（保底）；否則 `step % 9 == 0` 為 Strong Elite、`step % 5 == 0` 為 Elite；否則依權重隨機決定 combat/event/rest/choice。多個條件同時觸發時，優先序為：Stage 邊界（Boss） > 保底 Rest > 固定精英節奏 > 加權隨機。
 
@@ -86,8 +101,8 @@
 - **THEN** 下一節點為 Strong Elite combat
 
 #### Scenario: 敵人難度隨 step 提升
-- **WHEN** 下一節點為一般 combat，且 `step = 10`
-- **THEN** `enemyLevel = 1 + floor(10/2) = 6`，對應的 hp/atk/def 倍率依公式套用
+- **WHEN** 下一節點為一般 combat，且 `step = 10`，run 的 `progressionFactor = 0`
+- **THEN** `enemyLevel = 1 + floor(10/2) + 0 = 6`，對應的 hp/atk/def 倍率依公式套用（`progressionFactor` 對 `enemyLevel` 的額外加成見「玩家戰力對敵人難度的加成」）
 
 ### Requirement: 斷線重連與逾時結束
 系統 SHALL 允許在 15 分鐘內（以 `lastActivityAt` 判斷）恢復中斷的 run；超過窗口時 SHALL 以 `endReason = DISCONNECT` 結束該 run。
