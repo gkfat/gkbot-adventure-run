@@ -15,13 +15,14 @@ import type { Character } from '../../shared/types/character';
 import type { ItemInstance } from '../../shared/types/item';
 
 const {
-    collectionMock, txGetMock, txSetMock, txUpdateMock, runTransactionMock, docs, deleteMock,
+    collectionMock, txGetMock, txSetMock, txUpdateMock, runTransactionMock, docs, deleteMock, incrementProgressMock,
 } = vi.hoisted(() => {
     const docs = new Map<string, { exists: boolean; data?: () => unknown }>();
     const deleteMock = vi.fn((key: string) => {
         docs.delete(key);
         return Promise.resolve();
     });
+    const incrementProgressMock = vi.fn().mockResolvedValue(undefined);
 
     const makeRef = (collectionName: string, id: string) => ({
         collectionName,
@@ -42,7 +43,7 @@ const {
     }));
 
     return {
-        collectionMock, txGetMock, txSetMock, txUpdateMock, runTransactionMock, docs, deleteMock,
+        collectionMock, txGetMock, txSetMock, txUpdateMock, runTransactionMock, docs, deleteMock, incrementProgressMock,
     };
 });
 
@@ -50,6 +51,12 @@ vi.mock('../utils/firebaseAdmin', () => ({
     getAdminFirestore: () => ({
         collection: collectionMock,
         runTransaction: runTransactionMock,
+    }),
+}));
+
+vi.mock('./progress-tracker.service', () => ({
+    QuestAchievementProgressTracker: vi.fn().mockImplementation(function QuestAchievementProgressTrackerMock() {
+        return { incrementProgress: incrementProgressMock };
     }),
 }));
 
@@ -153,6 +160,10 @@ describe('ShopService.purchaseItem', () => {
         expect(result.item.itemId).toBe('shop-item-1');
         expect(result.goldSpent).toBe(150);
         expect(result.gemsSpent).toBeUndefined();
+
+        expect(incrementProgressMock).toHaveBeenCalledWith({
+            accountId: 'account-1', characterId: 'char-1', type: 'PURCHASE_SHOP', amount: 1,
+        });
 
         expect(txSetMock).toHaveBeenCalledWith(
             expect.objectContaining({

@@ -5,13 +5,14 @@
  * Wired into AdventureRunService in place of NoopProgressTracker.
  *
  * Event name -> QuestType/AchievementType mapping only covers what
- * AdventureRunService actually emits today (`ADVENTURE_COMPLETED`,
- * `ADVENTURE_COMPLETED_NO_DAMAGE`, `ENEMY_KILLED`, `ENEMY_KILLED_GKBOT`,
- * `ENEMY_KILLED_HUMAN`, `CHARACTER_LEVEL_REACHED`, `FACILITY_DISCOVERED`); other QuestType/
- * AchievementType values (EARN_GOLD, PURCHASE_SHOP, REACH_STEP, MAX_SCORE,
- * TOTAL_GOLD, EQUIP_LEGENDARY, ATTACK_SPEED) have no emitter yet and stay
- * dormant until their owning change (shop, equipment, leaderboard's score
- * redesign, …) adds one — see design.md's event type reference.
+ * AdventureRunService and ShopService actually emit today
+ * (`ADVENTURE_COMPLETED`, `ADVENTURE_COMPLETED_NO_DAMAGE`, `ENEMY_KILLED`,
+ * `ENEMY_KILLED_GKBOT`, `ENEMY_KILLED_HUMAN`, `CHARACTER_LEVEL_REACHED`,
+ * `FACILITY_DISCOVERED`, `PURCHASE_SHOP`); other QuestType/AchievementType
+ * values (EARN_GOLD, REACH_STEP, MAX_SCORE, TOTAL_GOLD, EQUIP_LEGENDARY,
+ * ATTACK_SPEED) have no emitter yet and stay dormant until their owning
+ * change (equipment, leaderboard's score redesign, …) adds one — see
+ * design.md's event type reference.
  */
 
 import type { ProgressTracker } from '../../shared/types/adventure';
@@ -24,6 +25,7 @@ import {
 const QUEST_EVENT_TYPE: Record<string, QuestType> = {
     ADVENTURE_COMPLETED: QuestType.COMPLETE_RUN,
     ENEMY_KILLED: QuestType.KILL_ENEMIES,
+    PURCHASE_SHOP: QuestType.PURCHASE_SHOP,
 };
 
 const ACHIEVEMENT_EVENT_TYPE: Record<string, AchievementType> = {

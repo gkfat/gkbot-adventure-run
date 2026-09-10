@@ -20,6 +20,7 @@
 import { BaseService } from './base.service';
 import { ShopRepository } from '../repositories/shop.repository';
 import { CharacterRepository } from '../repositories/character.repository';
+import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import { getAdminFirestore } from '../utils/firebaseAdmin';
 import { generateItemInstance } from './item.service';
 import { getAllItemTemplates } from '../constants/templates';
@@ -54,12 +55,14 @@ export class ShopService extends BaseService {
     protected serviceName = 'shop';
     private shopRepo: ShopRepository;
     private characterRepo: CharacterRepository;
+    private progressTracker: QuestAchievementProgressTracker;
     private db = getAdminFirestore();
 
     constructor() {
         super();
         this.shopRepo = new ShopRepository();
         this.characterRepo = new CharacterRepository();
+        this.progressTracker = new QuestAchievementProgressTracker();
     }
 
     /**
@@ -152,7 +155,7 @@ export class ShopService extends BaseService {
         const characterRef = this.db.collection('characters').doc(characterId);
         const inventoryRef = this.db.collection('inventories').doc(characterId);
 
-        return this.db.runTransaction(async (tx) => {
+        const result = await this.db.runTransaction(async (tx) => {
             const shopDoc = await tx.get(shopRef);
             if (!shopDoc.exists) {
                 throw new NotFoundError('shop');
@@ -243,6 +246,12 @@ export class ShopService extends BaseService {
                 unequipped,
             };
         });
+
+        await this.progressTracker.incrementProgress({
+            accountId, characterId, type: 'PURCHASE_SHOP', amount: 1,
+        });
+
+        return result;
     }
 }
 
