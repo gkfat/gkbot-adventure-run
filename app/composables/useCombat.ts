@@ -1,5 +1,11 @@
 import type { CombatApiResult } from './useAdventureRun';
-import type { CombatLogEntry } from '../../shared/types/adventure';
+import type {
+    CombatLogEntry, EnemyFaction, 
+} from '../../shared/types/adventure';
+import { useDialogueBubble } from './useDialogueBubble';
+import type {
+    DialogueSubject, DialogueTrigger, 
+} from '../constants/dialogueLines';
 
 // 每個 wave 開戰前都先播一段橫越戰場的 banner，一段文字的進出節奏都是
 // 「過 BANNER_TEXT_ENTER_DELAY_MS 後文字進入 → 停留 BANNER_TEXT_HOLD_MS →
@@ -121,7 +127,38 @@ export function useCombat(
     getResult: () => CombatApiResult | null,
     getPlayerHpMax: () => number,
     getPlayerHpStart: () => number,
+    // 對話氣泡觸發需要玩家 archetype / 敵方陣營才能查台詞（見
+    // app/constants/dialogueLines.ts），兩者選填——單元測試沒有提供時直接
+    // 略過觸發（不影響既有 playback/gauge 測試，見 useCombat.test.ts）。
+    getPlayerArchetypeId?: () => string,
+    getFactionType?: () => EnemyFaction | undefined,
 ) {
+    const { triggerDialogue } = useDialogueBubble();
+    const archetypeSlugByEnemyId = computed<Map<string, string | undefined>>(() => {
+        const map = new Map<string, string | undefined>();
+        for (const enemy of getResult()?.summary.enemies ?? []) {
+            map.set(enemy.enemyId, enemy.archetypeSlug);
+        }
+        return map;
+    });
+    const dialogueSubjectFor = (unitId: string): DialogueSubject | null => {
+        if (unitId === 'player') {
+            if (!getPlayerArchetypeId) return null;
+            return {
+                kind: 'player', archetypeId: getPlayerArchetypeId(),
+            };
+        }
+        const faction = getFactionType?.();
+        if (!faction) return null;
+        return {
+            kind: 'enemy', archetypeSlug: archetypeSlugByEnemyId.value.get(unitId), faction,
+        };
+    };
+    const fireDialogue = (unitId: string, trigger: DialogueTrigger) => {
+        const subject = dialogueSubjectFor(unitId);
+        if (!subject) return;
+        triggerDialogue(unitId, trigger, subject);
+    };
     // 一次性把「每一批 log 該在播放開始後第幾毫秒顯示」全部算好（絕對時間軸，
     // 不是逐批用 setTimeout 互相串接）。這樣播放排程跟充能條動畫可以共用同一份
     // 時間表，兩者永遠對得上，不會再有充能條演出跟實際出手時機脫鉤的問題。
@@ -289,16 +326,23 @@ export function useCombat(
             if (entry.action === 'DODGE') {
                 triggerCardFx(entry.targetId, 'dodge');
                 triggerDamageTextFx(entry.targetId, 'dodge');
+                fireDialogue(entry.targetId, 'DODGE');
             } else {
                 triggerSparkFx(entry.targetId, entry.action === 'CRIT' ? 'crit' : 'hit');
                 triggerDamageTextFx(entry.targetId, entry.action === 'CRIT' ? 'crit' : 'damage', entry.damage);
+                fireDialogue(entry.actorId, entry.action === 'CRIT' ? 'CRIT' : 'ATTACK');
+                fireDialogue(entry.targetId, 'HIT_TAKEN');
             }
         };
-        // DEATH 跟同一批的 ATTACK/CRIT 共用 actorId/targetId，特效已經由那筆
-        // sibling entry 觸發過，這裡跳過避免重複播放。
+        // DEATH 跟同一批的 ATTACK/CRIT 共用 actorId/targetId，視覺特效已經由那筆
+        // sibling entry 觸發過，這裡只補觸發 DEFEATED 對話，不重播其餘視覺 fx
+        // （見 tasks.md 4.3）。
         let stagger = 0;
         for (const entry of group.entries) {
-            if (entry.action === 'DEATH') continue;
+            if (entry.action === 'DEATH') {
+                fireDialogue(entry.targetId, 'DEFEATED');
+                continue;
+            }
             if (stagger === 0) {
                 fireEntry(entry);
             } else {
@@ -494,8 +538,24 @@ export function useCombat(
             wave: timing.wave, state: 'entering', 
         };
         return {
-            wave: timing.wave, state: 'idle', 
+            wave: timing.wave, state: 'idle',
         };
+    });
+
+    // 遭遇敵人對話：每個 wave（含後續增援）第一次進場（entering）那一刻，對
+    // 這個 wave 的每隻敵人各自觸發一次 ENCOUNTER（見 tasks.md 4.5——目前
+    // 「遭遇敵人」banner 已不再另外列出敵人清單，見 adventure.vue 註解，改在
+    // 敵人卡片實際登場、玩家真正看到牠的這一刻觸發）。encounteredWaves 記錄
+    // 已觸發過的 wave，避免同一 wave 因 nowMs 每幀重算而重複觸發。
+    const encounteredWaves = new Set<number>();
+    watch(waveDisplay, ({
+        wave, state, 
+    }) => {
+        if (state !== 'entering' || encounteredWaves.has(wave)) return;
+        encounteredWaves.add(wave);
+        for (const enemy of getResult()?.summary.enemies ?? []) {
+            if ((enemyWaveById.value.get(enemy.enemyId) ?? 0) === wave) fireDialogue(enemy.enemyId, 'ENCOUNTER');
+        }
     });
 
     // 敵人狀態：以目前已播放的 log 批次逐步套用 targetHpRemaining/DEATH，還原
@@ -793,10 +853,18 @@ export function useCombat(
         timers = [];
     };
 
+    // 戰鬥揭曉勝利那一刻（playbackDone 且 victory === true）觸發玩家 VICTORY
+    // 對話（見 tasks.md 4.4）；宣告要放在 schedulePlayback 的 immediate watch
+    // 之前——schedulePlayback 內會重置這個旗標，若宣告放後面會跟 nowMs 遇過的
+    // 同一種 TDZ ReferenceError（見上面 nowMs 宣告處的說明）。
+    let victoryDialogueFired = false;
+
     const schedulePlayback = () => {
         clearTimers();
         stopGaugeClock();
         clearFxTimers();
+        encounteredWaves.clear();
+        victoryDialogueFired = false;
         nowMs.value = 0;
         if (!getResult() || schedule.value.length === 0) return;
 
@@ -805,6 +873,12 @@ export function useCombat(
     };
 
     watch(getResult, schedulePlayback, { immediate: true });
+
+    watch(playbackDone, (done) => {
+        if (!done || victoryDialogueFired) return;
+        victoryDialogueFired = true;
+        if (getResult()?.summary.victory) fireDialogue('player', 'VICTORY');
+    });
     onUnmounted(() => {
         clearTimers();
         stopGaugeClock();

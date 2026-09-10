@@ -8,8 +8,19 @@
         <div class="wheel-result-dialog__title font-pixel mb-2">
             轉盤結果
         </div>
-        <div class="text-caption text-medium-emphasis mb-8">
+        <div class="text-caption text-medium-emphasis mb-2">
             {{ result?.description }}
+        </div>
+
+        <!-- 行內對話呈現：這個 dialog 置中顯示會蓋住玩家 stage 上的對話氣泡，沿用
+             同一份 useDialogueBubble 狀態，換一個一定看得到的位置（比照
+             eventResultDialog.vue／modifierAcquiredDialog.vue 的做法，見
+             tasks.md 5.1）。 -->
+        <div
+            v-if="playerDialogueText"
+            class="text-caption text-center font-pixel wheel-result-dialog__dialogue mb-6"
+        >
+            「{{ playerDialogueText }}」
         </div>
 
         <div class="wheel-spinner mb-4">
@@ -71,11 +82,15 @@
 
 <script setup lang="ts">
 import {
-    ref, watch,
+    computed, ref, watch,
 } from 'vue';
 import type { EventOutcome } from '../../../composables/useAdventureRun';
+import { useDialogueBubble } from '../../../composables/useDialogueBubble';
 
 const props = defineProps<{ result: EventOutcome | null; started: boolean }>();
+
+const { bubbles: dialogueBubbles } = useDialogueBubble();
+const playerDialogueText = computed(() => dialogueBubbles.get('player')?.text ?? null);
 
 // 轉盤圖上四個扇形的範圍（順時針角度，以 12 點鐘指針為 0 度），必須跟
 // pixel-art/vr-roulette-wheel/build.py 的 SECTORS 保持一致 —— 扇形大小依實際

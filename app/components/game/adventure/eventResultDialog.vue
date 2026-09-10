@@ -17,6 +17,17 @@
                 {{ result.description }}
             </div>
 
+            <!-- 行內對話呈現：玩家 stage（adventure-page__stage-fx-anchor）在這個
+                 dialog 開啟期間可能被置中的 v-dialog 完全遮蔽（design.md 決策 2/
+                 open question 2），沿用同一份 useDialogueBubble 狀態與台詞資料，
+                 只是換一個一定看得到的渲染位置，不影響資料層設計。 -->
+            <div
+                v-if="playerDialogueText"
+                class="text-caption text-center font-pixel event-result-dialog__dialogue mb-3"
+            >
+                「{{ playerDialogueText }}」
+            </div>
+
             <div class="d-flex flex-wrap justify-center ga-4 mb-3">
                 <div
                     v-if="result.hpHealed"
@@ -97,8 +108,12 @@
 <script setup lang="ts">
 import type { EventOutcome } from '../../../composables/useAdventureRun';
 import { EventType } from '../../../../shared/types/adventure';
+import { useDialogueBubble } from '../../../composables/useDialogueBubble';
 
 defineProps<{ open: boolean; result: EventOutcome | null }>();
+
+const { bubbles: dialogueBubbles } = useDialogueBubble();
+const playerDialogueText = computed(() => dialogueBubbles.get('player')?.text ?? null);
 </script>
 
 <style scoped lang="scss">
@@ -113,6 +128,10 @@ defineProps<{ open: boolean; result: EventOutcome | null }>();
     &__stat-value {
         font-size: 15px;
         font-weight: 700;
+    }
+
+    &__dialogue {
+        color: rgba(255, 255, 255, 0.75);
     }
 }
 </style>

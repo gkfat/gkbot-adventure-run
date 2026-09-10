@@ -644,6 +644,11 @@
                     >
                         +{{ healFx.amount }}
                     </span>
+                    <GameAdventureDialogueBubble
+                        v-if="playerDialogueBubble"
+                        :key="playerDialogueBubble.key"
+                        :text="playerDialogueBubble.text"
+                    />
                 </div>
                 <div class="adventure-page__stage-hp">
                     <div class="d-flex align-center justify-space-between">
@@ -836,6 +841,8 @@ import { pickIntroNarrative, pickTransitionNarrative, REST_NARRATIVE } from '../
 import { backSpriteUrl, idleFrameUrl } from '../utils/spriteDisplay';
 import { FACILITY_SEVERITY_TINT, getFacilityBackgroundUrl } from '../utils/facilityBackground';
 import { useCombat } from '../composables/useCombat';
+import { useDialogueBubble } from '../composables/useDialogueBubble';
+import type { DialogueTrigger } from '../constants/dialogueLines';
 
 definePageMeta({
     middleware: ['auth'],
@@ -923,8 +930,25 @@ const {
     () => lastCombatResult.value,
     () => currentRun.value?.playerHpMax ?? 0,
     () => combatStartHp.value,
+    // 'legacy'：多角色系統上線前建立的角色沒有 archetypeId（見
+    // server/constants/templates/characterArchetypes.ts LEGACY_ARCHETYPE_ID），
+    // 對話資料表沒有對應項目時 resolveDialogueLines 會 fallback 到通用池。
+    () => character.value?.archetypeId ?? 'legacy',
+    () => currentRun.value?.factionType,
 );
 const inCombatStage = computed(() => !!lastCombatResult.value);
+
+const {
+    bubbles: dialogueBubbles, triggerDialogue,
+} = useDialogueBubble();
+const playerDialogueBubble = computed(() => dialogueBubbles.get('player'));
+// 事件結算對話：EventResult 沒有 EnemyFaction 資訊（本來就是玩家自己的反應），
+// 只需要玩家 archetype 就能查表（見 tasks.md 5.2）。
+const triggerPlayerEventDialogue = (trigger: DialogueTrigger) => {
+    triggerDialogue('player', trigger, {
+        kind: 'player', archetypeId: character.value?.archetypeId ?? 'legacy',
+    });
+};
 
 // 本次戰鬥/事件中剛取得的祝福或詛咒，非 null 時以 dialog 呈現內容（見
 // handleResolveEvent/handleSelectBlessing）；關閉 dialog 後歸零，不做持久顯示，
@@ -1434,6 +1458,10 @@ const handleResolveEvent = async (choiceIndex?: number) => {
     // 設成 true 堵住這個時間差，等 dialog 內容真的設定好才清掉（見下方 watch）。
     pendingModifierAck.value = true;
     await resolveEvent(character.value.characterId, choiceIndex);
+    // EventType 的成員名稱（HEAL/BLESSING/CURSE/WHEEL/CHOICE）跟 DialogueTrigger
+    // 對應觸發類型的名稱剛好一致，直接轉型使用（見 design.md 決策 2）。
+    const eventDialogueTrigger = lastEventResult.value?.eventType as DialogueTrigger | undefined;
+    if (eventDialogueTrigger) triggerPlayerEventDialogue(eventDialogueTrigger);
     const hpHealed = lastEventResult.value?.hpHealed ?? 0;
     if (hpHealed > 0) {
         healFx.value = {
@@ -1464,6 +1492,10 @@ const handleSelectBlessing = async (blessingId: string) => {
     if (success) {
         const entry = currentRun.value?.blessings.find(b => b.modifierId === blessingId);
         acquiredModifierDialog.value = entry ? resolveBlessingModifier(entry) ?? null : null;
+        // BLESSING_SELECT 節點取得的祝福不經過 handleResolveEvent（那條路徑只
+        // 處理 EVENT 節點的 HEAL/BLESSING/CURSE/WHEEL/CHOICE），這裡是唯一觸發
+        // 點，同樣要讓玩家 murmur 一句（見使用者回報）。
+        triggerPlayerEventDialogue('BLESSING');
     }
     pendingModifierAck.value = false;
 };

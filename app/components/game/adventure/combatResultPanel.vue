@@ -98,6 +98,11 @@
                             >爆擊</span>
                             <span>{{ enemy.damageText.kind === 'dodge' ? '閃避' : enemy.damageText.value }}</span>
                         </span>
+                        <GameAdventureDialogueBubble
+                            v-if="dialogueBubbles.get(enemy.enemyId)"
+                            :key="dialogueBubbles.get(enemy.enemyId)!.key"
+                            :text="dialogueBubbles.get(enemy.enemyId)!.text"
+                        />
                     </div>
                 </div>
             </div>
@@ -107,6 +112,7 @@
 
 <script setup lang="ts">
 import type { WaveBanner, EnemyCardView } from '../../../composables/useCombat';
+import { useDialogueBubble } from '../../../composables/useDialogueBubble';
 import { getEnemyAvatarTier, getEnemyPortraitUrl } from '../../../utils/enemyAvatar';
 import type { EnemyFaction, NodeType } from '../../../../shared/types/adventure';
 
@@ -116,6 +122,10 @@ const props = defineProps<{
     factionType: EnemyFaction;
     currentNodeType?: NodeType;
 }>();
+
+// 對話氣泡狀態由 useCombat.ts 觸發（見該檔案 fireDialogue），這裡只是純讀取
+// 顯示（比照 enemyCards 已經是純渲染 props 的慣例）。
+const { bubbles: dialogueBubbles } = useDialogueBubble();
 
 const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     getEnemyPortraitUrl(archetypeSlug, props.factionType, getEnemyAvatarTier(isBoss, props.currentNodeType))
@@ -180,7 +190,7 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
         column-gap: 6px;
         margin-inline: auto;
         padding: 16px 0 18px;
-        margin-block: -16px -18px;
+        margin-block: 5px -18px;
         // 出手方向：敵人向下（朝玩家）撲出去再彈回來。
         --fx-dir: 1;
     }

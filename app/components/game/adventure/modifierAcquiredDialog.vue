@@ -30,14 +30,29 @@
             >
                 {{ effectText }}
             </div>
+
+            <!-- 行內對話呈現：這個 dialog 置中顯示時會蓋住玩家 stage 上的對話氣泡
+                 （見使用者實測：獲得祝福時氣泡幾乎被這個 dialog 完全遮蔽），沿用
+                 同一份 useDialogueBubble 狀態，換一個一定看得到的位置（比照
+                 eventResultDialog.vue 的做法，見 tasks.md 5.1）。 -->
+            <div
+                v-if="playerDialogueText"
+                class="text-caption text-center font-pixel modifier-acquired-dialog__dialogue"
+            >
+                「{{ playerDialogueText }}」
+            </div>
         </template>
     </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
 import type { RunModifier } from '../../../../shared/types/adventure';
+import { useDialogueBubble } from '../../../composables/useDialogueBubble';
 
 defineProps<{ modifier: RunModifier | null; effectText?: string }>();
+
+const { bubbles: dialogueBubbles } = useDialogueBubble();
+const playerDialogueText = computed(() => dialogueBubbles.get('player')?.text ?? null);
 </script>
 
 <style scoped lang="scss">
@@ -53,6 +68,10 @@ defineProps<{ modifier: RunModifier | null; effectText?: string }>();
         margin-bottom: 4px;
         image-rendering: pixelated;
         animation: modifier-acquired-dialog-spark-pop 0.5s ease-out;
+    }
+
+    &__dialogue {
+        color: rgba(255, 255, 255, 0.75);
     }
 }
 
