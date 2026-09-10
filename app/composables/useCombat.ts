@@ -10,28 +10,32 @@ import type {
 // 每個 wave 開戰前都先播一段橫越戰場的 banner，一段文字的進出節奏都是
 // 「過 BANNER_TEXT_ENTER_DELAY_MS 後文字進入 → 停留 BANNER_TEXT_HOLD_MS →
 // 文字離開（花 BANNER_TEXT_EXIT_MS）」：
-// - 第一個 wave：banner 只播一段文字「戰鬥開始」+ 波次計數，播完（消失）後
-//   再等 BANNER_POST_DELAY_MS 才開始演繹行動條充能（見 FIRST_WAVE_DELAY_MS）。
+// - 第一個 wave：敵人先播 ENEMY_WAVE_ENTER_MS 的進場滑入（不被 banner 蓋住，
+//   見使用者回報 #10：banner 應該放在敵人進場動畫「之後」再顯示，不能兩者
+//   重疊、把進場動畫蓋住看不到），進場播完 banner 才出現、播一段文字
+//   「戰鬥開始」+ 波次計數，播完（消失）後再等 BANNER_POST_DELAY_MS 才開始
+//   演繹行動條充能（見 FIRST_WAVE_DELAY_MS）。
 // - 換 wave（第二個 wave 以後）：上一個 wave 結束後先等
 //   WAVE_END_DELAY_MS，banner 才出現，依序播三段文字——先「戰鬥結束」，
 //   再「敵方增援來襲」，最後「戰鬥開始」+ 波次計數——播完後同樣再等
-//   BANNER_POST_DELAY_MS 才開始充能（見 WAVE_TRANSITION_DELAY_MS）。
+//   BANNER_POST_DELAY_MS 才開始充能（見 WAVE_TRANSITION_DELAY_MS），敵人進場
+//   動畫本來就已經排在 banner 消失之後才播（見 waveDisplay），不受影響。
 const BANNER_TEXT_ENTER_DELAY_MS = 300;
 const BANNER_TEXT_HOLD_MS = 800;
 const BANNER_TEXT_EXIT_MS = 300;
 const BANNER_POST_DELAY_MS = 1000;
 const WAVE_END_DELAY_MS = 1000;
 const BANNER_TEXT_CYCLE_MS = BANNER_TEXT_ENTER_DELAY_MS + BANNER_TEXT_HOLD_MS + BANNER_TEXT_EXIT_MS;
-const FIRST_WAVE_DELAY_MS = BANNER_TEXT_CYCLE_MS + BANNER_POST_DELAY_MS;
-const WAVE_TRANSITION_DELAY_MS = WAVE_END_DELAY_MS + (BANNER_TEXT_CYCLE_MS * 3) + BANNER_POST_DELAY_MS;
 // 敵人單排最多同時顯示一個 wave（見 combat.service.ts spawnWave，每個 wave
 // 最多 3 隻），換 wave 時的進出場動畫時長：banner 整條完全消失（goneAt）後，
 // 先讓上一個 wave 的敵人往上退場 ENEMY_WAVE_EXIT_MS，退場播完才換上下一個
 // wave、由上往下滑入 ENEMY_WAVE_ENTER_MS（見 waveDisplay，使用者要求兩波
-// 不要同時疊在畫面上）。第一個 wave 沒有「上一波」可以退場，goneAt 後直接
-// 播進場。
+// 不要同時疊在畫面上）。第一個 wave 沒有「上一波」可以退場，直接從 t=0 播
+// 進場，播完才輪到 banner 出現（見上面 FIRST_WAVE_DELAY_MS 的說明）。
 const ENEMY_WAVE_EXIT_MS = 320;
 const ENEMY_WAVE_ENTER_MS = 320;
+const FIRST_WAVE_DELAY_MS = ENEMY_WAVE_ENTER_MS + BANNER_TEXT_CYCLE_MS + BANNER_POST_DELAY_MS;
+const WAVE_TRANSITION_DELAY_MS = WAVE_END_DELAY_MS + (BANNER_TEXT_CYCLE_MS * 3) + BANNER_POST_DELAY_MS;
 // 被打中會讓「這個單位自己的下一次出手」延後最多 STUN_MS，模擬視覺上的頓挫感
 // （伺服器排程本身不會因為受擊延後 nextAttackAt，見 combat.service.ts；這純粹
 // 是演出）。
