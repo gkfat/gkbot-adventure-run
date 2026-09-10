@@ -11,7 +11,10 @@
             class="game-shell mx-auto d-flex flex-column"
             :style="{ width: '100%', maxWidth: '500px', height: '100%' }"
         >
-            <GameLayoutsHeader @open-drawer="drawerOpen = true" />
+            <GameLayoutsHeader
+                v-if="!isAdventurePage"
+                @open-drawer="drawerOpen = true"
+            />
             <GameLayoutsResourceBar v-if="selectedCharacterId && !isAdventurePage" />
 
             <main class="game-stage flex-grow-1">
