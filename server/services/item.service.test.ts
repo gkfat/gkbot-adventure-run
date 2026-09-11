@@ -98,12 +98,12 @@ describe('rollStats', () => {
     });
 
     it('never rolls a negative ATK/DEF — only HP may carry a "拖累" debuff', () => {
-        // salvaged_wrench's pool also has HP, so N/R's 30% debuff chance has
-        // somewhere to land besides ATK — loop enough times to observe it.
+        // riot_shield_scrap's pool has HP, so N/R's 30% debuff chance has
+        // somewhere to land besides DEF — loop enough times to observe it.
         let sawNegativeHp = false;
         for (let i = 0; i < 200; i++) {
-            const stats = rollStats('salvaged_wrench', Rarity.N);
-            expect(stats.ATK).toBeGreaterThan(0);
+            const stats = rollStats('riot_shield_scrap', Rarity.N);
+            expect(stats.DEF).toBeGreaterThan(0);
             if (stats.HP !== undefined && stats.HP < 0) {
                 sawNegativeHp = true;
             } else if (stats.HP !== undefined) {
@@ -111,6 +111,52 @@ describe('rollStats', () => {
             }
         }
         expect(sawNegativeHp).toBe(true);
+    });
+
+    it('never rolls HP on a weapon (attack-type gear never adds HP — known-issue #9)', () => {
+        for (let i = 0; i < 100; i++) {
+            const stats = rollStats('salvaged_wrench', Rarity.N);
+            expect(stats.HP).toBeUndefined();
+        }
+    });
+
+    it('may roll a positive critChanceMod on a weapon, never negative', () => {
+        let sawCrit = false;
+        for (let i = 0; i < 100; i++) {
+            const stats = rollStats('salvaged_wrench', Rarity.L);
+            if (stats.critChanceMod !== undefined) {
+                sawCrit = true;
+                expect(stats.critChanceMod).toBeGreaterThan(0);
+            }
+        }
+        expect(sawCrit).toBe(true);
+    });
+
+    it('always guarantees both actionSpeedMod and dodgeChanceMod on a HEAVY item (known-issue #9)', () => {
+        for (let i = 0; i < 50; i++) {
+            const stats = rollStats('riot_shield_scrap', Rarity.N);
+            expect(stats.actionSpeedMod).toBeGreaterThan(0);
+            expect(stats.dodgeChanceMod).toBeLessThan(0);
+        }
+    });
+
+    it('may shave a LIGHT armor piece\'s DEF (stacked debuff), never below 1, and may roll a negative critChanceMod', () => {
+        let sawDefDebuff = false;
+        let sawCritDebuff = false;
+        for (let i = 0; i < 300; i++) {
+            const stats = rollStats('maintenance_terminal_gloves', Rarity.N);
+            expect(stats.DEF).toBeGreaterThanOrEqual(1);
+            const template = getItemTemplate('maintenance_terminal_gloves');
+            const defRange = template?.baseStatsRange?.[Rarity.N]?.DEF;
+            if (defRange && (stats.DEF as number) < defRange.min) {
+                sawDefDebuff = true;
+            }
+            if (stats.critChanceMod !== undefined && stats.critChanceMod < 0) {
+                sawCritDebuff = true;
+            }
+        }
+        expect(sawDefDebuff).toBe(true);
+        expect(sawCritDebuff).toBe(true);
     });
 
     it('rolls higher stat ranges for higher rarities', () => {
@@ -177,21 +223,14 @@ describe('generateItemInstance', () => {
         expect(instance.weaponWeightClass).toBeUndefined();
     });
 
-    it('rolls a negative dodgeChanceMod for a HEAVY item when picked, within the rarity range', () => {
-        // dodgeChanceMod is part of the pool now, not guaranteed on every roll —
-        // loop until it's picked at least once.
-        let sawDodgeMod = false;
-        for (let i = 0; i < 100; i++) {
+    it('always rolls a negative dodgeChanceMod for a HEAVY item, within the rarity range (guaranteed — known-issue #9)', () => {
+        for (let i = 0; i < 50; i++) {
             const instance = generateItemInstance('riot_shield_scrap', {
                 source: ItemSource.DROP, maxRarity: Rarity.N,
             });
             expect(instance.weaponWeightClass).toBe(WeaponWeightClass.HEAVY);
-            if (instance.stats.dodgeChanceMod !== undefined) {
-                sawDodgeMod = true;
-                expect(instance.stats.dodgeChanceMod).toBeLessThan(0);
-            }
+            expect(instance.stats.dodgeChanceMod).toBeLessThan(0);
         }
-        expect(sawDodgeMod).toBe(true);
     });
 
     it('rolls a positive dodgeChanceMod for a MEDIUM item when picked, never negative', () => {
@@ -285,6 +324,16 @@ describe('sumEquipmentStats', () => {
         }));
         expect(result.actionIntervalSec as number).toBeGreaterThan(0);
         expect(result.dodgeChance as number).toBeLessThan(0);
+    });
+
+    it('sums critChanceMod across items into Stats.critChance', () => {
+        const weaponItem = heavyItem({
+            templateId: 'salvaged_wrench',
+            weaponWeightClass: WeaponWeightClass.MEDIUM,
+            stats: { critChanceMod: 0.02 },
+        });
+        const result = sumEquipmentStats([weaponItem], attributes());
+        expect(result.critChance).toBeCloseTo(0.02);
     });
 
     it('does not mitigate LIGHT/MEDIUM items regardless of STR+CON', () => {

@@ -4,17 +4,19 @@
 
 ## 裝備重量分類（`weaponWeightClass`）
 
-每個 `type: EQUIPMENT` 的 template（全部 6 個槽位皆適用，不限手部）固定屬於 `LIGHT`/`MEDIUM`/`HEAVY` 三者之一，不隨稀有度改變。分類決定「主屬性」（該槽位既有的成長屬性，如 HAND 武器的 ATK、防具類的 DEF/HP）與「副屬性」（`actionSpeedMod`/`dodgeChanceMod`）的走向：
+每個 `type: EQUIPMENT` 的 template（全部 6 個槽位皆適用，不限手部）固定屬於 `LIGHT`/`MEDIUM`/`HEAVY` 三者之一，不隨稀有度改變。`equipSlot === RIGHT_HAND` 為「攻擊型」(武器，主屬性 ATK)，其餘槽位（`LEFT_HAND`/`HEAD`/`BODY`/`SHOES`/`RING`）為「防禦型」(主屬性 DEF)，兩者的詞綴池規則不同（見 known-issue #9）：
 
 | 分類 | 主屬性 | 副屬性走向 |
 |---|---|---|
-| `LIGHT` | 幅度較低 | N/R/SR 僅副屬性（`actionSpeedMod` 加成，負值＝更快）；SSR/L 主屬性＋副屬性雙加成 |
-| `MEDIUM` | 隨稀有度純成長 | 無副屬性 |
-| `HEAVY` | 三者中幅度最大 | 每個稀有度皆有懲罰：`actionSpeedMod` 為正值（變慢）、`dodgeChanceMod` 為負值（閃避降低），且懲罰幅度隨稀有度單調加重 |
+| `LIGHT` | 幅度較低 | 池中可能抽到 `actionSpeedMod`（負值＝更快）/`dodgeChanceMod`（正值＝閃避提升）；防禦型 LIGHT 另外獨立擲一次「DEF debuff」機率（同 N/R 30%），命中則從已擲出的 DEF 疊加扣減（下限 1，不會變成非正值），並可能額外帶負值 `critChanceMod`（爆擊率降低） |
+| `MEDIUM` | 隨稀有度純成長 | 池中可能抽到溫和正向的 `actionSpeedMod`/`dodgeChanceMod`（幅度介於 LIGHT/HEAVY 之間） |
+| `HEAVY` | 三者中幅度最大 | **保證**（非機率池）帶有懲罰：`actionSpeedMod` 為正值（變慢）、`dodgeChanceMod` 為負值（閃避降低），懲罰幅度隨稀有度單調加重 |
 
-**負重能力折扣**：角色 `STR`+`CON`（`COMBAT_CONFIG.HEAVY_PENALTY_MITIGATION_PER_POINT` = 每點 2%，`MAX_HEAVY_PENALTY_MITIGATION` = 60% 上限）會折扣 `HEAVY` 裝備的 `actionSpeedMod`/`dodgeChanceMod` 懲罰幅度：`折扣後懲罰 = 基礎懲罰 × (1 - min(0.6, (STR + CON) × 0.02))`。折扣有上限，不會把懲罰完全抵銷。
+**攻擊型（武器，RIGHT_HAND）專屬規則**：一律不會帶 `HP`（詞綴池已移除），改為池中可能抽到正值 `critChanceMod`（爆擊率加成），三種重量級皆適用。
 
-現有 13 個裝備 template 的分類：
+**負重能力折扣**：角色 `STR`+`CON`（`COMBAT_CONFIG.HEAVY_PENALTY_MITIGATION_PER_POINT` = 每點 2%，`MAX_HEAVY_PENALTY_MITIGATION` = 60% 上限）會折扣 `HEAVY` 裝備的 `actionSpeedMod`/`dodgeChanceMod` 懲罰幅度：`折扣後懲罰 = 基礎懲罰 × (1 - min(0.6, (STR + CON) × 0.02))`。折扣有上限，不會把懲罰完全抵銷。此折扣不適用於 `critChanceMod`。
+
+> 下表列出最初 13 個裝備 template 作為每種重量/槽位組合的數值曲線範例；後續新增的主題裝備（VR、賭場、百貨、工廠、騎士競技場等）沿用相同曲線與規則，未逐一列出。
 
 | templateId | 槽位 | weaponWeightClass |
 |---|---|---|
@@ -56,7 +58,7 @@
 
 ## 頭部 Head（LIGHT／DEF + actionSpeedMod）
 
-`tech_goggles`（weaponWeightClass = LIGHT，actionSpeedMod 負值＝行動更快）：
+`tech_goggles`（weaponWeightClass = LIGHT，actionSpeedMod 負值＝行動更快）。防禦型 LIGHT 裝備另有機率（同 N/R 30%）疊加扣減已擲出的 DEF（下限 1）、以及機率帶負值 `critChanceMod`（-0.02 ~ -0.01，見 known-issue #9），下表未列出這兩者：
 
 | 稀有度 | DEF | actionSpeedMod | 售價 |
 |---|---|---|---|
@@ -114,45 +116,45 @@
 | SSR | 20–30 | 寶石 30–50 |
 | L | 30–42 | 寶石 80–120 |
 
-## 右手 Right Hand（MEDIUM／ATK）
+## 右手 Right Hand（MEDIUM／ATK，不帶 HP，可能加 critChanceMod）
 
 `salvaged_wrench`（weaponWeightClass = MEDIUM）：
 
-| 稀有度 | ATK | 售價 |
-|---|---|---|
-| N | 5–10 | 金幣 100–200 |
-| R | 10–20 | 金幣 300–500 |
-| SR | 20–35 | 金幣 800–1200 + 寶石 10–20 |
-| SSR | 35–55 | 寶石 30–50 |
-| L | 55–80 | 寶石 80–120 |
+| 稀有度 | ATK | critChanceMod（可能） | 售價 |
+|---|---|---|---|
+| N | 5–10 | 0.01 ~ 0.02 | 金幣 100–200 |
+| R | 10–20 | 0.018 ~ 0.036 | 金幣 300–500 |
+| SR | 20–35 | 0.03 ~ 0.06 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 35–55 | 0.046 ~ 0.092 | 寶石 30–50 |
+| L | 55–80 | 0.065 ~ 0.13 | 寶石 80–120 |
 
-## 右手 Right Hand（LIGHT／ATK + actionSpeedMod，冒險家 starter 武器）
+## 右手 Right Hand（LIGHT／ATK + actionSpeedMod，不帶 HP，可能加 critChanceMod，冒險家 starter 武器）
 
 `scrap_daggers`（weaponWeightClass = LIGHT，actionSpeedMod 負值＝行動更快）：
 
-| 稀有度 | ATK | actionSpeedMod | 售價 |
-|---|---|---|---|
-| N | 3–6 | -0.05 ~ -0.02 | 金幣 100–200 |
-| R | 6–12 | -0.1 ~ -0.05 | 金幣 300–500 |
-| SR | 12–20 | -0.18 ~ -0.1 | 金幣 800–1200 + 寶石 10–20 |
-| SSR | 20–30 | -0.28 ~ -0.18 | 寶石 30–50 |
-| L | 30–42 | -0.4 ~ -0.28 | 寶石 80–120 |
-
-## 右手 Right Hand（HEAVY／ATK + 懲罰）
-
-`raider_commander_gauntlet`（weaponWeightClass = HEAVY）：
-
-| 稀有度 | ATK | actionSpeedMod | dodgeChanceMod | 售價 |
+| 稀有度 | ATK | actionSpeedMod | critChanceMod（可能） | 售價 |
 |---|---|---|---|---|
-| N | 7–14 | 0.05 ~ 0.1 | -0.03 ~ -0.015 | 金幣 100–200 |
-| R | 14–26 | 0.1 ~ 0.18 | -0.05 ~ -0.03 | 金幣 300–500 |
-| SR | 26–45 | 0.18 ~ 0.28 | -0.08 ~ -0.05 | 金幣 800–1200 + 寶石 10–20 |
-| SSR | 45–70 | 0.28 ~ 0.4 | -0.12 ~ -0.08 | 寶石 30–50 |
-| L | 70–100 | 0.4 ~ 0.55 | -0.16 ~ -0.12 | 寶石 80–120 |
+| N | 3–6 | -0.03 ~ -0.015 | 0.01 ~ 0.02 | 金幣 100–200 |
+| R | 6–12 | -0.054 ~ -0.027 | 0.018 ~ 0.036 | 金幣 300–500 |
+| SR | 12–20 | -0.09 ~ -0.045 | 0.03 ~ 0.06 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 20–30 | -0.138 ~ -0.069 | 0.046 ~ 0.092 | 寶石 30–50 |
+| L | 30–42 | -0.195 ~ -0.0975 | 0.065 ~ 0.13 | 寶石 80–120 |
+
+## 右手 Right Hand（HEAVY／ATK + 保證懲罰，不帶 HP，可能加 critChanceMod）
+
+`raider_commander_gauntlet`（weaponWeightClass = HEAVY，actionSpeedMod/dodgeChanceMod 每次生成皆保證出現，見 known-issue #9）：
+
+| 稀有度 | ATK | actionSpeedMod（保證） | dodgeChanceMod（保證） | critChanceMod（可能） | 售價 |
+|---|---|---|---|---|---|
+| N | 7–14 | 0.03 ~ 0.06 | -0.03 ~ -0.015 | 0.01 ~ 0.02 | 金幣 100–200 |
+| R | 14–26 | 0.054 ~ 0.108 | -0.054 ~ -0.027 | 0.018 ~ 0.036 | 金幣 300–500 |
+| SR | 26–45 | 0.09 ~ 0.18 | -0.09 ~ -0.045 | 0.03 ~ 0.06 | 金幣 800–1200 + 寶石 10–20 |
+| SSR | 45–70 | 0.138 ~ 0.276 | -0.138 ~ -0.069 | 0.046 ~ 0.092 | 寶石 30–50 |
+| L | 70–100 | 0.195 ~ 0.39 | -0.195 ~ -0.0975 | 0.065 ~ 0.13 | 寶石 80–120 |
 
 ## 戒指 Ring（LIGHT／actionSpeedMod + DEF）
 
-`research_chip_ring`（weaponWeightClass = LIGHT，actionSpeedMod 負值＝行動更快）：
+`research_chip_ring`（weaponWeightClass = LIGHT，actionSpeedMod 負值＝行動更快）。同上，防禦型 LIGHT 裝備另有機率疊加扣減 DEF（下限 1）與機率帶負值 `critChanceMod`（見 known-issue #9），下表未列出：
 
 | 稀有度 | DEF | actionSpeedMod | 售價 |
 |---|---|---|---|
@@ -176,7 +178,7 @@
 
 ## 鞋子 Feet（LIGHT／actionSpeedMod + DEF）
 
-`servo_greaves`（weaponWeightClass = LIGHT）：
+`servo_greaves`（weaponWeightClass = LIGHT）。同上，防禦型 LIGHT 裝備另有機率疊加扣減 DEF（下限 1）與機率帶負值 `critChanceMod`（見 known-issue #9），下表未列出：
 
 | 稀有度 | DEF | actionSpeedMod | 售價 |
 |---|---|---|---|

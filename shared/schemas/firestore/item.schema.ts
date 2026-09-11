@@ -16,6 +16,7 @@ export const itemStatsSchema = z.object({
     HP: z.number().optional(),
     actionSpeedMod: z.number().optional(),
     dodgeChanceMod: z.number().optional(),
+    critChanceMod: z.number().optional(),
     healPercent: z.number().optional(),
 }).strict();
 

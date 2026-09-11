@@ -139,7 +139,13 @@ export function applyEquipmentStats(
                 baseStats.actionIntervalSec + (equipmentStats.actionIntervalSec || 0),
             ),
         ),
-        critChance: baseStats.critChance,
+        critChance: Math.max(
+            0,
+            Math.min(
+                COMBAT_CONFIG.CRIT_CAP,
+                baseStats.critChance + (equipmentStats.critChance || 0),
+            ),
+        ),
         critMultiplier: baseStats.critMultiplier,
         dodgeChance: Math.max(
             0,

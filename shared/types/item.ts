@@ -41,6 +41,7 @@ export type ItemStats = {
   HP?: number;
   actionSpeedMod?: number;  // Modifier to action speed (negative = faster)
   dodgeChanceMod?: number;  // Modifier to dodge chance (negative = HEAVY penalty)
+  critChanceMod?: number;   // Modifier to crit chance (weapons: positive bonus; LIGHT armor: possible negative)
   healPercent?: number;     // POTION only: % of max HP restored
 };
 

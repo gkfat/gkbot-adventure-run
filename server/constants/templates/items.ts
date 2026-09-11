@@ -128,11 +128,38 @@ const MEDIUM_MODS: StatBaseline[] = [
 const HEAVY_MODS: StatBaseline[] = [
     {
         key: 'actionSpeedMod', base: {
-            min: 0.03, max: 0.06, 
+            min: 0.03, max: 0.06,
         }, fractional: true,
     }, {
         key: 'dodgeChanceMod', base: {
-            min: -0.03, max: -0.015, 
+            min: -0.03, max: -0.015,
+        }, fractional: true,
+    },
+];
+
+/**
+ * Weapon-only crit bonus (known-issue #9: offensive gear may add crit
+ * instead of HP — weapons never roll HP). Magnitude mirrors LIGHT_MODS'
+ * dodgeChanceMod range so it reads consistently with the rest of the
+ * weight-class mod pools.
+ */
+const WEAPON_CRIT_BONUS: StatBaseline[] = [
+    {
+        key: 'critChanceMod', base: {
+            min: 0.01, max: 0.02,
+        }, fractional: true,
+    },
+];
+
+/**
+ * LIGHT-armor-only crit debuff (known-issue #9: light defensive gear may
+ * trade some crit chance for its speed/dodge upside). Never applies to
+ * weapons — LIGHT weapons get WEAPON_CRIT_BONUS instead.
+ */
+const LIGHT_ARMOR_CRIT_DEBUFF: StatBaseline[] = [
+    {
+        key: 'critChanceMod', base: {
+            min: -0.02, max: -0.01,
         }, fractional: true,
     },
 ];
@@ -242,15 +269,11 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         baseStatsRange: buildStatsRange([
             {
                 key: 'ATK', base: {
-                    min: 5, max: 10, 
-                }, 
-            },
-            {
-                key: 'HP', base: {
-                    min: 15, max: 30, 
-                }, 
+                    min: 5, max: 10,
+                },
             },
             ...MEDIUM_MODS,
+            ...WEAPON_CRIT_BONUS,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -326,6 +349,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                 }, 
             },
             ...LIGHT_MODS,
+            ...LIGHT_ARMOR_CRIT_DEBUFF,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -376,6 +400,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                 }, 
             },
             ...LIGHT_MODS,
+            ...LIGHT_ARMOR_CRIT_DEBUFF,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -476,6 +501,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                 }, 
             },
             ...LIGHT_MODS,
+            ...LIGHT_ARMOR_CRIT_DEBUFF,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -501,6 +527,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                 }, 
             },
             ...LIGHT_MODS,
+            ...LIGHT_ARMOR_CRIT_DEBUFF,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -576,6 +603,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                 }, 
             },
             ...LIGHT_MODS,
+            ...LIGHT_ARMOR_CRIT_DEBUFF,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -642,15 +670,11 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         baseStatsRange: buildStatsRange([
             {
                 key: 'ATK', base: {
-                    min: 3, max: 6, 
-                }, 
-            },
-            {
-                key: 'HP', base: {
-                    min: 9, max: 18, 
-                }, 
+                    min: 3, max: 6,
+                },
             },
             ...LIGHT_MODS,
+            ...WEAPON_CRIT_BONUS,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -667,15 +691,11 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         baseStatsRange: buildStatsRange([
             {
                 key: 'ATK', base: {
-                    min: 7, max: 14, 
-                }, 
-            },
-            {
-                key: 'HP', base: {
-                    min: 21, max: 42, 
-                }, 
+                    min: 7, max: 14,
+                },
             },
             ...HEAVY_MODS,
+            ...WEAPON_CRIT_BONUS,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -695,12 +715,8 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 3, max: 6,
                 },
             },
-            {
-                key: 'HP', base: {
-                    min: 9, max: 18,
-                },
-            },
             ...LIGHT_MODS,
+            ...WEAPON_CRIT_BONUS,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -776,6 +792,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                 },
             },
             ...LIGHT_MODS,
+            ...LIGHT_ARMOR_CRIT_DEBUFF,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -826,6 +843,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                 },
             },
             ...LIGHT_MODS,
+            ...LIGHT_ARMOR_CRIT_DEBUFF,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -845,12 +863,8 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 3, max: 6,
                 },
             },
-            {
-                key: 'HP', base: {
-                    min: 9, max: 18,
-                },
-            },
             ...LIGHT_MODS,
+            ...WEAPON_CRIT_BONUS,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -895,12 +909,8 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 7, max: 14,
                 },
             },
-            {
-                key: 'HP', base: {
-                    min: 21, max: 42,
-                },
-            },
             ...HEAVY_MODS,
+            ...WEAPON_CRIT_BONUS,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -920,12 +930,8 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 5, max: 10,
                 },
             },
-            {
-                key: 'HP', base: {
-                    min: 15, max: 30,
-                },
-            },
             ...MEDIUM_MODS,
+            ...WEAPON_CRIT_BONUS,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -976,6 +982,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                 },
             },
             ...LIGHT_MODS,
+            ...LIGHT_ARMOR_CRIT_DEBUFF,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -1026,6 +1033,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                 },
             },
             ...LIGHT_MODS,
+            ...LIGHT_ARMOR_CRIT_DEBUFF,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -1095,12 +1103,8 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 7, max: 14,
                 },
             },
-            {
-                key: 'HP', base: {
-                    min: 21, max: 42,
-                },
-            },
             ...HEAVY_MODS,
+            ...WEAPON_CRIT_BONUS,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },
@@ -1120,12 +1124,8 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
                     min: 5, max: 10,
                 },
             },
-            {
-                key: 'HP', base: {
-                    min: 15, max: 30,
-                },
-            },
             ...MEDIUM_MODS,
+            ...WEAPON_CRIT_BONUS,
         ]),
         priceRangeByRarity: EQUIPMENT_PRICE_RANGE,
     },

@@ -3,7 +3,7 @@ import type {
     Attributes, Stats, 
 } from '../../shared/types/common';
 import {
-    Rarity, WeaponWeightClass,
+    Rarity, WeaponWeightClass, EquipmentSlot,
 } from '../../shared/types/common';
 import { COMBAT_CONFIG } from '../../shared/types/adventure';
 import { ItemType } from '../../shared/types/item';
@@ -107,15 +107,35 @@ const PRIMARY_STAT_KEYS = new Set<keyof ItemStats>(['ATK', 'DEF']);
 const DEBUFFABLE_STAT_KEYS = new Set<keyof ItemStats>(['HP']);
 
 /**
+ * A HEAVY item's actionSpeedMod/dodgeChanceMod pair is its defining tradeoff
+ * (slower + less evasive, in exchange for higher ATK/DEF/HP) — per known-issue
+ * #9, HEAVY gear must ALWAYS carry this penalty, so for HEAVY templates these
+ * two keys are treated as guaranteed picks too, same as ATK/DEF.
+ */
+const HEAVY_GUARANTEED_KEYS = new Set<keyof ItemStats>(['actionSpeedMod', 'dodgeChanceMod']);
+
+/**
+ * A LIGHT armor piece (DEF-based, i.e. not RIGHT_HAND) may additionally have
+ * its guaranteed-positive DEF shaved down by a debuff — per known-issue #9,
+ * light armor trades some defense for its speed/dodge upside. This never
+ * applies to weapons (RIGHT_HAND), which have no DEF stat to shave.
+ */
+function isLightArmorTemplate(template: ItemTemplate): boolean {
+    return template.weaponWeightClass === WeaponWeightClass.LIGHT && template.equipSlot !== EquipmentSlot.RIGHT_HAND;
+}
+
+/**
  * Roll stats for a given template + rarity. Uses `baseStatsRange` for EQUIPMENT
  * and `healPercentRange` for POTION — the two never overlap on a single template.
  *
  * For EQUIPMENT, `baseStatsRange[rarity]` is a *pool* of possible stat keys —
  * the pool's ATK/DEF entry (whichever the template has) is always rolled as a
- * guaranteed positive bonus, a further random subset (sized by
+ * guaranteed positive bonus (HEAVY templates also guarantee their
+ * actionSpeedMod/dodgeChanceMod penalty), a further random subset (sized by
  * `RARITY_STAT_PICK_COUNT`) is rolled from the rest of the pool, and low
  * rarities may additionally roll one negative "拖累" to HP
- * (`RARITY_DEBUFF_CHANCE`) — never to ATK/DEF.
+ * (`RARITY_DEBUFF_CHANCE`) — never to ATK/DEF. LIGHT armor separately risks a
+ * debuff stacked onto its own already-rolled DEF (see `isLightArmorTemplate`).
  */
 export function rollStats(templateId: string, rarity: Rarity): ItemStats {
     const template = getTemplateOrThrow(templateId);
@@ -128,8 +148,11 @@ export function rollStats(templateId: string, rarity: Rarity): ItemStats {
     const statRanges = template.baseStatsRange?.[rarity] ?? {};
     const pool = Object.entries(statRanges) as [keyof ItemStats, StatRange][];
 
-    const guaranteedEntries = pool.filter(([key]) => PRIMARY_STAT_KEYS.has(key));
-    const restPool = pool.filter(([key]) => !PRIMARY_STAT_KEYS.has(key));
+    const isHeavy = template.weaponWeightClass === WeaponWeightClass.HEAVY;
+    const isGuaranteedKey = (key: keyof ItemStats) => PRIMARY_STAT_KEYS.has(key) || (isHeavy && HEAVY_GUARANTEED_KEYS.has(key));
+
+    const guaranteedEntries = pool.filter(([key]) => isGuaranteedKey(key));
+    const restPool = pool.filter(([key]) => !isGuaranteedKey(key));
 
     const pickCountRange = RARITY_STAT_PICK_COUNT[rarity];
     const totalPickCount = pickCountRange ? Math.min(rollInRange(pickCountRange), pool.length) : pool.length;
@@ -157,6 +180,18 @@ export function rollStats(templateId: string, rarity: Rarity): ItemStats {
         }
     }
 
+    // LIGHT armor: independently roll a chance to shave the DEF it already
+    // rolled above — stacked (subtracted), never dropping DEF below 1, so
+    // gear still never reads as worse than bare-handed.
+    if (isLightArmorTemplate(template) && stats.DEF !== undefined) {
+        const lightDefDebuffChance = RARITY_DEBUFF_CHANCE[rarity] ?? 0;
+        const defRange = statRanges.DEF;
+        if (defRange && lightDefDebuffChance > 0 && Math.random() < lightDefDebuffChance) {
+            const magnitude = Math.max(1, Math.round(defRange.min * DEBUFF_MAGNITUDE_RATIO));
+            stats.DEF = Math.max(1, stats.DEF - magnitude);
+        }
+    }
+
     return stats;
 }
 
@@ -165,7 +200,11 @@ export function rollStats(templateId: string, rarity: Rarity): ItemStats {
  * are small fractional modifiers (e.g. -0.05..-0.02) — rounding those with
  * `rollInRange` would collapse every roll to 0.
  */
-const FRACTIONAL_STAT_KEYS = new Set<keyof ItemStats>(['actionSpeedMod', 'dodgeChanceMod']);
+const FRACTIONAL_STAT_KEYS = new Set<keyof ItemStats>([
+    'actionSpeedMod',
+    'dodgeChanceMod',
+    'critChanceMod',
+]);
 
 function shuffle<T>(items: T[]): T[] {
     const result = [...items];
@@ -221,8 +260,9 @@ function getHeavyPenaltyMitigation(attributes: Attributes): number {
 /**
  * Sum the rolled stats of a set of equipped items into the shape
  * `applyEquipmentStats` expects: ItemStats.HP maps to Stats.HP_MAX,
- * ItemStats.actionSpeedMod maps to a delta on Stats.actionIntervalSec, and
- * ItemStats.dodgeChanceMod maps to a delta on Stats.dodgeChance. HEAVY items'
+ * ItemStats.actionSpeedMod maps to a delta on Stats.actionIntervalSec,
+ * ItemStats.dodgeChanceMod maps to a delta on Stats.dodgeChance, and
+ * ItemStats.critChanceMod maps to a delta on Stats.critChance. HEAVY items'
  * actionSpeedMod/dodgeChanceMod are shrunk by the character's carry-capacity
  * discount (STR+CON) before being summed in.
  */
@@ -240,6 +280,7 @@ export function sumEquipmentStats(items: ItemInstance[], attributes: Attributes)
             HP_MAX: (acc.HP_MAX ?? 0) + (item.stats.HP ?? 0),
             actionIntervalSec: (acc.actionIntervalSec ?? 0) + actionSpeedMod,
             dodgeChance: (acc.dodgeChance ?? 0) + dodgeChanceMod,
+            critChance: (acc.critChance ?? 0) + (item.stats.critChanceMod ?? 0),
         };
     }, {});
 }

@@ -63,4 +63,22 @@ describe('applyEquipmentStats — carryCapacity and dodgeChance', () => {
         expect(fast.actionIntervalSec).toBe(STATS_CONFIG.ACTION_INTERVAL_MIN);
         expect(slow.actionIntervalSec).toBe(STATS_CONFIG.ACTION_INTERVAL_MAX);
     });
+
+    it('sums equipment critChance into the base critChance (known-issue #9: weapon crit affixes)', () => {
+        const base = calculateBaseStats(attributes());
+        const result = applyEquipmentStats(base, { critChance: 0.02 });
+        expect(result.critChance).toBeCloseTo(base.critChance + 0.02);
+    });
+
+    it('clamps critChance at the CRIT_CAP', () => {
+        const base = calculateBaseStats(attributes({ AGI: 100 }));
+        const result = applyEquipmentStats(base, { critChance: 0.5 });
+        expect(result.critChance).toBeLessThanOrEqual(COMBAT_CONFIG.CRIT_CAP);
+    });
+
+    it('clamps critChance at 0 when equipment penalty exceeds the base (LIGHT armor crit debuff)', () => {
+        const base = calculateBaseStats(attributes());
+        const result = applyEquipmentStats(base, { critChance: -1 });
+        expect(result.critChance).toBe(0);
+    });
 });
