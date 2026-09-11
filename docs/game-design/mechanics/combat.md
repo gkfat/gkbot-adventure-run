@@ -7,8 +7,9 @@
 - 玩家在 COMBAT 節點的冒險畫面點擊「開始戰鬥」，前端呼叫 `POST /api/adventure/combat/start`；伺服器以**決定性 RNG 單次模擬整場戰鬥**（含多 wave/多敵）至某一方全滅為止，回傳完整 `combatLog` 與 `combatSummary`，**戰鬥進行中不接受任何玩家操作**。
 - 不是固定順序的「回合制」，而是依**行動速度（`actionIntervalSec`，秒）**的離散事件排程：每個單位（玩家、每隻敵人）都有自己的 `nextAttackAt`（下次行動的相對時間，毫秒），每次由 `player` + 存活敵人中 `nextAttackAt` 最小者行動，攻擊後該單位的 `nextAttackAt += actionIntervalSec * 1000`，藤循環直到某一方全滅或 `MAX_ROUNDS = 500`（安全上限，非設計數值）。
 - 玩家永遠攻擊「敵方存活清單中的第一隻」，敵人永遠攻擊玩家（無敵人間互打、無玩家選擇攻擊目標的機制）。
-- 傷害公式：`damage = max(1, ATK - DEF) * (crit ? critMultiplier : 1)`。
+- 傷害公式：`damage = ATK <= 0 ? 0 : max(1, round(ATK^2 / (ATK + DEF))) * (crit ? critMultiplier : 1)`——DEF 越高傷害遞減幅度越大，但只要 ATK > 0 就永遠不會降到 0（避免高 DEF 敵人讓玩家「打不動」而卡關，2026-09 balance 調整取代舊版 `max(1, ATK-DEF)` 搭配 `DEF >= 2*ATK` 完全免傷門檻）。
 - 命中判定：先判定防禦方是否閃避（DODGE，傷害為 0），再判定攻擊方是否暴擊（CRIT）。
+- 敵人攻速下限：組裝敵人單位時，`actionIntervalSec = max(archetype 基礎值, 當場玩家 actionIntervalSec × ENEMY_ACTION_INTERVAL_MIN_MULTIPLIER(1.15))`（`server/constants/combat.ts`），確保敵人一定比當場玩家慢至少 15%，不論玩家 AGI/裝備配置為何；玩家攻速夠快時（乘 1.15 後仍低於 archetype 基礎值）則不受影響，沿用 archetype 原本數值。
 - crit/dodge 機率（`COMBAT_CONFIG`，玩家用）：
 
 | 項目 | 基礎值 | 每點 AGI | 上限 |

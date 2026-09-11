@@ -13,19 +13,22 @@ import {
 } from '../../shared/types/adventure';
 
 describe('computeDamage', () => {
-    it('floors damage at 1 when ATK <= DEF but DEF stays below 2x ATK', () => {
-        expect(computeDamage(5, 9, false, 1.5)).toBe(1);
-        expect(computeDamage(5, 5, false, 1.5)).toBe(1);
+    it('decays with DEF but never zeroes out as long as ATK > 0', () => {
+        expect(computeDamage(5, 9, false, 1.5)).toBe(2); // round(25/14)
+        expect(computeDamage(5, 5, false, 1.5)).toBe(3); // round(25/10)
+        expect(computeDamage(5, 10, false, 1.5)).toBe(2); // round(25/15)
+        expect(computeDamage(5, 20, false, 1.5)).toBe(1); // round(25/25)
+        expect(computeDamage(5, 1000, false, 1.5)).toBe(1); // floored at 1
     });
 
-    it('zeroes damage when DEF is at least 2x ATK', () => {
-        expect(computeDamage(5, 10, false, 1.5)).toBe(0);
-        expect(computeDamage(5, 20, false, 1.5)).toBe(0);
+    it('deals no damage when ATK is 0, regardless of DEF', () => {
+        expect(computeDamage(0, 0, false, 1.5)).toBe(0);
+        expect(computeDamage(0, 10, false, 1.5)).toBe(0);
     });
 
     it('applies critMultiplier on top of the base damage', () => {
-        expect(computeDamage(20, 5, false, 1.5)).toBe(15);
-        expect(computeDamage(20, 5, true, 1.5)).toBe(22.5);
+        expect(computeDamage(20, 5, false, 1.5)).toBe(16); // round(400/25)
+        expect(computeDamage(20, 5, true, 1.5)).toBe(24); // 16 * 1.5
     });
 });
 
@@ -713,9 +716,9 @@ describe('CombatService.resolve', () => {
             // index1=3000ms — see server/constants/templates/enemies.ts), so
             // the player still strikes first; but the second enemy's own
             // first action (3000ms) lands before the player's second action
-            // (4000ms), so it gets to hit back — any enemy attack deals >=1
-            // damage (computeDamage floors at 1), which instantly kills the
-            // 1-HP player before the player can act again.
+            // (4000ms), so it gets to hit back — any enemy attack with ATK >
+            // 0 deals >=1 damage (computeDamage floors at 1), which instantly
+            // kills the 1-HP player before the player can act again.
             getCharacterWithStatsMock.mockResolvedValue({
                 nickname: 'Tester',
                 attributes: { LUCK: 0 },
@@ -744,11 +747,10 @@ describe('CombatService.resolve', () => {
         });
 
         it('calls recordDefeatedArchetypes with an empty list when nothing is killed', async () => {
-            // ATK 0 means the player's own hits always land as 0 damage under
-            // the DEF>=2*ATK rule (computeDamage), so nothing dies on the
-            // player's side of the fight; DEF 0 keeps the player from also
-            // being damage-immune to the enemy (known-issue.md #8), so the
-            // enemy's own hit still kills the 1-HP player and ends combat.
+            // ATK 0 means the player's own hits always land as 0 damage
+            // (computeDamage: ATK <= 0 deals no damage), so nothing dies on
+            // the player's side of the fight; the enemy's own hit still kills
+            // the 1-HP player and ends combat.
             getCharacterWithStatsMock.mockResolvedValue({
                 nickname: 'Tester',
                 attributes: { LUCK: 0 },

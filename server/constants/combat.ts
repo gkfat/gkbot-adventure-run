@@ -21,6 +21,13 @@ export const BOSS_REINFORCE_CONFIG = {
     MAX_REINFORCEMENTS: 2,
 } as const;
 
+// Enemies must always act slower than the player currently fighting them,
+// regardless of the player's own AGI/equipment build — an enemy's
+// actionIntervalSec is clamped up to at least this multiple of the player's
+// actionIntervalSec (combat.service.ts buildEnemyUnit). ASSUMPTION: margin
+// value invented for this change, freely tunable.
+export const ENEMY_ACTION_INTERVAL_MIN_MULTIPLIER = 1.15;
+
 // Enemies use the same base crit/dodge as players but skip the per-AGI bonus
 // (enemies have no AGI attribute).
 export const ENEMY_COMBAT_STATS = {

@@ -23,7 +23,7 @@ import {
     type EnemyArchetype,
 } from '../constants/templates/enemies';
 import {
-    ENEMY_COMBAT_STATS, BOSS_REINFORCE_CONFIG,
+    ENEMY_COMBAT_STATS, BOSS_REINFORCE_CONFIG, ENEMY_ACTION_INTERVAL_MIN_MULTIPLIER,
     expForKill, goldForKill, applyLuckToGold, itemDropChance,
     blessingPointsForVictory, maxDropRarity, gemsDropTier, DROP_ITEM_CONTEXT,
 } from '../constants/combat';
@@ -128,18 +128,18 @@ export function resolveActiveModifiers(run: Pick<AdventureRun, 'blessings' | 'cu
     return [...blessingModifiers, ...curseModifiers];
 }
 
-// 防禦壓倒性超過攻擊力時視為完全防禦成功（known-issue.md #8），門檻取
-// DEF >= 2 * ATK；否則沿用 max(1, ATK-DEF) 的傷害下限。
-const DAMAGE_ZERO_DEF_ATK_RATIO = 2;
-
 /**
- * `damage = DEF >= 2*ATK ? 0 : max(1, ATK-DEF) * (crit ? critMultiplier : 1)`
- * — combat-engine spec.md "傷害與命中判定公式". Pure function, exported for
- * direct testing.
+ * `damage = round(ATK^2 / (ATK+DEF)) * (crit ? critMultiplier : 1)`, floored
+ * at 1 whenever ATK > 0 — a decaying-return formula (known-issue.md #8): DEF
+ * always reduces damage but never fully blocks it, so high-DEF enemies slow
+ * a fight down instead of stalling it outright. ATK <= 0 deals no damage (no
+ * artificial floor for an attacker with no attack power). Pure function,
+ * exported for direct testing.
  */
 export function computeDamage(atk: number, def: number, isCrit: boolean, critMultiplier: number): number {
-    if (def >= atk * DAMAGE_ZERO_DEF_ATK_RATIO) return 0;
-    return Math.max(1, atk - def) * (isCrit ? critMultiplier : 1);
+    if (atk <= 0) return 0;
+    const base = Math.max(1, Math.round((atk * atk) / (atk + def)));
+    return isCrit ? base * critMultiplier : base;
 }
 
 // Safety cap on simulation loop iterations — HP is bounded and almost every
@@ -248,7 +248,7 @@ export class CombatService extends BaseService implements CombatResolver {
             player.nextAttackAt = player.actionIntervalSec * 1000;
 
             const enemies = this.spawnWave(
-                cursor, context, mobArchetypes, bossArchetypes, severityTier,
+                cursor, context, mobArchetypes, bossArchetypes, severityTier, player.actionIntervalSec,
                 wave === 0 ? context.firstWaveArchetypeIndices : undefined,
             );
             encountered.push(...enemies);
@@ -308,7 +308,9 @@ export class CombatService extends BaseService implements CombatResolver {
                             const minionArchetypeIndex = Math.floor(minionArchetypeRoll * mobArchetypes.length);
                             const minionArchetype = mobArchetypes[minionArchetypeIndex] as EnemyArchetype;
                             const minionMultipliers = getStatMultipliers(context.enemyLevel, 'BOSS_MINION', severityTier);
-                            const minion = this.buildEnemyUnit(minionArchetype, minionArchetypeIndex, minionMultipliers, context.enemyLevel, false);
+                            const minion = this.buildEnemyUnit(
+                                minionArchetype, minionArchetypeIndex, minionMultipliers, context.enemyLevel, false, player.actionIntervalSec,
+                            );
                             minion.nextAttackAt = eventTimestamp;
                             alive.push(minion);
                             encountered.push(minion);
@@ -369,6 +371,7 @@ export class CombatService extends BaseService implements CombatResolver {
         mobArchetypes: EnemyArchetype[],
         bossArchetypes: EnemyArchetype[],
         severityTier: FacilitySeverity,
+        playerActionIntervalSec: number,
         archetypeIndices?: number[],
     ): CombatUnit[] {
         const enemyLevel = context.enemyLevel;
@@ -390,7 +393,7 @@ export class CombatService extends BaseService implements CombatResolver {
             const archetype = archetypes[archetypeIndex] as EnemyArchetype;
             const multipliers = isBossTier ? (isBossUnit ? bossMultipliers! : minionMultipliers!) : uniformMultipliers!;
 
-            enemies.push(this.buildEnemyUnit(archetype, archetypeIndex, multipliers, enemyLevel, isBossUnit));
+            enemies.push(this.buildEnemyUnit(archetype, archetypeIndex, multipliers, enemyLevel, isBossUnit, playerActionIntervalSec));
         }
         return enemies;
     }
@@ -406,7 +409,17 @@ export class CombatService extends BaseService implements CombatResolver {
         multipliers: { hp: number; atk: number; def: number },
         enemyLevel: number,
         isBoss: boolean,
+        playerActionIntervalSec: number,
     ): CombatUnit {
+        // Enemies must always act slower than the player currently fighting
+        // them, independent of the player's own AGI/equipment build —
+        // clamp up to at least ENEMY_ACTION_INTERVAL_MIN_MULTIPLIER x the
+        // player's actionIntervalSec (known-issue.md — a fast archetype like
+        // 失控搬運機 at 2.2s could otherwise outpace an AGI-less player at 3.0s).
+        const actionIntervalSec = Math.max(
+            archetype.actionIntervalSec,
+            playerActionIntervalSec * ENEMY_ACTION_INTERVAL_MIN_MULTIPLIER,
+        );
         return {
             id: crypto.randomUUID(),
             name: archetype.name,
@@ -414,14 +427,14 @@ export class CombatService extends BaseService implements CombatResolver {
             def: Math.round(archetype.baseDef * multipliers.def),
             hpMax: Math.round(archetype.baseHp * multipliers.hp),
             hp: Math.round(archetype.baseHp * multipliers.hp),
-            actionIntervalSec: archetype.actionIntervalSec,
+            actionIntervalSec,
             // LUK overrides (enemy-factions-and-severity design.md 決策 3):
             // an archetype's own critChanceOverride/dodgeChanceOverride wins
             // when set, otherwise fall back to the global default.
             critChance: archetype.critChanceOverride ?? ENEMY_COMBAT_STATS.critChance,
             critMultiplier: ENEMY_COMBAT_STATS.critMultiplier,
             dodgeChance: archetype.dodgeChanceOverride ?? ENEMY_COMBAT_STATS.dodgeChance,
-            nextAttackAt: archetype.actionIntervalSec * 1000,
+            nextAttackAt: actionIntervalSec * 1000,
             level: enemyLevel,
             archetypeIndex,
             archetypeSlug: archetype.slug,
