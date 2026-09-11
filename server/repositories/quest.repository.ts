@@ -97,4 +97,26 @@ export class QuestRepository extends BaseRepository<DailyQuest> {
             throw new DatabaseError(`Failed to create persistent quests: ${message}`);
         }
     }
+
+    /**
+     * Permanently delete every daily and persistent quest document belonging
+     * to a character — used when the character itself is deleted.
+     */
+    async deleteAllByCharacterId(characterId: string): Promise<void> {
+        try {
+            const [dailySnapshot, persistentSnapshot] = await Promise.all([this.collection.where('characterId', '==', characterId).get(), this.persistentCollection.where('characterId', '==', characterId).get()]);
+
+            if (dailySnapshot.empty && persistentSnapshot.empty) {
+                return;
+            }
+
+            const batch = this.db.batch();
+            dailySnapshot.docs.forEach(doc => batch.delete(doc.ref));
+            persistentSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new DatabaseError(`Failed to delete quests: ${message}`);
+        }
+    }
 }

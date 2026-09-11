@@ -65,6 +65,18 @@ vi.mock('./achievement.service', () => ({
     }),
 }));
 
+vi.mock('../repositories/achievement.repository', () => ({
+    AchievementRepository: vi.fn().mockImplementation(function AchievementRepositoryMock() {
+        return {};
+    }),
+}));
+
+vi.mock('../repositories/quest.repository', () => ({
+    QuestRepository: vi.fn().mockImplementation(function QuestRepositoryMock() {
+        return {};
+    }),
+}));
+
 function fighterCharacter(overrides: Partial<Character> = {}): Character {
     return {
         characterId: 'char-1',

@@ -14,6 +14,8 @@ import { AchievementService } from './achievement.service';
 import { AchievementType } from '../../shared/types/quest';
 import { InventoryRepository } from '../repositories/inventory.repository';
 import { AdventureRunRepository } from '../repositories/adventure-run.repository';
+import { AchievementRepository } from '../repositories/achievement.repository';
+import { QuestRepository } from '../repositories/quest.repository';
 import {
     SELECTABLE_CHARACTER_ARCHETYPES, getArchetypeById,
 } from '../constants/templates/characterArchetypes';
@@ -72,6 +74,8 @@ export class CharacterService extends BaseService {
     private adventureRunRepo: AdventureRunRepository;
     private shopService: ShopService;
     private achievementService: AchievementService;
+    private achievementRepo: AchievementRepository;
+    private questRepo: QuestRepository;
 
     constructor() {
         super();
@@ -83,6 +87,8 @@ export class CharacterService extends BaseService {
         this.adventureRunRepo = new AdventureRunRepository();
         this.shopService = new ShopService();
         this.achievementService = new AchievementService();
+        this.achievementRepo = new AchievementRepository();
+        this.questRepo = new QuestRepository();
     }
 
     /**
@@ -341,11 +347,12 @@ export class CharacterService extends BaseService {
      * (equipped + permanent inventory) are permanently deleted from the
      * top-level `items` collection, along with the character's `equipment`
      * map and the character-owned `inventories/{characterId}` reference
-     * list, every adventure run the character has ever started, and its
+     * list, every adventure run the character has ever started, its
      * per-character shop documents — see ShopService.deleteShopsForCharacter,
      * since once the character is gone the shop's own lazy-destroy on next
-     * generation will never run for it again — before the character
-     * document itself is removed.
+     * generation will never run for it again — and all its achievement
+     * progress and quest documents (`achievementProgress`, `dailyQuests`,
+     * `persistentQuests`) — before the character document itself is removed.
      */
     async deleteCharacter(accountId: string, characterId: string): Promise<void> {
         const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
@@ -360,6 +367,8 @@ export class CharacterService extends BaseService {
         await this.adventureRunRepo.deleteAllByCharacterId(characterId);
         await this.inventoryRepo.delete(characterId);
         await this.shopService.deleteShopsForCharacter(characterId);
+        await this.achievementRepo.deleteAllByCharacterId(characterId);
+        await this.questRepo.deleteAllByCharacterId(characterId);
         await this.characterRepo.delete(characterId);
     }
 

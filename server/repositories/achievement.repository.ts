@@ -54,4 +54,24 @@ export class AchievementRepository extends BaseRepository<AchievementProgress> {
             throw new DatabaseError(`Failed to create achievements: ${message}`);
         }
     }
+
+    /**
+     * Permanently delete every achievement progress document belonging to a
+     * character — used when the character itself is deleted.
+     */
+    async deleteAllByCharacterId(characterId: string): Promise<void> {
+        try {
+            const snapshot = await this.collection.where('characterId', '==', characterId).get();
+            if (snapshot.empty) {
+                return;
+            }
+
+            const batch = this.db.batch();
+            snapshot.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new DatabaseError(`Failed to delete achievements: ${message}`);
+        }
+    }
 }

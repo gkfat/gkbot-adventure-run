@@ -9,6 +9,7 @@ const {
     grantItemMock, equipItemMock, itemGetByIdsMock, itemDeleteByIdsMock,
     inventoryDeleteMock, getByCharacterIdMock, deleteAllByCharacterIdMock, deleteShopsForCharacterMock, updateTalentsMock,
     addEncounteredArchetypeSlugsMock, updateDefeatedArchetypeCountsMock, incrementProgressMock,
+    achievementDeleteAllByCharacterIdMock, questDeleteAllByCharacterIdMock,
 } = vi.hoisted(() => ({
     listByAccountIdMock: vi.fn(),
     createCharacterFromArchetypeMock: vi.fn(),
@@ -26,6 +27,8 @@ const {
     addEncounteredArchetypeSlugsMock: vi.fn(),
     updateDefeatedArchetypeCountsMock: vi.fn(),
     incrementProgressMock: vi.fn(),
+    achievementDeleteAllByCharacterIdMock: vi.fn(),
+    questDeleteAllByCharacterIdMock: vi.fn(),
 }));
 
 vi.mock('../repositories/character.repository', () => ({
@@ -88,6 +91,18 @@ vi.mock('./shop.service', () => ({
 vi.mock('./achievement.service', () => ({
     AchievementService: vi.fn().mockImplementation(function AchievementServiceMock() {
         return { incrementProgress: incrementProgressMock };
+    }),
+}));
+
+vi.mock('../repositories/achievement.repository', () => ({
+    AchievementRepository: vi.fn().mockImplementation(function AchievementRepositoryMock() {
+        return { deleteAllByCharacterId: achievementDeleteAllByCharacterIdMock };
+    }),
+}));
+
+vi.mock('../repositories/quest.repository', () => ({
+    QuestRepository: vi.fn().mockImplementation(function QuestRepositoryMock() {
+        return { deleteAllByCharacterId: questDeleteAllByCharacterIdMock };
     }),
 }));
 
@@ -258,6 +273,8 @@ describe('CharacterService.deleteCharacter', () => {
         getByCharacterIdMock.mockReset();
         deleteAllByCharacterIdMock.mockReset();
         deleteShopsForCharacterMock.mockReset();
+        achievementDeleteAllByCharacterIdMock.mockReset();
+        questDeleteAllByCharacterIdMock.mockReset();
     });
 
     it('rejects deleting a character that does not belong to the caller', async () => {
@@ -270,9 +287,11 @@ describe('CharacterService.deleteCharacter', () => {
         expect(inventoryDeleteMock).not.toHaveBeenCalled();
         expect(deleteAllByCharacterIdMock).not.toHaveBeenCalled();
         expect(deleteShopsForCharacterMock).not.toHaveBeenCalled();
+        expect(achievementDeleteAllByCharacterIdMock).not.toHaveBeenCalled();
+        expect(questDeleteAllByCharacterIdMock).not.toHaveBeenCalled();
     });
 
-    it('deletes equipped/inventory item documents, adventure runs, the inventory reference list, the shop documents, then the character document', async () => {
+    it('deletes equipped/inventory item documents, adventure runs, the inventory reference list, the shop documents, achievement progress, quests, then the character document', async () => {
         getByIdForAccountMock.mockResolvedValue({
             characterId: 'char-1',
             accountId: 'account-1',
@@ -299,6 +318,8 @@ describe('CharacterService.deleteCharacter', () => {
         expect(deleteAllByCharacterIdMock).toHaveBeenCalledWith('char-1');
         expect(inventoryDeleteMock).toHaveBeenCalledWith('char-1');
         expect(deleteShopsForCharacterMock).toHaveBeenCalledWith('char-1');
+        expect(achievementDeleteAllByCharacterIdMock).toHaveBeenCalledWith('char-1');
+        expect(questDeleteAllByCharacterIdMock).toHaveBeenCalledWith('char-1');
         expect(characterDeleteMock).toHaveBeenCalledWith('char-1');
     });
 });
