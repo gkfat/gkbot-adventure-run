@@ -19,6 +19,7 @@
 
 import { BaseService } from './base.service';
 import { ShopRepository } from '../repositories/shop.repository';
+import { DailySupplyRepository } from '../repositories/dailySupply.repository';
 import { CharacterRepository } from '../repositories/character.repository';
 import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import { getAdminFirestore } from '../utils/firebaseAdmin';
@@ -28,8 +29,9 @@ import type {
     DailyShop, ShopItem, CurrencyType,
 } from '../../shared/types/shop';
 import {
-    PurchaseDestination, SHOP_CONFIG, 
+    PurchaseDestination, SHOP_CONFIG,
 } from '../../shared/types/shop';
+import type { DailySupply } from '../../shared/schemas/firestore/shop.schema';
 import type {
     ItemInstance, ItemGenerationContext, Inventory,
 } from '../../shared/types/item';
@@ -37,7 +39,7 @@ import {
     ItemType, ItemSource,
 } from '../../shared/types/item';
 import {
-    Rarity, RESOURCE_LIMITS, HAND_SLOTS, type EquipmentSlot,
+    Rarity, RESOURCE_LIMITS, HAND_SLOTS, clampCurrency, type EquipmentSlot,
 } from '../../shared/types/common';
 import type { Character } from '../../shared/types/character';
 import {
@@ -51,9 +53,18 @@ export type PurchaseResult = {
     unequipped?: ItemInstance;
 };
 
+/** Gold granted by a single daily supply claim. */
+const DAILY_SUPPLY_REWARD_GOLD = 100;
+
+export type ClaimDailySupplyResult = {
+    rewardGold: number;
+    item: ItemInstance;
+};
+
 export class ShopService extends BaseService {
     protected serviceName = 'shop';
     private shopRepo: ShopRepository;
+    private dailySupplyRepo: DailySupplyRepository;
     private characterRepo: CharacterRepository;
     private progressTracker: QuestAchievementProgressTracker;
     private db = getAdminFirestore();
@@ -61,6 +72,7 @@ export class ShopService extends BaseService {
     constructor() {
         super();
         this.shopRepo = new ShopRepository();
+        this.dailySupplyRepo = new DailySupplyRepository();
         this.characterRepo = new CharacterRepository();
         this.progressTracker = new QuestAchievementProgressTracker();
     }
@@ -253,6 +265,105 @@ export class ShopService extends BaseService {
 
         return result;
     }
+
+    /**
+     * Get today's daily supply for a character — a free once-a-day claim of
+     * 100 gold plus one pre-rolled N-rarity equipment item — lazily
+     * generating it if it doesn't exist yet. Same lazy-generation shape as
+     * getOrGenerateShop; the item is rolled once at generation time and
+     * delivered unchanged by claimDailySupply, never re-rolled.
+     */
+    async getOrGenerateDailySupply(characterId: string): Promise<DailySupply> {
+        const today = getTodayUtcDate();
+        const existing = await this.dailySupplyRepo.getDailySupply(characterId, today);
+        if (existing) {
+            return existing;
+        }
+
+        const timestamp = Date.now();
+        const supply: DailySupply = {
+            characterId,
+            date: today,
+            rewardGold: DAILY_SUPPLY_REWARD_GOLD,
+            item: rollDailySupplyItem(characterId),
+            claimed: false,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        const created = await this.dailySupplyRepo.createDailySupply(supply);
+        const result = created ?? await this.dailySupplyRepo.getDailySupply(characterId, today);
+        if (!result) {
+            throw new DatabaseError('Failed to generate daily supply');
+        }
+        return result;
+    }
+
+    /**
+     * Claim today's daily supply: verifies it's unclaimed, credits the gold
+     * and delivers the item into the character's permanent inventory, and
+     * marks it claimed — all in one Firestore transaction (Shop + Character +
+     * Item/Inventory), same shape as purchaseItem.
+     */
+    async claimDailySupply(accountId: string, characterId: string): Promise<ClaimDailySupplyResult> {
+        const ownedCharacter = await this.characterRepo.getByIdForAccount(characterId, accountId);
+        if (!ownedCharacter) {
+            throw new NotFoundError('character');
+        }
+
+        const today = getTodayUtcDate();
+        const supplyRef = this.db.collection('dailySupplies').doc(`${characterId}_${today}`);
+        const characterRef = this.db.collection('characters').doc(characterId);
+        const inventoryRef = this.db.collection('inventories').doc(characterId);
+
+        return this.db.runTransaction(async (tx) => {
+            const supplyDoc = await tx.get(supplyRef);
+            if (!supplyDoc.exists) {
+                throw new NotFoundError('daily supply');
+            }
+            const supply = supplyDoc.data() as DailySupply;
+            if (supply.claimed) {
+                throw new ConflictError('Daily supply already claimed');
+            }
+
+            const characterDoc = await tx.get(characterRef);
+            if (!characterDoc.exists) {
+                throw new NotFoundError('character');
+            }
+            const character = characterDoc.data() as Character;
+
+            const inventoryDoc = await tx.get(inventoryRef);
+            const inventory: Inventory = inventoryDoc.exists
+                ? (inventoryDoc.data() as Inventory)
+                : {
+                    characterId, items: [], updatedAt: Date.now(),
+                };
+            if (inventory.items.length >= RESOURCE_LIMITS.INVENTORY_PERMANENT_MAX) {
+                throw new BusinessLogicError('Inventory is full');
+            }
+
+            const item = supply.item;
+            const itemRef = this.db.collection('items').doc(item.itemId);
+            tx.set(itemRef, item);
+            tx.set(inventoryRef, {
+                characterId,
+                items: [...inventory.items, item.itemId],
+                updatedAt: Date.now(),
+            });
+
+            const gold = clampCurrency(character.gold + supply.rewardGold);
+            tx.update(characterRef, {
+                gold, updatedAt: Date.now(),
+            });
+            tx.update(supplyRef, {
+                claimed: true, claimedAt: Date.now(), updatedAt: Date.now(),
+            });
+
+            return {
+                rewardGold: supply.rewardGold,
+                item,
+            };
+        });
+    }
 }
 
 function getTodayUtcDate(): string {
@@ -346,4 +457,21 @@ function generateShopItems(characterId: string): ShopItem[] {
         ...gemsEquipmentSlots,
         ...gemsPotionSlots,
     ];
+}
+
+/**
+ * Roll the single N-rarity equipment item granted by a daily supply claim.
+ */
+function rollDailySupplyItem(characterId: string): ItemInstance {
+    const equipmentTemplates = getAllItemTemplates().filter(t => t.type === ItemType.EQUIPMENT);
+    const template = equipmentTemplates[Math.floor(Math.random() * equipmentTemplates.length)];
+    if (!template) {
+        throw new DatabaseError('No equipment templates available for daily supply generation');
+    }
+    const rolled = generateItemInstance(template.templateId, {
+        source: ItemSource.SHOP, minRarity: Rarity.N, maxRarity: Rarity.N,
+    });
+    return {
+        ...rolled, characterId,
+    };
 }

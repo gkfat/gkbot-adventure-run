@@ -7,6 +7,7 @@ import { PurchaseDestination } from '../../shared/types/shop';
 import type {
     DailyShop, ShopItem,
 } from '../../shared/types/shop';
+import type { DailySupply } from '../../shared/schemas/firestore/shop.schema';
 import { EquipmentSlot } from '../../shared/types/common';
 import {
     ItemType, ItemSource, 
@@ -135,6 +136,19 @@ function baseShop(overrides: Partial<DailyShop> = {}): DailyShop {
         date: todayUtcDate(),
         items: [baseSlot()],
         generatedAt: Date.now(),
+        ...overrides,
+    };
+}
+
+function baseDailySupply(overrides: Partial<DailySupply> = {}): DailySupply {
+    return {
+        characterId: 'char-1',
+        date: todayUtcDate(),
+        rewardGold: 100,
+        item: baseItem({ itemId: 'supply-item-1' }),
+        claimed: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
         ...overrides,
     };
 }
@@ -294,5 +308,81 @@ describe('ShopService.deleteShopsForCharacter', () => {
     it('does not throw when none of the documents exist', async () => {
         const service = new ShopService();
         await expect(service.deleteShopsForCharacter('char-without-shops')).resolves.toBeUndefined();
+    });
+});
+
+describe('ShopService.claimDailySupply', () => {
+    it('credits gold and delivers the pre-rolled item into the permanent inventory, marking it claimed', async () => {
+        setDoc('characters', 'char-1', baseCharacter());
+        setDoc('dailySupplies', `char-1_${todayUtcDate()}`, baseDailySupply());
+
+        const service = new ShopService();
+        const result = await service.claimDailySupply('account-1', 'char-1');
+
+        expect(result.rewardGold).toBe(100);
+        expect(result.item.itemId).toBe('supply-item-1');
+
+        expect(txSetMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collectionName: 'items', id: 'supply-item-1',
+            }),
+            expect.objectContaining({ itemId: 'supply-item-1' }),
+        );
+        expect(txSetMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collectionName: 'inventories', id: 'char-1',
+            }),
+            expect.objectContaining({ items: ['supply-item-1'] }),
+        );
+        expect(txUpdateMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collectionName: 'characters', id: 'char-1',
+            }),
+            expect.objectContaining({ gold: 1100 }),
+        );
+        expect(txUpdateMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collectionName: 'dailySupplies', id: `char-1_${todayUtcDate()}`,
+            }),
+            expect.objectContaining({ claimed: true }),
+        );
+    });
+
+    it('rejects claiming an already-claimed daily supply without crediting again', async () => {
+        setDoc('characters', 'char-1', baseCharacter());
+        setDoc('dailySupplies', `char-1_${todayUtcDate()}`, baseDailySupply({ claimed: true }));
+
+        const service = new ShopService();
+        await expect(
+            service.claimDailySupply('account-1', 'char-1'),
+        ).rejects.toThrow();
+        expect(txUpdateMock).not.toHaveBeenCalled();
+        expect(txSetMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects when no daily supply has been generated yet for today', async () => {
+        setDoc('characters', 'char-1', baseCharacter());
+
+        const service = new ShopService();
+        await expect(
+            service.claimDailySupply('account-1', 'char-1'),
+        ).rejects.toThrow();
+    });
+
+    it('rejects when the permanent inventory is already full, leaving the character/supply untouched', async () => {
+        setDoc('characters', 'char-1', baseCharacter());
+        setDoc('inventories', 'char-1', {
+            characterId: 'char-1',
+            items: Array.from({ length: 500 }, (_, i) => `existing-${i}`),
+            updatedAt: Date.now(),
+        });
+        setDoc('dailySupplies', `char-1_${todayUtcDate()}`, baseDailySupply());
+
+        const service = new ShopService();
+        await expect(
+            service.claimDailySupply('account-1', 'char-1'),
+        ).rejects.toThrow();
+        expect(txUpdateMock).not.toHaveBeenCalled();
+        expect(txSetMock).not.toHaveBeenCalled();
     });
 });

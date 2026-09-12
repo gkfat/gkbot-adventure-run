@@ -18,4 +18,5 @@ export type PixelIconName =
     | 'fiberSuit' | 'maglevBoots' | 'dataRing'
     | 'warhammer' | 'crusaderSword' | 'kiteShield' | 'plateGauntlet' | 'tournamentHelm'
     | 'chainmailVest' | 'ridingBoots' | 'signetRing'
+    | 'mysteryCapsule'
     | 'confirm' | 'cancel';

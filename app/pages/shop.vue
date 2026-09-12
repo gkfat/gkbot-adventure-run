@@ -1,5 +1,55 @@
 <template>
     <div class="fill-height shop-page pa-3">
+        <!-- 每日補給箱：每日限領一次，內容物在領取前保持未知，僅以神祕膠囊示意 -->
+        <div
+            v-if="dailySupply"
+            class="shop-page__supply mb-3"
+        >
+            <span class="shop-page__supply-badge font-pixel">每日補給</span>
+            <div class="shop-page__supply-body d-flex align-center">
+                <div class="shop-page__supply-slots d-flex ga-2">
+                    <div
+                        class="shop-page__supply-slot d-flex align-center justify-center"
+                        :class="{ 'shop-page__supply-slot--claimed': dailySupply.claimed }"
+                    >
+                        <GameCommonPixelIcon
+                            name="mysteryCapsule"
+                            :size="28"
+                        />
+                    </div>
+                    <div
+                        class="shop-page__supply-slot d-flex flex-column align-center justify-center"
+                        :class="{ 'shop-page__supply-slot--claimed': dailySupply.claimed }"
+                    >
+                        <GameCommonCurrencyIcon
+                            type="GOLD"
+                            :size="20"
+                        />
+                        <span class="font-pixel text-caption mt-1">{{ dailySupply.rewardGold }}</span>
+                    </div>
+                </div>
+                <div class="shop-page__supply-info flex-grow-1">
+                    <div class="shop-page__supply-flavor text-caption text-medium-emphasis">
+                        每天準時送來的一份補給品，真好奇是誰送的...?
+                    </div>
+                </div>
+                <SystemBtn
+                    :disabled="dailySupply.claimed"
+                    :loading="claimDailySupplyLoading"
+                    variant="outlined"
+                    color="primary"
+                    size="small"
+                    class="text-none flex-grow-0"
+                    @click="handleClaimDailySupply"
+                >
+                    {{ dailySupply.claimed ? '已領取' : '領取' }}
+                </SystemBtn>
+            </div>
+        </div>
+
+        <!-- 每日補給揭曉 dialog -->
+        <GameCommonDailySupplyClaimDialog ref="claimDialogRef" />
+
         <!-- 老虎機入口：沿用商品格位的卡片語彙（角標／分隔線／價格列），放大成橫幅 -->
         <button
             type="button"
@@ -177,7 +227,7 @@
 <script setup lang="ts">
 import { GACHA_CONFIG } from '~~/shared/constants/gacha';
 import { ItemType } from '../../shared/types/item';
-import type { ShopSlot } from '../composables/useShop';
+import type { ShopSlot, ShopItemInstance } from '../composables/useShop';
 
 definePageMeta({
     middleware: ['auth'],
@@ -193,7 +243,22 @@ const GOLD_COST = GACHA_CONFIG.GOLD_COST;
 const GEMS_COST = GACHA_CONFIG.GEMS_COST;
 const {
     items, loading, loaded, error, fetchShop,
+    dailySupply, claimDailySupplyLoading, fetchDailySupply, claimDailySupply,
 } = useShop();
+const { fetchCharacter } = useCharacter();
+
+// eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
+type ClaimDialog = { open: (result: { rewardGold: number; item: ShopItemInstance }) => void };
+const claimDialogRef = ref<ClaimDialog | null>(null);
+
+const handleClaimDailySupply = async () => {
+    if (!dailySupply.value || dailySupply.value.claimed) return;
+    const result = await claimDailySupply();
+    if (result) {
+        claimDialogRef.value?.open(result);
+        await fetchCharacter();
+    }
+};
 
 // 寶石商品排在前面（價格高到低），金幣商品排在後面（價格高到低）
 const sortByCurrencyThenPrice = (slots: ShopSlot[]) => [...slots].sort((a, b) => {
@@ -230,13 +295,68 @@ const loadShop = () => {
     if (!loaded.value) fetchShop();
 };
 
-onMounted(loadShop);
+onMounted(() => {
+    loadShop();
+    fetchDailySupply();
+});
 </script>
 
 <style scoped lang="scss">
 .shop-page {
     width: 100%;
     overflow-y: auto;
+
+    &__supply {
+        position: relative;
+        padding: 10px 12px;
+        border: 2px solid rgba(196, 203, 219, 0.25);
+        border-radius: 3px;
+        background: #14171c;
+        box-shadow:
+            inset 2px 2px 0 rgba(255, 255, 255, 0.06),
+            inset -2px -2px 0 rgba(0, 0, 0, 0.55);
+    }
+
+    &__supply-badge {
+        position: absolute;
+        top: -6px;
+        left: -6px;
+        padding: 0 4px;
+        font-size: 7px;
+        line-height: 1.4;
+        color: #14171c;
+        background: rgb(var(--v-theme-primary));
+        border-radius: 2px;
+        white-space: nowrap;
+    }
+
+    &__supply-body {
+        gap: 10px;
+        margin-top: 2px;
+    }
+
+    &__supply-slot {
+        position: relative;
+        flex-shrink: 0;
+        width: 52px;
+        height: 52px;
+        border: 2px solid rgba(196, 203, 219, 0.25);
+        border-radius: 3px;
+        background: #14171c;
+        box-shadow:
+            inset 2px 2px 0 rgba(255, 255, 255, 0.06),
+            inset -2px -2px 0 rgba(0, 0, 0, 0.55);
+        transition: opacity 0.15s ease-out;
+
+        &--claimed {
+            opacity: 0.4;
+        }
+    }
+
+    &__supply-flavor {
+        font-size: 10px;
+        line-height: 1.4;
+    }
 
     &__gacha-banner {
         position: relative;

@@ -66,6 +66,8 @@ import {
     getShopResponseSchema,
     purchaseItemRequestSchema,
     purchaseItemResponseSchema,
+    getDailySupplyResponseSchema,
+    claimDailySupplyResponseSchema,
 } from '../../shared/schemas/api/shop.schema';
 
 import {
@@ -148,6 +150,8 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         GetShopResponse: getShopResponseSchema,
         PurchaseItemRequest: purchaseItemRequestSchema,
         PurchaseItemResponse: purchaseItemResponseSchema,
+        GetDailySupplyResponse: getDailySupplyResponseSchema,
+        ClaimDailySupplyResponse: claimDailySupplyResponseSchema,
         GachaPullRequest: gachaPullRequestSchema,
         GachaPullResponse: gachaPullResponseSchema,
         GetDailyQuestsResponse: getDailyQuestsResponseSchema,
@@ -573,6 +577,60 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             },
             409: {
                 description: 'Shop slot already sold',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}/shop/daily-supply',
+        description: 'Get the character\'s daily supply (100 gold + one pre-rolled N-rarity equipment item, claimable once per day), lazily generating it if today\'s daily supply doesn\'t exist yet',
+        tags: ['Shop'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Daily supply retrieved',
+                content: { 'application/json': { schema: getDailySupplyResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/shop/daily-supply/claim',
+        description: 'Claim today\'s daily supply: credits 100 gold and delivers the pre-rolled N-rarity equipment item into the character\'s permanent inventory, then marks it claimed',
+        tags: ['Shop'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Daily supply claimed',
+                content: { 'application/json': { schema: claimDailySupplyResponseSchema } },
+            },
+            400: {
+                description: 'Inventory is full',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found, or daily supply not generated yet',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            409: {
+                description: 'Daily supply already claimed',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
         },

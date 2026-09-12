@@ -11,7 +11,7 @@ interface ShopItemStats {
     healPercent?: number;
 }
 
-interface ShopItemInstance {
+export interface ShopItemInstance {
     itemId: string;
     templateId: string;
     type: 'EQUIPMENT' | 'POTION';
@@ -24,6 +24,13 @@ interface ShopItemInstance {
     source: string;
     characterId: string;
     createdAt: number;
+}
+
+function extractErrorMessage(err: unknown, fallback: string): string {
+    if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
+        return (err as { message: string }).message;
+    }
+    return fallback;
 }
 
 export type ShopType = 'GOLD' | 'GEMS';
@@ -53,12 +60,35 @@ interface PurchaseResponse {
 
 export type PurchaseDestination = 'INVENTORY' | 'EQUIP';
 
+export interface DailySupply {
+    date: string;
+    rewardGold: number;
+    item: ShopItemInstance;
+    claimed: boolean;
+}
+
+interface GetDailySupplyResponse {
+    success: boolean;
+    data: DailySupply;
+}
+
+interface ClaimDailySupplyResponse {
+    success: boolean;
+    data: { rewardGold: number; item: ShopItemInstance };
+}
+
 const items = ref<ShopSlot[]>([]);
 const loading = ref(false);
 const loaded = ref(false);
 const error = ref<string | null>(null);
 const purchaseLoading = ref(false);
 const purchaseError = ref<string | null>(null);
+
+const dailySupply = ref<DailySupply | null>(null);
+const dailySupplyLoading = ref(false);
+const dailySupplyError = ref<string | null>(null);
+const claimDailySupplyLoading = ref(false);
+const claimDailySupplyError = ref<string | null>(null);
 
 /**
  * Shop Composable
@@ -122,6 +152,56 @@ export const useShop = () => {
         }
     };
 
+    /**
+     * 取得今日每日補給箱狀態（100 金幣 + 一件 N 級裝備，每日限領一次），若尚未生成則後端會自動生成。
+     */
+    const fetchDailySupply = async () => {
+        if (!selectedCharacterId.value) return;
+
+        dailySupplyLoading.value = true;
+        dailySupplyError.value = null;
+
+        try {
+            const response = await api.get<GetDailySupplyResponse>(
+                `/api/character/${selectedCharacterId.value}/shop/daily-supply`,
+            );
+            dailySupply.value = response.data;
+        } catch (err: unknown) {
+            console.error('[useShop] Failed to fetch daily supply:', err);
+            dailySupplyError.value = extractErrorMessage(err, '無法取得每日補給');
+        } finally {
+            dailySupplyLoading.value = false;
+        }
+    };
+
+    /**
+     * 領取今日每日補給箱；成功後本地樂觀更新為已領取（不需要重新整理），並回傳這次
+     * 領取到的內容（金幣 + 裝備），供呼叫端彈出 dialog 揭曉——領取前這份內容不會顯示在畫面上。
+     */
+    const claimDailySupply = async (): Promise<{ rewardGold: number; item: ShopItemInstance } | null> => {
+        if (!selectedCharacterId.value) return null;
+
+        claimDailySupplyLoading.value = true;
+        claimDailySupplyError.value = null;
+
+        try {
+            const response = await api.post<ClaimDailySupplyResponse>(
+                `/api/character/${selectedCharacterId.value}/shop/daily-supply/claim`,
+                {},
+            );
+
+            if (dailySupply.value) dailySupply.value.claimed = true;
+
+            return response.data;
+        } catch (err: unknown) {
+            console.error('[useShop] Failed to claim daily supply:', err);
+            claimDailySupplyError.value = extractErrorMessage(err, '領取失敗');
+            return null;
+        } finally {
+            claimDailySupplyLoading.value = false;
+        }
+    };
+
     const reset = () => {
         items.value = [];
         loaded.value = false;
@@ -129,6 +209,11 @@ export const useShop = () => {
         loading.value = false;
         purchaseError.value = null;
         purchaseLoading.value = false;
+        dailySupply.value = null;
+        dailySupplyError.value = null;
+        dailySupplyLoading.value = false;
+        claimDailySupplyError.value = null;
+        claimDailySupplyLoading.value = false;
     };
 
     return {
@@ -140,6 +225,13 @@ export const useShop = () => {
         purchaseError: computed(() => purchaseError.value),
         fetchShop,
         purchase,
+        dailySupply: computed(() => dailySupply.value),
+        dailySupplyLoading: computed(() => dailySupplyLoading.value),
+        dailySupplyError: computed(() => dailySupplyError.value),
+        claimDailySupplyLoading: computed(() => claimDailySupplyLoading.value),
+        claimDailySupplyError: computed(() => claimDailySupplyError.value),
+        fetchDailySupply,
+        claimDailySupply,
         reset,
     };
 };
