@@ -510,14 +510,17 @@ export const DIFFICULTY_CONFIG = {
     HP_MULT_PER_LEVEL: 0.08,
     ATK_MULT_PER_LEVEL: 0.07,
     DEF_MULT_PER_LEVEL: 0.05,
-  
-    // Elite multipliers (on top of base)
-    ELITE_HP_MULT: 1.8,
+
+    // Normal tier HP multiplier (on top of base) — general 難度加成
+    NORMAL_HP_MULT: 1.3,
+
+    // Elite multipliers (on top of base) — HP: 菁英難度加成
+    ELITE_HP_MULT: 1.5,
     ELITE_ATK_MULT: 1.6,
     ELITE_DEF_MULT: 1.3,
   
-    // Strong Elite multipliers
-    STRONG_ELITE_HP_MULT: 2.6,
+    // Strong Elite multipliers — HP: 強菁英難度加成
+    STRONG_ELITE_HP_MULT: 1.7,
     STRONG_ELITE_ATK_MULT: 2.1,
     STRONG_ELITE_DEF_MULT: 1.6,
 

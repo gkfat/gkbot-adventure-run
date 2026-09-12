@@ -44,7 +44,7 @@ export function getStatMultipliers(
 
     const tierMult = {
         NORMAL: {
-            hp: 1, atk: 1, def: 1,
+            hp: DIFFICULTY_CONFIG.NORMAL_HP_MULT, atk: 1, def: 1,
         },
         ELITE: {
             hp: DIFFICULTY_CONFIG.ELITE_HP_MULT,

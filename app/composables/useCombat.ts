@@ -92,7 +92,7 @@ export type WaveBanner = {
 };
 
 type GaugeScheduleEntry = { group: LogGroup; actAt: number; waveStartAt: number };
-type UnitCycle = { start: number; end: number | null; hitDisplayTimes: number[]; endsWave: boolean };
+type UnitCycle = { start: number; end: number | null; hitDisplayTimes: number[]; endsWave: boolean; holdMs: number };
 export type UnitGauge = { percent: number | null; paused: boolean };
 export type UnitStatus = { hpCurrent: number; hpMax: number; hpPercent: number };
 export type EnemyCardView = {
@@ -686,7 +686,7 @@ export function useCombat(
         const ensureOpen = (unitId: string, startAt: number) => {
             if (open.has(unitId)) return;
             const cycle: UnitCycle = {
-                start: startAt, end: null, hitDisplayTimes: [], endsWave: false,
+                start: startAt, end: null, hitDisplayTimes: [], endsWave: false, holdMs: 0,
             };
             if (!cycles.has(unitId)) cycles.set(unitId, []);
             cycles.get(unitId)!.push(cycle);
@@ -715,11 +715,17 @@ export function useCombat(
                 open.get(entry.targetId)!.hitDisplayTimes.push(actAt);
             }
 
+            // 出手方的攻擊卡片位移動畫還要再播 CARD_FX_MS 才會讓玩家視覺上認定「這次
+            // 攻擊演完了」；充能條若在 actAt 這一刻就立刻開始往上累加，玩家看到動畫
+            // 播完、視線轉回充能條時已經悄悄充了一截（約 CARD_FX_MS / 週期總長），
+            // 而不是預期中的 0%（見 known-issue.md）。這裡用 holdMs 讓 gaugeAt 在新
+            // 週期開始的頭 CARD_FX_MS 內固定顯示 0%，之後再開始累加，且仍精準在
+            // end（下次出手時間）補滿 100%。
             const actedUnitIds = new Set(group.entries.map(entry => entry.actorId));
             for (const unitId of actedUnitIds) {
                 open.get(unitId)!.end = actAt;
                 const next: UnitCycle = {
-                    start: actAt, end: null, hitDisplayTimes: [], endsWave: false,
+                    start: actAt, end: null, hitDisplayTimes: [], endsWave: false, holdMs: CARD_FX_MS,
                 };
                 cycles.get(unitId)!.push(next);
                 open.set(unitId, next);
@@ -784,15 +790,23 @@ export function useCombat(
         };
 
         const {
-            start, end, hitDisplayTimes, 
+            start, end, hitDisplayTimes, holdMs,
         } = cycle;
         const total = end - start;
         if (total <= 0) return {
-            percent: 100, paused: false, 
+            percent: 100, paused: false,
+        };
+
+        // holdMs：這個週期剛重置後，出手方的攻擊動畫還要再播一段時間才會讓玩家
+        // 視覺上認定「這次攻擊演完了」，這段期間充能條固定顯示 0%，之後才開始
+        // 累加，且仍精準在 end 補滿 100%（見上面建立 next cycle 時的說明）。
+        const chargeStart = Math.min(start + holdMs, end);
+        if (atMs < chargeStart) return {
+            percent: 0, paused: false,
         };
 
         const windows: [number, number][] = hitDisplayTimes
-            .map((hitAt): [number, number] => [Math.max(hitAt, start), Math.min(hitAt + STUN_MS, end)])
+            .map((hitAt): [number, number] => [Math.max(hitAt, chargeStart), Math.min(hitAt + STUN_MS, end)])
             .filter(([from, to]) => to > from)
             .sort((a, b) => a[0] - b[0]);
         const merged: [number, number][] = [];
@@ -803,7 +817,7 @@ export function useCombat(
         }
 
         const totalPaused = merged.reduce((sum, [from, to]) => sum + (to - from), 0);
-        const effectiveTotal = total - totalPaused;
+        const effectiveTotal = (end - chargeStart) - totalPaused;
 
         let pausedSoFar = 0;
         let paused = false;
@@ -815,7 +829,7 @@ export function useCombat(
             }
         }
 
-        const effectiveElapsed = Math.max(0, (atMs - start) - pausedSoFar);
+        const effectiveElapsed = Math.max(0, (atMs - chargeStart) - pausedSoFar);
         const percent = effectiveTotal > 0 ? Math.min(100, (effectiveElapsed / effectiveTotal) * 100) : 100;
 
         return {

@@ -15,9 +15,9 @@ describe('getEnemyLevel', () => {
 });
 
 describe('getStatMultipliers', () => {
-    it('applies no tier bonus for NORMAL at level 1', () => {
+    it('applies the NORMAL tier HP bonus (no atk/def bonus) at level 1', () => {
         expect(getStatMultipliers(1, 'NORMAL')).toEqual({
-            hp: 1, atk: 1, def: 1,
+            hp: 1.3, atk: 1, def: 1,
         });
     });
 
