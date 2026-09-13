@@ -55,6 +55,7 @@ interface CharacterData {
     talentTree: TalentTree;
     equipment: Partial<Record<EquipmentSlot, string>>;
     nickname: string;
+    hasRenamed: boolean;
     spriteUrl: string;
     stats: CharacterStats;
     equipmentBonus: Partial<Pick<CharacterStats, 'ATK' | 'DEF' | 'HP_MAX' | 'actionIntervalSec' | 'dodgeChance'>>;
@@ -86,6 +87,14 @@ interface GetCharacterResponse {
     success: boolean;
     data: CharacterData;
 }
+
+interface SetNicknameResponse {
+    success: boolean;
+    data: { nickname: string; hasRenamed: boolean; gems: number; gemsSpent: number };
+}
+
+// 角色改名費用（首次免費, 之後每次改名扣除的寶石數）
+export const RENAME_COST_GEMS = 5;
 
 interface GetRosterResponse {
     success: boolean;
@@ -315,6 +324,38 @@ export const useCharacter = () => {
     };
 
     /**
+     * 修改目前選定角色的暱稱。第一次免費, 之後每次修改扣 RENAME_COST_GEMS 寶石
+     * （費用計算與扣款皆由後端 transaction 判定, 這裡只負責呼叫與刷新資料）。
+     * 失敗時（例如寶石不足）拋出錯誤, 由呼叫端（UI dialog）顯示訊息。
+     */
+    const renameCharacter = async (nickname: string): Promise<{ gemsSpent: number }> => {
+        if (!selectedCharacterId.value) throw new Error('尚未選定角色');
+
+        loading.value = true;
+        error.value = null;
+
+        try {
+            const response = await api.post<SetNicknameResponse>(`/api/character/${selectedCharacterId.value}/nickname`, { nickname });
+            await fetchCharacter();
+
+            const characterId = selectedCharacterId.value;
+            roster.value = roster.value.map(entry => (
+                entry.characterId === characterId ? {
+                    ...entry, nickname: response.data.nickname, 
+                } : entry
+            ));
+
+            return { gemsSpent: response.data.gemsSpent };
+        } catch (err: any) {
+            console.error('[useCharacter] Failed to rename character:', err);
+            error.value = err.message || '修改暱稱失敗';
+            throw err;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    /**
      * 刪除指定角色（連同其冒險紀錄、永久背包一併移除，裝備物品本身不會被刪除，
      * 僅解除其擁有者關聯），成功後從本地清單移除；若刪除的正是目前選定角色，
      * 一併清空選定狀態與記住的 localStorage 紀錄。
@@ -397,6 +438,7 @@ export const useCharacter = () => {
         unequipItem,
         allocateAttributes,
         allocateTalent,
+        renameCharacter,
         deleteCharacter,
         clearSelection,
 

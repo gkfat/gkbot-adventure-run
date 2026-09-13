@@ -65,6 +65,10 @@ export const characterSchema = z.object({
     // Leaderboard display
     nickname: z.string().min(1).max(20),
 
+    // Character renaming (character-rename): first rename is free, every
+    // subsequent rename costs RENAME_COST_GEMS gems.
+    hasRenamed: z.boolean().default(false),
+
     // Enemy bestiary (enemy-bestiary): archetype slugs the character has
     // encountered (seen in a combat's first wave), used to gate name/
     // description/portrait disclosure in GET /api/character/:characterId/bestiary.

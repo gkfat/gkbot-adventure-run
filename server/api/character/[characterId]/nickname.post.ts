@@ -29,7 +29,9 @@ export default defineEventHandler(async (event) => {
         }
 
         const characterService = new CharacterService();
-        const character = await characterService.setNickname(authUser.uid, characterId, parseResult.data.nickname);
+        const {
+            character, gemsSpent, 
+        } = await characterService.setNickname(authUser.uid, characterId, parseResult.data.nickname);
 
         logRequest({
             severity: 'INFO',
@@ -44,7 +46,12 @@ export default defineEventHandler(async (event) => {
 
         const response = {
             success: true,
-            data: { nickname: character.nickname },
+            data: {
+                nickname: character.nickname,
+                hasRenamed: character.hasRenamed,
+                gems: character.gems,
+                gemsSpent,
+            },
         };
 
         return setNicknameResponseSchema.parse(response);

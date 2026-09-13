@@ -10,13 +10,15 @@
 
 import { BaseRepository } from './base.repository';
 import type { Character } from '../../shared/types/character';
-import { EXP_TABLE } from '../../shared/types/character';
+import {
+    EXP_TABLE, RENAME_COST_GEMS, 
+} from '../../shared/types/character';
 import {
     AdventureEndReason, rollChapterTotalLevels,
 } from '../../shared/types/adventure';
 import { characterSchema } from '../../shared/schemas/firestore/character.schema';
 import {
-    DatabaseError, NotFoundError,
+    DatabaseError, NotFoundError, BusinessLogicError,
 } from '../../shared/types/errors';
 import {
     RESOURCE_LIMITS, clamp, type Attributes,
@@ -91,8 +93,20 @@ function withBestiaryDefaults(character: Character): Character {
     };
 }
 
+/**
+ * Backfill `hasRenamed` for character documents written before
+ * `character-rename` shipped — same "不做資料回填" tolerance pattern as
+ * withTalentDefaults.
+ */
+function withRenameDefaults(character: Character): Character {
+    return {
+        ...character,
+        hasRenamed: character.hasRenamed ?? false,
+    };
+}
+
 function withCharacterDefaults(character: Character): Character {
-    return withBestiaryDefaults(withTalentDefaults(withLevelDefaults(withNextChapterDefault(character))));
+    return withRenameDefaults(withBestiaryDefaults(withTalentDefaults(withLevelDefaults(withNextChapterDefault(character)))));
 }
 
 export class CharacterRepository extends BaseRepository<Character> {
@@ -164,6 +178,7 @@ export class CharacterRepository extends BaseRepository<Character> {
             chapterTotalLevels: rollChapterTotalLevelsForCharacter(characterId, 0, archetype.attributes),
 
             nickname: this.generateArchetypeNickname(archetype.className, characterId),
+            hasRenamed: false,
 
             createdAt: timestamp,
             updatedAt: timestamp,
@@ -275,10 +290,49 @@ export class CharacterRepository extends BaseRepository<Character> {
     }
 
     /**
-     * Update character nickname
+     * Rename a character (character-rename). The first rename is free; every
+     * rename after that costs RENAME_COST_GEMS gems. Runs inside a
+     * transaction so two concurrent renames can't both land the free rename
+     * or drive gems negative.
+     *
+     * @throws NotFoundError if the character doesn't exist
+     * @throws BusinessLogicError if a paid rename is attempted without enough gems
      */
-    async updateNickname(characterId: string, nickname: string): Promise<Character> {
-        return this.update(characterId, { nickname });
+    async renameCharacter(characterId: string, nickname: string): Promise<{ character: Character; gemsSpent: number }> {
+        const docRef = this.getDocumentRef(characterId);
+
+        try {
+            return await this.db.runTransaction(async (tx) => {
+                const doc = await tx.get(docRef);
+                if (!doc.exists) {
+                    throw new NotFoundError('character');
+                }
+                const character = withCharacterDefaults(doc.data() as Character);
+
+                const gemsSpent = character.hasRenamed ? RENAME_COST_GEMS : 0;
+                if (gemsSpent > 0 && character.gems < gemsSpent) {
+                    throw new BusinessLogicError('Insufficient gems');
+                }
+
+                const gems = character.gems - gemsSpent;
+                const updated: Character = {
+                    ...character, nickname, hasRenamed: true, gems,
+                };
+                tx.update(docRef, {
+                    nickname, hasRenamed: true, gems, updatedAt: Date.now(),
+                });
+
+                return {
+                    character: updated, gemsSpent, 
+                };
+            });
+        } catch (error: unknown) {
+            if (error instanceof NotFoundError || error instanceof BusinessLogicError) {
+                throw error;
+            }
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new DatabaseError(`Failed to rename character: ${message}`);
+        }
     }
 
     /**

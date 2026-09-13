@@ -5,6 +5,7 @@ import {
 import { CharacterRepository } from './character.repository';
 import { AdventureEndReason } from '../../shared/types/adventure';
 import type { Character } from '../../shared/types/character';
+import { BusinessLogicError } from '../../shared/types/errors';
 
 const {
     docMock, collectionMock, runTransactionMock, txGetMock, txUpdateMock,
@@ -49,6 +50,7 @@ function baseCharacter(overrides: Partial<Character> = {}): Character {
         currentLevelIndex: 0,
         chapterTotalLevels: 5,
         nickname: '玩家A1B2C3',
+        hasRenamed: false,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         ...overrides,
@@ -242,5 +244,50 @@ describe('CharacterRepository.settleRunRewards — chapter/level advance (chapte
         // defaulted (and persisted) rather than left undefined.
         expect(result.character.currentLevelIndex).toBe(0);
         expect(result.character.chapterTotalLevels).toBeGreaterThan(0);
+    });
+});
+
+describe('CharacterRepository.renameCharacter (character-rename)', () => {
+    it('renames for free and sets hasRenamed when the character has never renamed', async () => {
+        txGetMock.mockResolvedValue({
+            exists: true, data: () => baseCharacter({ hasRenamed: false, gems: 10 }),
+        });
+
+        const repo = new CharacterRepository();
+        const result = await repo.renameCharacter('char-1', '新名字');
+
+        expect(result.gemsSpent).toBe(0);
+        expect(result.character.nickname).toBe('新名字');
+        expect(result.character.hasRenamed).toBe(true);
+        expect(result.character.gems).toBe(10);
+        expect(txUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'char-1' }), expect.objectContaining({
+            nickname: '新名字', hasRenamed: true, gems: 10,
+        }));
+    });
+
+    it('deducts RENAME_COST_GEMS when the character has already used its free rename', async () => {
+        txGetMock.mockResolvedValue({
+            exists: true, data: () => baseCharacter({ hasRenamed: true, gems: 10 }),
+        });
+
+        const repo = new CharacterRepository();
+        const result = await repo.renameCharacter('char-1', '新名字2');
+
+        expect(result.gemsSpent).toBe(5);
+        expect(result.character.gems).toBe(5);
+        expect(txUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'char-1' }), expect.objectContaining({
+            nickname: '新名字2', hasRenamed: true, gems: 5,
+        }));
+    });
+
+    it('throws BusinessLogicError without writing when gems are insufficient for a paid rename', async () => {
+        txGetMock.mockResolvedValue({
+            exists: true, data: () => baseCharacter({ hasRenamed: true, gems: 4 }),
+        });
+
+        const repo = new CharacterRepository();
+
+        await expect(repo.renameCharacter('char-1', '新名字3')).rejects.toBeInstanceOf(BusinessLogicError);
+        expect(txUpdateMock).not.toHaveBeenCalled();
     });
 });

@@ -102,8 +102,17 @@
                             <div class="font-pixel text-caption character-stage__power-tag">
                                 戰力 {{ combatPower }}
                             </div>
-                            <div class="text-body-2 text-medium-emphasis">
-                                {{ character.nickname }}
+                            <div class="d-flex align-center ga-1">
+                                <span class="text-body-2 text-medium-emphasis">
+                                    {{ character.nickname }}
+                                </span>
+                                <v-icon
+                                    icon="mdi-pencil-outline"
+                                    size="14"
+                                    color="primary"
+                                    class="character-stage__rename-btn"
+                                    @click="openRenameDialog"
+                                />
                             </div>
                         </div>
 
@@ -128,6 +137,9 @@
 
                 <!-- 裝備詳情 dialog -->
                 <GameCommonItemDetailDialog ref="itemDetailDialogRef" />
+
+                <!-- 修改暱稱 dialog -->
+                <GameCommonRenameCharacterDialog ref="renameCharacterDialogRef" />
             </div>
 
             <!-- 章節進度／開始冒險：固定於底部 -->
@@ -218,6 +230,13 @@ const itemDetailDialogRef = ref<ItemDetailDialog | null>(null);
 
 const openItemDetail = (item: ItemLike) => {
     itemDetailDialogRef.value?.open(item);
+};
+
+type RenameCharacterDialog = { open: () => void };
+const renameCharacterDialogRef = ref<RenameCharacterDialog | null>(null);
+
+const openRenameDialog = () => {
+    renameCharacterDialogRef.value?.open();
 };
 
 type AttributeKey = 'STR' | 'AGI' | 'CON' | 'LUCK';
@@ -320,6 +339,10 @@ watch(character, (value) => {
         flex-direction: column;
         align-items: center;
         gap: 2px;
+    }
+
+    &__rename-btn {
+        cursor: pointer;
     }
 
     &__lv-tag {

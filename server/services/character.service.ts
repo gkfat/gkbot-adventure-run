@@ -331,15 +331,16 @@ export class CharacterService extends BaseService {
     }
 
     /**
-     * Set (or overwrite) the display name of a character owned by the caller
+     * Rename a character owned by the caller (character-rename). The first
+     * rename is free; every rename after that costs RENAME_COST_GEMS gems.
      */
-    async setNickname(accountId: string, characterId: string, nickname: string): Promise<Character> {
+    async setNickname(accountId: string, characterId: string, nickname: string): Promise<{ character: Character; gemsSpent: number }> {
         const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
         if (!character) {
             throw new NotFoundError('character');
         }
 
-        return this.characterRepo.updateNickname(characterId, nickname);
+        return this.characterRepo.renameCharacter(characterId, nickname);
     }
 
     /**

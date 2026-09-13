@@ -85,6 +85,10 @@ export type Character = {
   // Leaderboard display
   nickname: string;           // Display name; auto-generated on creation, player can override
 
+  // Character renaming (character-rename): whether the free first rename has
+  // been used; every rename after that costs RENAME_COST_GEMS gems.
+  hasRenamed: boolean;
+
   // Enemy bestiary (enemy-bestiary): archetype slugs this character has
   // encountered (seen in a combat's first wave, regardless of outcome).
   encounteredArchetypeSlugs: string[];
@@ -138,6 +142,12 @@ export type AllocateAttributesInput = {
   CON?: number;
   LUCK?: number;
 };
+
+/**
+ * Gem cost of a character rename after the free first rename
+ * (character-rename).
+ */
+export const RENAME_COST_GEMS = 5;
 
 /**
  * Experience table: level -> expToNext

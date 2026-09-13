@@ -351,7 +351,7 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
     registry.registerPath({
         method: 'post',
         path: '/api/character/{characterId}/nickname',
-        description: 'Set or update character nickname',
+        description: 'Rename character. First rename is free; every rename after that costs RENAME_COST_GEMS gems',
         tags: ['Character'],
         security: [{ bearerAuth: [] }],
         request: {
@@ -364,7 +364,7 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
                 content: { 'application/json': { schema: setNicknameResponseSchema } },
             },
             400: {
-                description: 'Invalid nickname',
+                description: 'Invalid nickname, or insufficient gems for a paid rename',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
             401: {

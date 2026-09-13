@@ -125,6 +125,7 @@ export const getCharacterResponseSchema = z.object({
         talentTree: talentTreeSchema,
         equipment: equipmentSchema,
         nickname: z.string(),
+        hasRenamed: z.boolean(),
         spriteUrl: z.string(),
         stats: statsSchema,
         equipmentBonus: equipmentBonusSchema,
@@ -181,7 +182,12 @@ export const setNicknameRequestSchema = z.object({ nickname: z.string().min(1).m
 
 export const setNicknameResponseSchema = z.object({
     success: z.boolean(),
-    data: z.object({ nickname: z.string() }),
+    data: z.object({
+        nickname: z.string(),
+        hasRenamed: z.boolean(),
+        gems: z.number(),
+        gemsSpent: z.number(),
+    }),
 });
 
 /**
