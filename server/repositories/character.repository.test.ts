@@ -250,7 +250,9 @@ describe('CharacterRepository.settleRunRewards — chapter/level advance (chapte
 describe('CharacterRepository.renameCharacter (character-rename)', () => {
     it('renames for free and sets hasRenamed when the character has never renamed', async () => {
         txGetMock.mockResolvedValue({
-            exists: true, data: () => baseCharacter({ hasRenamed: false, gems: 10 }),
+            exists: true, data: () => baseCharacter({
+                hasRenamed: false, gems: 10, 
+            }),
         });
 
         const repo = new CharacterRepository();
@@ -267,7 +269,9 @@ describe('CharacterRepository.renameCharacter (character-rename)', () => {
 
     it('deducts RENAME_COST_GEMS when the character has already used its free rename', async () => {
         txGetMock.mockResolvedValue({
-            exists: true, data: () => baseCharacter({ hasRenamed: true, gems: 10 }),
+            exists: true, data: () => baseCharacter({
+                hasRenamed: true, gems: 10, 
+            }),
         });
 
         const repo = new CharacterRepository();
@@ -282,7 +286,9 @@ describe('CharacterRepository.renameCharacter (character-rename)', () => {
 
     it('throws BusinessLogicError without writing when gems are insufficient for a paid rename', async () => {
         txGetMock.mockResolvedValue({
-            exists: true, data: () => baseCharacter({ hasRenamed: true, gems: 4 }),
+            exists: true, data: () => baseCharacter({
+                hasRenamed: true, gems: 4, 
+            }),
         });
 
         const repo = new CharacterRepository();

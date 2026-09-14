@@ -246,6 +246,7 @@ const {
     dailySupply, claimDailySupplyLoading, fetchDailySupply, claimDailySupply,
 } = useShop();
 const { fetchCharacter } = useCharacter();
+const { invalidate: invalidateInventory } = useInventory();
 
 // eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
 type ClaimDialog = { open: (result: { rewardGold: number; item: ShopItemInstance }) => void };
@@ -257,6 +258,7 @@ const handleClaimDailySupply = async () => {
     if (result) {
         claimDialogRef.value?.open(result);
         await fetchCharacter();
+        invalidateInventory();
     }
 };
 

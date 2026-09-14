@@ -222,6 +222,16 @@ export const useCharacter = () => {
             ];
 
             await selectCharacter(created.characterId);
+
+            // 剛建立角色進入主畫面時，bottomNav 掛載當下抓到的任務清單可能還沒反映
+            // 新角色的初始進度，延遲後靜默重抓一次，讓任務入口的紅點能正確顯示。
+            setTimeout(() => {
+                const {
+                    fetchDaily, fetchPersistent, 
+                } = useQuests();
+                fetchDaily();
+                fetchPersistent();
+            }, 2000);
         } catch (err: any) {
             console.error('[useCharacter] Failed to create character:', err);
             error.value = err.message || '無法建立角色';
