@@ -137,6 +137,12 @@ const TEMPLATE_ICON: Record<string, PixelIconName> = {
     chainmail_cutting_vest: 'chainmailVest',
     mounted_patrol_riding_boots: 'ridingBoots',
     knights_order_signet_ring: 'signetRing',
+    scrap_daggers: 'scrapDagger',
+    maintenance_breach_pike: 'breachPike',
+    patrol_riot_halberd: 'riotHalberd',
+    electromagnetic_pistol: 'emPistol',
+    salvaged_laser_rifle: 'laserRifle',
+    exhibition_pulse_crossbow: 'pulseCrossbow',
 };
 
 export type ItemLike = {
