@@ -1534,12 +1534,12 @@ onMounted(() => {
     width: 100%;
     overflow-y: auto;
 
-    // 點擊推進時，背景底圖跟著輕微位移，呈現「正在往前移動」的錯覺，跟
+    // 點擊推進時，背景底圖跟著左右搖擺（bob），呈現「正在往前走」的錯覺，跟
     // walkFrame.isWalking 同一個 WALK_BEAT_MS 節拍。CSS animation 對
     // background-position 的效果會蓋過 inline style 算出的固定值，動畫
     // 播完後自動還原成 pageBackgroundStyle 原本的置中位置。
     &--walking {
-        animation: adventure-page-bg-drift 1.5s ease-in-out;
+        animation: adventure-page-bg-drift 0.375s ease-in-out 4;
     }
 
     &__scroll {
@@ -1835,14 +1835,14 @@ onMounted(() => {
 }
 
 @keyframes adventure-page-bg-drift {
-    0% {
+    0%, 100% {
         background-position: center top;
     }
-    50% {
+    25% {
+        background-position: 46% top;
+    }
+    75% {
         background-position: 54% top;
-    }
-    100% {
-        background-position: center top;
     }
 }
 
