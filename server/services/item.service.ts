@@ -1,11 +1,14 @@
 import { getItemTemplate } from '../constants/templates';
 import type {
-    Attributes, Stats, 
+    Attributes, Stats,
 } from '../../shared/types/common';
 import {
-    Rarity, WeaponWeightClass, EquipmentSlot,
+    Rarity, WeaponWeightClass,  
 } from '../../shared/types/common';
 import { COMBAT_CONFIG } from '../../shared/types/adventure';
+import {
+    deriveWeaponWeightClass, RARITY_WEIGHT_BONUS,
+} from '../../shared/constants/equipmentWeight';
 import { ItemType } from '../../shared/types/item';
 import type {
     ItemInstance, ItemStats, ItemTemplate, ItemGenerationContext, StatRange, RolledItem,
@@ -115,13 +118,14 @@ const DEBUFFABLE_STAT_KEYS = new Set<keyof ItemStats>(['HP']);
 const HEAVY_GUARANTEED_KEYS = new Set<keyof ItemStats>(['actionSpeedMod', 'dodgeChanceMod']);
 
 /**
- * A LIGHT armor piece (DEF-based, i.e. not RIGHT_HAND) may additionally have
+ * A LIGHT armor piece (DEF-based, i.e. not a weapon) may additionally have
  * its guaranteed-positive DEF shaved down by a debuff — per known-issue #9,
  * light armor trades some defense for its speed/dodge upside. This never
- * applies to weapons (RIGHT_HAND), which have no DEF stat to shave.
+ * applies to weapons — presence of `weaponType` is what marks a template as
+ * a weapon (weapon-proficiency-system D1), not its `equipSlot`.
  */
 function isLightArmorTemplate(template: ItemTemplate): boolean {
-    return template.weaponWeightClass === WeaponWeightClass.LIGHT && template.equipSlot !== EquipmentSlot.RIGHT_HAND;
+    return deriveWeaponWeightClass(template.weight) === WeaponWeightClass.LIGHT && template.weaponType === undefined;
 }
 
 /**
@@ -148,7 +152,7 @@ export function rollStats(templateId: string, rarity: Rarity): ItemStats {
     const statRanges = template.baseStatsRange?.[rarity] ?? {};
     const pool = Object.entries(statRanges) as [keyof ItemStats, StatRange][];
 
-    const isHeavy = template.weaponWeightClass === WeaponWeightClass.HEAVY;
+    const isHeavy = deriveWeaponWeightClass(template.weight) === WeaponWeightClass.HEAVY;
     const isGuaranteedKey = (key: keyof ItemStats) => PRIMARY_STAT_KEYS.has(key) || (isHeavy && HEAVY_GUARANTEED_KEYS.has(key));
 
     const guaranteedEntries = pool.filter(([key]) => isGuaranteedKey(key));
@@ -216,6 +220,44 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 /**
+ * Roll-quality component of an item instance's `weight` (design.md D6): looks
+ * at the instance's primary stat (ATK or DEF — the two are mutually
+ * exclusive, see PRIMARY_STAT_KEYS) and compares the rolled value against
+ * that stat's own range at this rarity. Landing at/above the range's midpoint
+ * ("a good roll") adds +1; otherwise +0. Returns 0 when the template has no
+ * primary stat pool for this rarity (e.g. POTION, or a malformed template).
+ */
+function getRollQualityBonus(template: ItemTemplate, rarity: Rarity, stats: ItemStats): number {
+    const statRanges = template.baseStatsRange?.[rarity] ?? {};
+    const primaryKey = ([...PRIMARY_STAT_KEYS] as (keyof ItemStats)[]).find((key) => stats[key] !== undefined);
+    if (!primaryKey) {
+        return 0;
+    }
+
+    const range = statRanges[primaryKey];
+    const rolled = stats[primaryKey];
+    if (!range || rolled === undefined) {
+        return 0;
+    }
+
+    const median = (range.min + range.max) / 2;
+    return rolled >= median ? 1 : 0;
+}
+
+/**
+ * Final `weight` for an item instance (design.md D6): the template's baseline
+ * `weight` plus a rarity bonus (RARITY_WEIGHT_BONUS) plus a roll-quality
+ * bonus — higher rarity and better rolls make gear heavier. `undefined` when
+ * the template has no `weight` (non-EQUIPMENT templates).
+ */
+function deriveInstanceWeight(template: ItemTemplate, rarity: Rarity, stats: ItemStats): number | undefined {
+    if (template.weight === undefined) {
+        return undefined;
+    }
+    return template.weight + (RARITY_WEIGHT_BONUS[rarity] ?? 0) + getRollQualityBonus(template, rarity, stats);
+}
+
+/**
  * Generate a full item instance: rolls rarity + stats and assigns a unique itemId.
  * Pure and Firestore-free — has no owner yet. A caller (e.g. InventoryService)
  * assigns `characterId` and persists it into the `items` collection.
@@ -224,6 +266,7 @@ export function generateItemInstance(templateId: string, context: ItemGeneration
     const template = getTemplateOrThrow(templateId);
     const rarity = rollRarity(templateId, context);
     const stats = rollStats(templateId, rarity);
+    const weight = deriveInstanceWeight(template, rarity, stats);
 
     return {
         itemId: crypto.randomUUID(),
@@ -231,7 +274,10 @@ export function generateItemInstance(templateId: string, context: ItemGeneration
         type: template.type,
         // Omit rather than set `undefined` — Firestore rejects undefined field values
         ...(template.equipSlot ? { equipSlot: template.equipSlot } : {}),
-        ...(template.weaponWeightClass ? { weaponWeightClass: template.weaponWeightClass } : {}),
+        ...(weight !== undefined ? { weight } : {}),
+        ...(template.weaponType ? { weaponType: template.weaponType } : {}),
+        ...(template.aoeChance ? { aoeChance: template.aoeChance } : {}),
+        ...(template.splashChance ? { splashChance: template.splashChance } : {}),
         rarity,
         stats,
         name: template.name,
@@ -270,7 +316,7 @@ export function sumEquipmentStats(items: ItemInstance[], attributes: Attributes)
     const mitigation = getHeavyPenaltyMitigation(attributes);
 
     return items.reduce<Partial<Stats>>((acc, item) => {
-        const isHeavy = item.weaponWeightClass === WeaponWeightClass.HEAVY;
+        const isHeavy = deriveWeaponWeightClass(item.weight) === WeaponWeightClass.HEAVY;
         const actionSpeedMod = (item.stats.actionSpeedMod ?? 0) * (isHeavy ? mitigation : 1);
         const dodgeChanceMod = (item.stats.dodgeChanceMod ?? 0) * (isHeavy ? mitigation : 1);
 
@@ -283,6 +329,15 @@ export function sumEquipmentStats(items: ItemInstance[], attributes: Attributes)
             critChance: (acc.critChance ?? 0) + (item.stats.critChanceMod ?? 0),
         };
     }, {});
+}
+
+/**
+ * Sum the `weight` of a set of equipped items — total-body carry weight for
+ * `applyWeightOverloadPenalty` (weapon-weight-class D6). Items missing
+ * `weight` (pre-migration instances) contribute 0, not a validation error.
+ */
+export function sumEquippedWeight(items: ItemInstance[]): number {
+    return items.reduce((total, item) => total + (item.weight ?? 0), 0);
 }
 
 /**

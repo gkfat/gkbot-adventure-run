@@ -12,6 +12,7 @@
 
 import { BaseService } from './base.service';
 import { CharacterService } from './character.service';
+import { ItemRepository } from '../repositories/item.repository';
 import {
     RngService, type RngCursor,
 } from './rng.service';
@@ -36,6 +37,7 @@ import {
 } from '../../shared/constants/blessings';
 import { ItemType } from '../../shared/types/item';
 import type { ItemInstance } from '../../shared/types/item';
+import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import {
     NodeType, disambiguateEnemyNames,
 } from '../../shared/types/adventure';
@@ -43,7 +45,14 @@ import type {
     AdventureRun, CombatContext, CombatResolver, CombatResolution, CombatLogEntry, RunModifier,
     EnemyFaction, FacilitySeverity,
 } from '../../shared/types/adventure';
-import type { Stats } from '../../shared/types/common';
+import {
+    EquipmentSlot, WeaponType, type Stats,
+} from '../../shared/types/common';
+import type { Character } from '../../shared/types/character';
+import {
+    PROFICIENCY_EXP_PER_HIT, PROFICIENCY_EXP_PER_CRIT, PROFICIENCY_MAX_LEVEL,
+    PASSIVE_UNLOCK_LEVELS, WEAPON_PASSIVE_CONFIG, BLADE_PASSIVE_CONFIG, DUAL_WIELD_PASSIVE_CONFIG,
+} from '../constants/weaponProficiency';
 
 const EQUIPMENT_TEMPLATE_IDS = Object.values(ITEM_TEMPLATES)
     .filter(template => template.type === ItemType.EQUIPMENT)
@@ -150,6 +159,22 @@ export function computeDamage(atk: number, def: number, isCrit: boolean, critMul
 // loop simply exits with the player still alive.)
 const MAX_ROUNDS = 500;
 
+/**
+ * A minimal, single-combat-only status effect (weapon-proficiency-system D5):
+ * applies a flat delta to the unit's own `critChance`/`actionIntervalSec` on
+ * its own next N attacks, or a damage-taken multiplier on the next N hits it
+ * receives from anyone. Never persisted to Firestore. `kind` beyond `keyof
+ * Stats` (`damageTaken`) is a deliberate extension of design.md's literal
+ * `stat: keyof Stats` shape — a pure additive Stats delta can't express
+ * "damage taken %", and design.md explicitly leaves magnitude/shape details
+ * to the implementation (D5 ASSUMPTION).
+ */
+type StatusEffect = {
+    kind: 'critChance' | 'actionIntervalSec' | 'damageTaken';
+    magnitude: number;
+    remainingAttacks: number;
+};
+
 type CombatUnit = {
     id: string;
     name: string;
@@ -172,17 +197,79 @@ type CombatUnit = {
     archetypeSlug: string;
     isBoss: boolean;
     canReinforce: boolean;
+    // Weapon proficiency passives (weapon-proficiency-system D5) — usable on
+    // any unit (e.g. BLUNT's "target takes +15% damage" debuff on an enemy).
+    statusEffects: StatusEffect[];
+    // Player-only: consecutive un-dodged hits landed, reset to 0 on a dodge —
+    // drives FIST/RANGED's "Nth consecutive hit" passive triggers.
+    consecutiveHitCount: number;
+    // One extra forced-crit charge, consumed by the next crit roll (RANGED B).
+    forcedCritCharges: number;
 };
+
+/** Player's currently-equipped weapon context, computed once per combat (D3/D4/D5/D7). */
+type PlayerWeaponContext = {
+    // Distinct weaponTypes across both hands (0, 1, or 2 entries).
+    weaponTypes: WeaponType[];
+    bothHandsAreWeapons: boolean;
+    baseAoeChance: number;
+    baseSplashChance: number;
+    levelByType: Partial<Record<WeaponType, number>>;
+    dualWieldLevel: number;
+};
+
+function unitStatValue(unit: CombatUnit, kind: 'critChance' | 'actionIntervalSec', base: number): number {
+    const bonus = unit.statusEffects
+        .filter(effect => effect.kind === kind)
+        .reduce((sum, effect) => sum + effect.magnitude, 0);
+    return base + bonus;
+}
+
+function damageTakenMultiplier(unit: CombatUnit): number {
+    const bonus = unit.statusEffects
+        .filter(effect => effect.kind === 'damageTaken')
+        .reduce((sum, effect) => sum + effect.magnitude, 0);
+    return 1 + bonus;
+}
+
+function addStatusEffect(unit: CombatUnit, kind: StatusEffect['kind'], magnitude: number, durationAttacks: number): void {
+    if (durationAttacks <= 0) return;
+    unit.statusEffects.push({
+        kind, magnitude, remainingAttacks: durationAttacks,
+    });
+}
+
+/** Decrement + prune a unit's own-attack-scoped effects after it acts. */
+function tickOwnAttackEffects(unit: CombatUnit): void {
+    unit.statusEffects = unit.statusEffects
+        .map(effect => (effect.kind === 'damageTaken' ? effect : {
+            ...effect, remainingAttacks: effect.remainingAttacks - 1,
+        }))
+        .filter(effect => effect.remainingAttacks > 0);
+}
+
+/** Decrement + prune a unit's incoming-hit-scoped effects after it's hit. */
+function tickIncomingHitEffects(unit: CombatUnit): void {
+    unit.statusEffects = unit.statusEffects
+        .map(effect => (effect.kind === 'damageTaken' ? {
+            ...effect, remainingAttacks: effect.remainingAttacks - 1,
+        } : effect))
+        .filter(effect => effect.remainingAttacks > 0);
+}
 
 export class CombatService extends BaseService implements CombatResolver {
     protected serviceName = 'combat';
     private characterService: CharacterService;
     private rngService: RngService;
+    private itemRepo: ItemRepository;
+    private progressTracker: QuestAchievementProgressTracker;
 
     constructor() {
         super();
         this.characterService = new CharacterService();
         this.rngService = new RngService();
+        this.itemRepo = new ItemRepository();
+        this.progressTracker = new QuestAchievementProgressTracker();
     }
 
     async resolve(run: AdventureRun, context: CombatContext): Promise<CombatResolution> {
@@ -221,11 +308,29 @@ export class CombatService extends BaseService implements CombatResolver {
             archetypeSlug: '',
             isBoss: false,
             canReinforce: false,
+            statusEffects: [],
+            consecutiveHitCount: 0,
+            forcedCritCharges: 0,
         };
+
+        const weaponContext = await this.getPlayerWeaponContext(character);
 
         const combatLog: CombatLogEntry[] = [];
         const defeated: CombatUnit[] = [];
         const encountered: CombatUnit[] = [];
+        // Per-hit exp tally (weapon-proficiency-system D3/D2b) — accrued
+        // across every wave, written once at the end of resolve().
+        const proficiencyExpGained: Partial<Record<WeaponType, number>> = {};
+        let dualWieldExpGained = 0;
+        const addProficiencyExp = (isCrit: boolean) => {
+            const amount = isCrit ? PROFICIENCY_EXP_PER_CRIT : PROFICIENCY_EXP_PER_HIT;
+            for (const type of weaponContext.weaponTypes) {
+                proficiencyExpGained[type] = (proficiencyExpGained[type] ?? 0) + amount;
+            }
+            if (weaponContext.bothHandsAreWeapons) {
+                dualWieldExpGained += amount;
+            }
+        };
 
         for (let wave = 0; wave < context.waveCount && player.hp > 0; wave++) {
             // Each wave is its own discrete-event window: every unit — including
@@ -277,22 +382,20 @@ export class CombatService extends BaseService implements CombatResolver {
                 const actor = [player, ...alive].reduce(
                     (min, unit) => (unit.nextAttackAt < min.nextAttackAt ? unit : min),
                 );
-                const target = actor === player ? alive[0] as CombatUnit : player;
                 const eventTimestamp = actor.nextAttackAt;
 
-                this.performAttack(cursor, actor, target, combatLog, wave);
-
-                if (target.hp <= 0) {
-                    combatLog.push({
-                        timestamp: eventTimestamp, wave, actorId: actor.id, targetId: target.id, action: 'DEATH',
-                    });
-                    if (target !== player) {
-                        alive.splice(alive.indexOf(target), 1);
-                        defeated.push(target);
+                if (actor === player) {
+                    this.performPlayerAttack(cursor, player, alive, defeated, weaponContext, combatLog, wave, addProficiencyExp);
+                } else {
+                    this.performAttack(cursor, actor, player, combatLog, wave);
+                    if (player.hp <= 0) {
+                        combatLog.push({
+                            timestamp: eventTimestamp, wave, actorId: actor.id, targetId: player.id, action: 'DEATH',
+                        });
                     }
                 }
 
-                actor.nextAttackAt += actor.actionIntervalSec * 1000;
+                actor.nextAttackAt += unitStatValue(actor, 'actionIntervalSec', actor.actionIntervalSec) * 1000;
 
                 if (bossUnit && bossUnit.canReinforce && bossUnit.hp > 0
                     && rounds % BOSS_REINFORCE_CONFIG.CHECK_INTERVAL_ROUNDS === 0
@@ -329,6 +432,37 @@ export class CombatService extends BaseService implements CombatResolver {
             character.defeatedArchetypeCounts,
             defeated.map(unit => unit.archetypeSlug),
         );
+
+        // Weapon proficiency (weapon-proficiency-system D3/D9): a one-time
+        // write of this fight's tallied exp, independent of victory/defeat —
+        // hits landed regardless of outcome.
+        const {
+            weaponTypeLevelUps, dualWieldLevelUp, 
+        } = await this.characterService.recordWeaponProficiency(
+            run.characterId,
+            character.weaponProficiency,
+            character.dualWieldProficiency,
+            proficiencyExpGained,
+            dualWieldExpGained,
+        );
+        for (const levelUp of weaponTypeLevelUps) {
+            await this.progressTracker.incrementProgress({
+                accountId: run.accountId, characterId: run.characterId, type: 'WEAPON_LEVEL_REACHED', amount: levelUp.newLevel,
+            });
+            await this.progressTracker.incrementProgress({
+                accountId: run.accountId, characterId: run.characterId, type: `WEAPON_LEVEL_REACHED_${levelUp.weaponType}`, amount: levelUp.newLevel,
+            });
+            if (levelUp.oldLevel < PROFICIENCY_MAX_LEVEL && levelUp.newLevel >= PROFICIENCY_MAX_LEVEL) {
+                await this.progressTracker.incrementProgress({
+                    accountId: run.accountId, characterId: run.characterId, type: 'WEAPON_TYPE_MASTERED', amount: 1,
+                });
+            }
+        }
+        if (dualWieldLevelUp) {
+            await this.progressTracker.incrementProgress({
+                accountId: run.accountId, characterId: run.characterId, type: 'WEAPON_LEVEL_REACHED_DUAL_WIELD', amount: dualWieldLevelUp.newLevel,
+            });
+        }
 
         const victory = player.hp > 0;
         const rewards = victory
@@ -440,7 +574,311 @@ export class CombatService extends BaseService implements CombatResolver {
             archetypeSlug: archetype.slug,
             isBoss,
             canReinforce: isBoss ? (archetype.canReinforce ?? false) : false,
+            statusEffects: [],
+            consecutiveHitCount: 0,
+            forcedCritCharges: 0,
         };
+    }
+
+    /**
+     * Resolve the player's currently-equipped hand items into weapon-
+     * proficiency context (weapon-proficiency-system D3/D4/D7) — which
+     * weaponTypes are in play, whether both hands are weapons, the max
+     * aoeChance/splashChance across both hands, and each dimension's current
+     * level (for stat/passive gating during the fight).
+     */
+    private async getPlayerWeaponContext(character: Character): Promise<PlayerWeaponContext> {
+        const handItemIds = [character.equipment[EquipmentSlot.LEFT_HAND], character.equipment[EquipmentSlot.RIGHT_HAND]]
+            .filter((id): id is string => Boolean(id));
+        const handItems = handItemIds.length > 0 ? await this.itemRepo.getByIds(handItemIds) : [];
+        const weaponItems = handItems.filter((item): item is ItemInstance & { weaponType: WeaponType } => Boolean(item.weaponType));
+
+        const weaponTypes = [...new Set(weaponItems.map(item => item.weaponType))];
+        const bothHandsAreWeapons = weaponItems.length === 2;
+
+        const levelByType: Partial<Record<WeaponType, number>> = {};
+        for (const type of weaponTypes) {
+            levelByType[type] = character.weaponProficiency[type]?.level ?? 1;
+        }
+
+        return {
+            weaponTypes,
+            bothHandsAreWeapons,
+            baseAoeChance: Math.max(0, ...weaponItems.map(item => item.aoeChance ?? 0)),
+            baseSplashChance: Math.max(0, ...weaponItems.map(item => item.splashChance ?? 0)),
+            levelByType,
+            dualWieldLevel: character.dualWieldProficiency.level,
+        };
+    }
+
+    /**
+     * Effective aoeChance/splashChance for this attack (design.md D7 + POLEARM
+     * B + dual-wield B pattern bonuses): the weapon-authored max across both
+     * hands, plus POLEARM's own Mastery-level bonus (only when POLEARM is
+     * equipped) and the dual-wield bonus (only when both hands are weapons).
+     */
+    private getEffectivePatternChances(ctx: PlayerWeaponContext): { aoeChance: number; splashChance: number } {
+        let bonus = 0;
+        const polearmLevel = ctx.levelByType[WeaponType.POLEARM];
+        if (polearmLevel !== undefined && polearmLevel >= PASSIVE_UNLOCK_LEVELS.B_MASTERY) {
+            bonus += WEAPON_PASSIVE_CONFIG[WeaponType.POLEARM].b.patternChanceBonus ?? 0;
+        }
+        if (ctx.bothHandsAreWeapons) {
+            if (ctx.dualWieldLevel >= PASSIVE_UNLOCK_LEVELS.B_MASTERY) {
+                bonus += DUAL_WIELD_PASSIVE_CONFIG.B_PATTERN_CHANCE_BONUS_MASTERY;
+            } else if (ctx.dualWieldLevel >= PASSIVE_UNLOCK_LEVELS.B_UNLOCK) {
+                bonus += DUAL_WIELD_PASSIVE_CONFIG.B_PATTERN_CHANCE_BONUS;
+            }
+        }
+        return {
+            aoeChance: Math.min(1, ctx.baseAoeChance + bonus),
+            splashChance: Math.min(1, ctx.baseSplashChance + bonus),
+        };
+    }
+
+    /** POLEARM A's splash secondary-target damage ratio (0.5 default, D5 passive A). */
+    private getSplashSecondaryRatio(ctx: PlayerWeaponContext): number {
+        const level = ctx.levelByType[WeaponType.POLEARM];
+        if (level === undefined || level < PASSIVE_UNLOCK_LEVELS.A_UNLOCK) return 0.5;
+        const config = WEAPON_PASSIVE_CONFIG[WeaponType.POLEARM].a;
+        return level >= PASSIVE_UNLOCK_LEVELS.A_STRENGTHEN ? config.strengthenedMagnitude : config.magnitude;
+    }
+
+    /**
+     * BLADE's inline (non-statusEffects) damage-time bonuses (design.md D5
+     * ASSUMPTION): crit-damage bonus (A) and a target-hp-ratio execute bonus
+     * (B). Both only apply when BLADE is currently equipped.
+     */
+    private applyBladeDamageBonus(ctx: PlayerWeaponContext, target: CombatUnit, isCrit: boolean, damage: number): number {
+        const level = ctx.levelByType[WeaponType.BLADE];
+        if (level === undefined) return damage;
+
+        let result = damage;
+        if (isCrit && level >= PASSIVE_UNLOCK_LEVELS.A_UNLOCK) {
+            const bonus = level >= PASSIVE_UNLOCK_LEVELS.A_STRENGTHEN
+                ? BLADE_PASSIVE_CONFIG.A_CRIT_DAMAGE_BONUS_STRENGTHENED
+                : BLADE_PASSIVE_CONFIG.A_CRIT_DAMAGE_BONUS;
+            result = Math.round(result * (1 + bonus));
+        }
+        if (level >= PASSIVE_UNLOCK_LEVELS.B_UNLOCK) {
+            const threshold = level >= PASSIVE_UNLOCK_LEVELS.B_MASTERY
+                ? BLADE_PASSIVE_CONFIG.B_HP_RATIO_THRESHOLD_MASTERY
+                : BLADE_PASSIVE_CONFIG.B_HP_RATIO_THRESHOLD;
+            const bonus = level >= PASSIVE_UNLOCK_LEVELS.B_MASTERY
+                ? BLADE_PASSIVE_CONFIG.B_DAMAGE_BONUS_MASTERY
+                : BLADE_PASSIVE_CONFIG.B_DAMAGE_BONUS;
+            if (target.hpMax > 0 && target.hp / target.hpMax >= threshold) {
+                result = Math.round(result * (1 + bonus));
+            }
+        }
+        return result;
+    }
+
+    /** Full damage against one target: base formula + BLADE bonus + target's damageTaken statusEffects. */
+    private computePlayerDamageAgainst(ctx: PlayerWeaponContext, player: CombatUnit, target: CombatUnit, isCrit: boolean): number {
+        const base = computeDamage(player.atk, target.def, isCrit, player.critMultiplier);
+        const withBlade = this.applyBladeDamageBonus(ctx, target, isCrit, base);
+        return Math.round(withBlade * damageTakenMultiplier(target));
+    }
+
+    /**
+     * On-hit passive triggers for FIST/BLUNT/POLEARM/RANGED (design.md D5) —
+     * BLADE is handled inline in computePlayerDamageAgainst instead. Applied
+     * once per player attack action (not per AoE/splash secondary target —
+     * ASSUMPTION: keeps multi-target passive fan-out bounded, see design.md
+     * Risks "被動效果系統範圍蔓延風險").
+     */
+    private applyOnHitPassives(
+        ctx: PlayerWeaponContext, player: CombatUnit, primaryTarget: CombatUnit, isCrit: boolean, cursor: RngCursor,
+    ): void {
+        for (const type of ctx.weaponTypes) {
+            const level = ctx.levelByType[type] ?? 1;
+
+            if (type === WeaponType.FIST) {
+                if (isCrit && level >= PASSIVE_UNLOCK_LEVELS.A_UNLOCK) {
+                    const config = WEAPON_PASSIVE_CONFIG[WeaponType.FIST].a;
+                    const strengthened = level >= PASSIVE_UNLOCK_LEVELS.A_STRENGTHEN;
+                    addStatusEffect(
+                        player, 'actionIntervalSec',
+                        strengthened ? config.strengthenedMagnitude : config.magnitude,
+                        strengthened ? config.strengthenedDurationAttacks : config.durationAttacks,
+                    );
+                }
+                if (level >= PASSIVE_UNLOCK_LEVELS.B_UNLOCK) {
+                    const b = WEAPON_PASSIVE_CONFIG[WeaponType.FIST].b;
+                    const mastery = level >= PASSIVE_UNLOCK_LEVELS.B_MASTERY;
+                    const threshold = mastery ? (b.masteryThreshold as number) : (b.threshold as number);
+                    if (player.consecutiveHitCount >= threshold) {
+                        player.consecutiveHitCount = 0;
+                        addStatusEffect(
+                            player, 'critChance',
+                            mastery ? (b.masteryCritChanceBonus as number) : (b.critChanceBonus as number),
+                            1,
+                        );
+                    }
+                }
+            }
+
+            if (type === WeaponType.BLUNT) {
+                if (level >= PASSIVE_UNLOCK_LEVELS.A_UNLOCK) {
+                    const config = WEAPON_PASSIVE_CONFIG[WeaponType.BLUNT].a;
+                    const strengthened = level >= PASSIVE_UNLOCK_LEVELS.A_STRENGTHEN;
+                    addStatusEffect(
+                        primaryTarget, 'damageTaken',
+                        strengthened ? config.strengthenedMagnitude : config.magnitude,
+                        strengthened ? config.strengthenedDurationAttacks : config.durationAttacks,
+                    );
+                }
+                if (isCrit && level >= PASSIVE_UNLOCK_LEVELS.B_UNLOCK) {
+                    const b = WEAPON_PASSIVE_CONFIG[WeaponType.BLUNT].b;
+                    const mastery = level >= PASSIVE_UNLOCK_LEVELS.B_MASTERY;
+                    const chance = mastery ? (b.masteryChance as number) : (b.chance as number);
+                    if (cursor.next() < chance) {
+                        primaryTarget.nextAttackAt += (b.extraIntervalRatio as number) * primaryTarget.actionIntervalSec * 1000;
+                    }
+                }
+            }
+
+            if (type === WeaponType.RANGED) {
+                if (level >= PASSIVE_UNLOCK_LEVELS.A_UNLOCK) {
+                    const config = WEAPON_PASSIVE_CONFIG[WeaponType.RANGED].a;
+                    const strengthened = level >= PASSIVE_UNLOCK_LEVELS.A_STRENGTHEN;
+                    addStatusEffect(
+                        player, 'critChance',
+                        strengthened ? config.strengthenedMagnitude : config.magnitude,
+                        strengthened ? config.strengthenedDurationAttacks : config.durationAttacks,
+                    );
+                }
+                if (level >= PASSIVE_UNLOCK_LEVELS.B_UNLOCK) {
+                    const b = WEAPON_PASSIVE_CONFIG[WeaponType.RANGED].b;
+                    const mastery = level >= PASSIVE_UNLOCK_LEVELS.B_MASTERY;
+                    const threshold = mastery ? (b.masteryThreshold as number) : (b.threshold as number);
+                    if (player.consecutiveHitCount >= threshold) {
+                        player.consecutiveHitCount = 0;
+                        player.forcedCritCharges += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * One player attack action against `alive` enemies (design.md D3/D5/D7).
+     * A single dodge roll (against the primary target, `alive[0]`) gates the
+     * whole action; once it passes, target-pattern (AoE/splash/single) is
+     * decided and resolved, weapon-proficiency exp is tallied once, and
+     * on-hit/crit passives trigger. Mutates `alive`/`defeated`/`combatLog` in
+     * place and returns nothing.
+     */
+    private performPlayerAttack(
+        cursor: RngCursor,
+        player: CombatUnit,
+        alive: CombatUnit[],
+        defeated: CombatUnit[],
+        ctx: PlayerWeaponContext,
+        combatLog: CombatLogEntry[],
+        wave: number,
+        addProficiencyExp: (_isCrit: boolean) => void,
+    ): void {
+        const primary = alive[0] as CombatUnit;
+        const timestamp = player.nextAttackAt;
+
+        const dodgeRoll = cursor.next();
+        if (dodgeRoll < primary.dodgeChance) {
+            combatLog.push({
+                timestamp, wave, actorId: player.id, targetId: primary.id, action: 'DODGE',
+            });
+            player.consecutiveHitCount = 0;
+            tickOwnAttackEffects(player);
+            return;
+        }
+
+        player.consecutiveHitCount += 1;
+
+        const rollCrit = (): boolean => {
+            if (player.forcedCritCharges > 0) {
+                player.forcedCritCharges -= 1;
+                return true;
+            }
+            const critRoll = cursor.next();
+            return critRoll < unitStatValue(player, 'critChance', player.critChance);
+        };
+
+        const applyDamage = (target: CombatUnit, damage: number, isCrit: boolean, ratio = 1): void => {
+            const finalDamage = ratio === 1 ? damage : Math.max(0, Math.round(damage * ratio));
+            target.hp = Math.max(0, target.hp - finalDamage);
+            tickIncomingHitEffects(target);
+            combatLog.push({
+                timestamp, wave, actorId: player.id, targetId: target.id, action: isCrit ? 'CRIT' : 'ATTACK', damage: finalDamage, targetHpRemaining: target.hp,
+            });
+            if (target.hp <= 0) {
+                combatLog.push({
+                    timestamp, wave, actorId: player.id, targetId: target.id, action: 'DEATH',
+                });
+                const index = alive.indexOf(target);
+                if (index >= 0) {
+                    alive.splice(index, 1);
+                    defeated.push(target);
+                }
+            }
+        };
+
+        const {
+            aoeChance, splashChance, 
+        } = this.getEffectivePatternChances(ctx);
+        const aoeRoll = cursor.next();
+        const isAoe = aoeChance > 0 && aoeRoll < aoeChance;
+        const splashRoll = isAoe ? -1 : cursor.next();
+        const isSplash = !isAoe && splashChance > 0 && splashRoll < splashChance;
+
+        if (isAoe) {
+            const polearmMastery = (ctx.levelByType[WeaponType.POLEARM] ?? 0) >= PASSIVE_UNLOCK_LEVELS.B_MASTERY;
+            const mainTargetBonus = polearmMastery ? (WEAPON_PASSIVE_CONFIG[WeaponType.POLEARM].b.masteryMainTargetBonus as number) : 0;
+            let anyCrit = false;
+            for (const target of [...alive]) {
+                const isCrit = rollCrit();
+                anyCrit = anyCrit || isCrit;
+                let damage = this.computePlayerDamageAgainst(ctx, player, target, isCrit);
+                if (target === primary && mainTargetBonus > 0) {
+                    damage = Math.round(damage * (1 + mainTargetBonus));
+                }
+                applyDamage(target, damage, isCrit);
+            }
+            addProficiencyExp(anyCrit);
+            this.applyOnHitPassives(ctx, player, primary, anyCrit, cursor);
+        } else if (isSplash) {
+            const isCrit = rollCrit();
+            const mainDamage = this.computePlayerDamageAgainst(ctx, player, primary, isCrit);
+            applyDamage(primary, mainDamage, isCrit);
+            const secondaryRatio = this.getSplashSecondaryRatio(ctx);
+            for (const secondary of alive.filter(unit => unit !== primary).slice(0, 2)) {
+                const secondaryDamage = this.computePlayerDamageAgainst(ctx, player, secondary, isCrit);
+                applyDamage(secondary, secondaryDamage, isCrit, secondaryRatio);
+            }
+            addProficiencyExp(isCrit);
+            this.applyOnHitPassives(ctx, player, primary, isCrit, cursor);
+        } else {
+            const isCrit = rollCrit();
+            const damage = this.computePlayerDamageAgainst(ctx, player, primary, isCrit);
+            applyDamage(primary, damage, isCrit);
+            addProficiencyExp(isCrit);
+            this.applyOnHitPassives(ctx, player, primary, isCrit, cursor);
+        }
+
+        // Dual-wield extra-attack passive (D5 "雙持被動" A): one bonus swing
+        // reusing this action's crit result, never itself re-triggers AoE/
+        // splash/extra-attack (design.md D5 ASSUMPTION — bounded recursion).
+        if (ctx.bothHandsAreWeapons && ctx.dualWieldLevel >= PASSIVE_UNLOCK_LEVELS.A_UNLOCK && alive.length > 0 && alive.includes(primary)) {
+            const strengthened = ctx.dualWieldLevel >= PASSIVE_UNLOCK_LEVELS.A_STRENGTHEN;
+            const chance = strengthened ? DUAL_WIELD_PASSIVE_CONFIG.A_EXTRA_ATTACK_CHANCE_STRENGTHENED : DUAL_WIELD_PASSIVE_CONFIG.A_EXTRA_ATTACK_CHANCE;
+            if (cursor.next() < chance) {
+                const extraIsCrit = player.forcedCritCharges > 0 ? rollCrit() : false;
+                const extraDamage = this.computePlayerDamageAgainst(ctx, player, primary, extraIsCrit);
+                applyDamage(primary, extraDamage, extraIsCrit, DUAL_WIELD_PASSIVE_CONFIG.A_EXTRA_ATTACK_DAMAGE_RATIO);
+            }
+        }
+
+        tickOwnAttackEffects(player);
     }
 
     private performAttack(

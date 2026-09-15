@@ -52,7 +52,12 @@ type SparkFx = { kind: 'hit' | 'crit'; key: number };
 export type DamageTextFx = { kind: 'damage' | 'crit' | 'dodge'; value?: number; key: number };
 const CARD_FX_MS = 320;
 const SPARK_FX_MS = 450;
-const DAMAGE_TEXT_FX_MS = 700;
+// 傷害飄字時長拆成一般命中/爆擊兩個常數（adventure-run-presentation D11）：
+// AoE/濺射/被動觸發會讓同一波動作短時間內出現更多筆傷害事件，原本共用的
+// 700ms 太容易一眼漏看。DODGE 沿用原始 700ms，不套用這兩個新常數。
+const DAMAGE_TEXT_FX_MS_NORMAL = 1500; // ATTACK（一般命中）
+const DAMAGE_TEXT_FX_MS_CRIT = 2000;   // CRIT
+const DAMAGE_TEXT_FX_MS_DODGE = 700;
 // 同一批（同 wave、同 timestamp）合併的多筆 log entry 之間的錯開間隔——多見於每個
 // wave 開戰的第一輪：所有單位的 nextAttackAt 都從 0 起算，玩家的第一次出手跟緊接著
 // 的敵方第一次出手因此會落在同一個 timestamp、被 groups 合併成同一批。若在同一個
@@ -303,11 +308,12 @@ export function useCombat(
     };
     const triggerDamageTextFx = (unitId: string, kind: DamageTextFx['kind'], value?: number) => {
         damageTextFx.set(unitId, {
-            kind, value, key: fxKeySeq++, 
+            kind, value, key: fxKeySeq++,
         });
         const existing = damageTextFxTimers.get(unitId);
         if (existing) clearTimeout(existing);
-        damageTextFxTimers.set(unitId, setTimeout(() => damageTextFx.delete(unitId), DAMAGE_TEXT_FX_MS));
+        const duration = kind === 'crit' ? DAMAGE_TEXT_FX_MS_CRIT : kind === 'dodge' ? DAMAGE_TEXT_FX_MS_DODGE : DAMAGE_TEXT_FX_MS_NORMAL;
+        damageTextFxTimers.set(unitId, setTimeout(() => damageTextFx.delete(unitId), duration));
     };
     const clearFxTimers = () => {
         cardFxTimers.forEach(timer => clearTimeout(timer));

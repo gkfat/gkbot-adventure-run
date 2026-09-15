@@ -36,6 +36,16 @@ const ACHIEVEMENT_EVENT_TYPE: Record<string, AchievementType> = {
     CHARACTER_LEVEL_REACHED: AchievementType.CHARACTER_LEVEL,
     FACILITY_DISCOVERED: AchievementType.DISCOVER_FACILITIES,
     ADVENTURE_COMPLETED_NO_DAMAGE: AchievementType.NO_DAMAGE_CLEAR,
+
+    // weapon-proficiency-system (design.md D9): emitted by CombatService.resolve()
+    WEAPON_LEVEL_REACHED: AchievementType.WEAPON_PROFICIENCY_LEVEL,
+    WEAPON_LEVEL_REACHED_FIST: AchievementType.WEAPON_MASTERY_FIST,
+    WEAPON_LEVEL_REACHED_BLADE: AchievementType.WEAPON_MASTERY_BLADE,
+    WEAPON_LEVEL_REACHED_BLUNT: AchievementType.WEAPON_MASTERY_BLUNT,
+    WEAPON_LEVEL_REACHED_POLEARM: AchievementType.WEAPON_MASTERY_POLEARM,
+    WEAPON_LEVEL_REACHED_RANGED: AchievementType.WEAPON_MASTERY_RANGED,
+    WEAPON_LEVEL_REACHED_DUAL_WIELD: AchievementType.WEAPON_MASTERY_DUAL_WIELD,
+    WEAPON_TYPE_MASTERED: AchievementType.WEAPON_TYPES_MASTERED,
 };
 
 export class QuestAchievementProgressTracker implements ProgressTracker {

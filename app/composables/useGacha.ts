@@ -1,5 +1,5 @@
 import type {
-    EquipmentSlot, Rarity, WeaponWeightClass,
+    EquipmentSlot, Rarity, WeaponType,
 } from '../../shared/types/common';
 import type { ShopType as GachaCurrency } from './useShop';
 
@@ -17,7 +17,10 @@ export interface GachaItemInstance {
     templateId: string;
     type: 'EQUIPMENT' | 'POTION';
     equipSlot?: EquipmentSlot;
-    weaponWeightClass?: WeaponWeightClass;
+    weight?: number;
+    weaponType?: WeaponType;
+    aoeChance?: number;
+    splashChance?: number;
     rarity: Rarity;
     stats: GachaItemStats;
     name: string;

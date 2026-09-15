@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 實作冒險過程角色與敵人喃喃自語機制
 - 商店實作每日補給
 - 實作角色修改暱稱
+- 實作角色負重機制，裝備重量系統、武器熟練度系統
 
 ### Changed
 

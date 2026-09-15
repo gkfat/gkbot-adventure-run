@@ -4,8 +4,9 @@
 
 import { z } from 'zod';
 import {
-    attributesSchema, equipmentSchema,
+    attributesSchema, equipmentSchema, proficiencyProgressSchema,
 } from '../firestore/character.schema';
+import { WeaponType } from '../../types/common';
 
 const statsSchema = z.object({
     ATK: z.number(),
@@ -39,6 +40,12 @@ const talentBonusSchema = z.object({
     carryCapacity: z.number().optional(),
 });
 
+// Only the keys weapon proficiency actually contributed to are present.
+const proficiencyBonusSchema = z.object({
+    ATK: z.number().optional(),
+    critChance: z.number().optional(),
+});
+
 const talentEffectSchema = z.object({
     stat: z.enum([
         'ATK',
@@ -69,6 +76,8 @@ const talentTreeSchema = z.object({
 });
 
 const talentsSchema = z.record(z.string(), z.number());
+
+const weaponProficiencySchema = z.partialRecord(z.nativeEnum(WeaponType), proficiencyProgressSchema);
 
 const archetypeSchema = z.object({
     archetypeId: z.string(),
@@ -123,6 +132,8 @@ export const getCharacterResponseSchema = z.object({
         talentPoints: z.number(),
         talents: talentsSchema,
         talentTree: talentTreeSchema,
+        weaponProficiency: weaponProficiencySchema,
+        dualWieldProficiency: proficiencyProgressSchema,
         equipment: equipmentSchema,
         nickname: z.string(),
         hasRenamed: z.boolean(),
@@ -130,6 +141,7 @@ export const getCharacterResponseSchema = z.object({
         stats: statsSchema,
         equipmentBonus: equipmentBonusSchema,
         talentBonus: talentBonusSchema,
+        proficiencyBonus: proficiencyBonusSchema,
         nextChapterIndex: z.number(),
         currentLevelIndex: z.number(),
         chapterTotalLevels: z.number(),

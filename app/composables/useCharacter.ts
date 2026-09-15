@@ -53,6 +53,8 @@ interface CharacterData {
     talentPoints: number;
     talents: Record<string, number>;
     talentTree: TalentTree;
+    weaponProficiency: Partial<Record<string, { exp: number; level: number }>>;
+    dualWieldProficiency: { exp: number; level: number };
     equipment: Partial<Record<EquipmentSlot, string>>;
     nickname: string;
     hasRenamed: boolean;
@@ -60,6 +62,7 @@ interface CharacterData {
     stats: CharacterStats;
     equipmentBonus: Partial<Pick<CharacterStats, 'ATK' | 'DEF' | 'HP_MAX' | 'actionIntervalSec' | 'dodgeChance'>>;
     talentBonus: Partial<Pick<CharacterStats, TalentStat>>;
+    proficiencyBonus: Partial<Pick<CharacterStats, 'ATK' | 'critChance'>>;
     nextChapterIndex: number;
     currentLevelIndex: number;
     chapterTotalLevels: number;

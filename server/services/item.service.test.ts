@@ -9,6 +9,7 @@ import {
     Rarity, WeaponWeightClass,
 } from '../../shared/types/common';
 import type { Attributes } from '../../shared/types/common';
+import { deriveWeaponWeightClass } from '../../shared/constants/equipmentWeight';
 import {
     ItemType, ItemSource,
 } from '../../shared/types/item';
@@ -208,19 +209,62 @@ describe('generateItemInstance', () => {
         expect(() => generateItemInstance('does_not_exist', { source: ItemSource.SHOP })).toThrow();
     });
 
-    it('carries the template\'s weaponWeightClass onto the generated equipment instance', () => {
-        const instance = generateItemInstance('salvaged_wrench', { source: ItemSource.SHOP });
-        expect(instance.weaponWeightClass).toBe(WeaponWeightClass.MEDIUM);
+    it('derives weight (baseline + rarity/roll bonus) onto the generated equipment instance, deriving MEDIUM at low rarity', () => {
+        // Pinned to N/R (RARITY_WEIGHT_BONUS 0) so the +0/+1 roll-quality
+        // bonus can't push salvaged_wrench (baseline 5) out of MEDIUM (4-6).
+        const instance = generateItemInstance('salvaged_wrench', {
+            source: ItemSource.SHOP, maxRarity: Rarity.R,
+        });
+        expect(deriveWeaponWeightClass(instance.weight)).toBe(WeaponWeightClass.MEDIUM);
     });
 
-    it('carries weaponWeightClass for non-HAND EQUIPMENT slots too', () => {
-        const instance = generateItemInstance('gkbot_faceplate', { source: ItemSource.DROP });
-        expect(instance.weaponWeightClass).toBe(WeaponWeightClass.MEDIUM);
+    it('carries weight for non-HAND EQUIPMENT slots too', () => {
+        const instance = generateItemInstance('gkbot_faceplate', {
+            source: ItemSource.DROP, maxRarity: Rarity.R,
+        });
+        expect(deriveWeaponWeightClass(instance.weight)).toBe(WeaponWeightClass.MEDIUM);
     });
 
-    it('does not set weaponWeightClass on a POTION instance', () => {
+    it('increases weight with RARITY_WEIGHT_BONUS as rarity rises (design.md D6)', () => {
+        // gkbot_faceplate baseline weight is 5; L's +3 bonus alone guarantees
+        // weight >= 8, always HEAVY, regardless of the +0/+1 roll-quality term.
+        const n = generateItemInstance('gkbot_faceplate', {
+            source: ItemSource.DROP, maxRarity: Rarity.N,
+        });
+        const l = generateItemInstance('gkbot_faceplate', {
+            source: ItemSource.DROP, minRarity: Rarity.L,
+        });
+        expect(l.weight).toBeGreaterThan(n.weight as number);
+        expect(deriveWeaponWeightClass(l.weight)).toBe(WeaponWeightClass.HEAVY);
+    });
+
+    it('adds a +1 roll-quality bonus on top of the rarity bonus when the primary stat rolls at/above the range midpoint', () => {
+        const template = getItemTemplate('salvaged_wrench');
+        const range = template?.baseStatsRange?.[Rarity.N]?.ATK as { min: number; max: number };
+        const median = (range.min + range.max) / 2;
+
+        let sawBaselineWeight = false;
+        let sawBonusWeight = false;
+        for (let i = 0; i < 200; i++) {
+            const instance = generateItemInstance('salvaged_wrench', {
+                source: ItemSource.SHOP, maxRarity: Rarity.N,
+            });
+            const atk = instance.stats.ATK as number;
+            if (atk >= median) {
+                expect(instance.weight).toBe((template?.weight as number) + 1);
+                sawBonusWeight = true;
+            } else {
+                expect(instance.weight).toBe(template?.weight as number);
+                sawBaselineWeight = true;
+            }
+        }
+        expect(sawBaselineWeight).toBe(true);
+        expect(sawBonusWeight).toBe(true);
+    });
+
+    it('does not set weight on a POTION instance', () => {
         const instance = generateItemInstance('engine_oil_basic', { source: ItemSource.DROP });
-        expect(instance.weaponWeightClass).toBeUndefined();
+        expect(instance.weight).toBeUndefined();
     });
 
     it('always rolls a negative dodgeChanceMod for a HEAVY item, within the rarity range (guaranteed — known-issue #9)', () => {
@@ -228,7 +272,7 @@ describe('generateItemInstance', () => {
             const instance = generateItemInstance('riot_shield_scrap', {
                 source: ItemSource.DROP, maxRarity: Rarity.N,
             });
-            expect(instance.weaponWeightClass).toBe(WeaponWeightClass.HEAVY);
+            expect(deriveWeaponWeightClass(instance.weight)).toBe(WeaponWeightClass.HEAVY);
             expect(instance.stats.dodgeChanceMod).toBeLessThan(0);
         }
     });
@@ -286,7 +330,7 @@ describe('sumEquipmentStats', () => {
         itemId: 'heavy-1',
         templateId: 'riot_shield_scrap',
         type: ItemType.EQUIPMENT,
-        weaponWeightClass: WeaponWeightClass.HEAVY,
+        weight: 8,
         rarity: Rarity.N,
         stats: {
             DEF: 5, actionSpeedMod: 0.2, dodgeChanceMod: -0.1,
@@ -329,7 +373,7 @@ describe('sumEquipmentStats', () => {
     it('sums critChanceMod across items into Stats.critChance', () => {
         const weaponItem = heavyItem({
             templateId: 'salvaged_wrench',
-            weaponWeightClass: WeaponWeightClass.MEDIUM,
+            weight: 5,
             stats: { critChanceMod: 0.02 },
         });
         const result = sumEquipmentStats([weaponItem], attributes());
@@ -338,7 +382,7 @@ describe('sumEquipmentStats', () => {
 
     it('does not mitigate LIGHT/MEDIUM items regardless of STR+CON', () => {
         const lightItem = heavyItem({
-            weaponWeightClass: WeaponWeightClass.LIGHT, stats: { actionSpeedMod: -0.1 },
+            weight: 2, stats: { actionSpeedMod: -0.1 },
         });
         const lowCarry = sumEquipmentStats([lightItem], attributes({
             STR: 0, CON: 0, 

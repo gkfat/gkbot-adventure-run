@@ -4,9 +4,12 @@ import {
 } from '../repositories/character.repository';
 import { ItemRepository } from '../repositories/item.repository';
 import {
-    calculateBaseStats, applyEquipmentStats, applyTalentStats,
+    calculateBaseStats, applyEquipmentStats, applyTalentStats, applyProficiencyStats, applyWeightOverloadPenalty,
 } from '../constants/stats';
-import { sumEquipmentStats } from './item.service';
+import {
+    sumEquipmentStats, sumEquippedWeight, 
+} from './item.service';
+import { getProficiencyLevelForExp } from '../../shared/constants/weaponProficiency';
 import { InventoryService } from './inventory.service';
 import { EquipmentService } from './equipment.service';
 import { ShopService } from './shop.service';
@@ -35,11 +38,15 @@ import {
 import type {
     Character, CharacterWithStats, CharacterSummary, AllocateAttributesInput, TalentTree,
 } from '../../shared/types/character';
-import {
-    ItemSource, type ItemGenerationContext,
+import { ItemSource } from '../../shared/types/item';
+import type {
+    ItemInstance, ItemGenerationContext,
 } from '../../shared/types/item';
 import {
-    Rarity, type Stats,
+    Rarity, EquipmentSlot,
+} from '../../shared/types/common';
+import type {
+    WeaponType, Stats,
 } from '../../shared/types/common';
 import {
     BusinessLogicError, NotFoundError,
@@ -294,6 +301,74 @@ export class CharacterService extends BaseService {
     }
 
     /**
+     * Tally this combat's weapon-proficiency exp gains into the character's
+     * `weaponProficiency`/`dualWieldProficiency` (weapon-proficiency-system
+     * D3/D2b) — a one-time write at combat resolution, same pattern as
+     * recordDefeatedArchetypes. `expGainedByType`/`dualWieldExpGained` are
+     * the caller's (CombatService) already-tallied per-hit exp for this
+     * fight; a zero-everywhere call no-ops without a Firestore write.
+     *
+     * Returns the level before/after per dimension that actually changed
+     * level this call, for the caller to fire achievement events off of.
+     */
+    async recordWeaponProficiency(
+        characterId: string,
+        existingWeaponProficiency: Character['weaponProficiency'],
+        existingDualWieldProficiency: Character['dualWieldProficiency'],
+        expGainedByType: Partial<Record<WeaponType, number>>,
+        dualWieldExpGained: number,
+    ): Promise<{
+        weaponTypeLevelUps: { weaponType: WeaponType; oldLevel: number; newLevel: number }[];
+        dualWieldLevelUp?: { oldLevel: number; newLevel: number };
+    }> {
+        const hasAnyGain = Object.values(expGainedByType).some(exp => (exp ?? 0) > 0) || dualWieldExpGained > 0;
+        if (!hasAnyGain) {
+            return { weaponTypeLevelUps: [] };
+        }
+
+        const weaponProficiency = { ...existingWeaponProficiency };
+        const weaponTypeLevelUps: { weaponType: WeaponType; oldLevel: number; newLevel: number }[] = [];
+        for (const [type, expGained] of Object.entries(expGainedByType) as [WeaponType, number | undefined][]) {
+            if (!expGained) continue;
+            const existing = weaponProficiency[type] ?? {
+                exp: 0, level: 1,
+            };
+            const exp = existing.exp + expGained;
+            const level = getProficiencyLevelForExp(exp);
+            if (level !== existing.level) {
+                weaponTypeLevelUps.push({
+                    weaponType: type, oldLevel: existing.level, newLevel: level,
+                });
+            }
+            weaponProficiency[type] = {
+                exp, level,
+            };
+        }
+
+        let dualWieldProficiency = existingDualWieldProficiency;
+        let dualWieldLevelUp: { oldLevel: number; newLevel: number } | undefined;
+        if (dualWieldExpGained > 0) {
+            const exp = existingDualWieldProficiency.exp + dualWieldExpGained;
+            const level = getProficiencyLevelForExp(exp);
+            if (level !== existingDualWieldProficiency.level) {
+                dualWieldLevelUp = {
+                    oldLevel: existingDualWieldProficiency.level, newLevel: level,
+                };
+            }
+            dualWieldProficiency = {
+                exp, level,
+            };
+        }
+
+        await this.characterRepo.updateWeaponProficiency(characterId, {
+            weaponProficiency, dualWieldProficiency,
+        });
+        return {
+            weaponTypeLevelUps, dualWieldLevelUp,
+        };
+    }
+
+    /**
      * Get the full enemy bestiary for a character owned by the caller
      * (enemy-bestiary). Every archetype is included; `name`/`description`/
      * `portraitUrl` are only attached when the character has encountered it
@@ -375,25 +450,57 @@ export class CharacterService extends BaseService {
 
     private async withStats(character: Character): Promise<CharacterWithStats> {
         const baseStats = calculateBaseStats(character.attributes);
-        const equipmentBonus = await this.getEquipmentBonus(character);
+        const equippedItems = await this.getEquippedItems(character);
+        const equipmentBonus = sumEquipmentStats(equippedItems, character.attributes);
         const afterEquipment = applyEquipmentStats(baseStats, equipmentBonus);
         // Legacy (pre-roster) characters have no talent tree — treat as empty.
         const talentTree: TalentTree = getTalentTreeByArchetypeId(character.archetypeId)
             ?? {
-                archetypeId: character.archetypeId, nodes: [], 
+                archetypeId: character.archetypeId, nodes: [],
             };
         const talentBonus = this.getTalentBonus(character, talentTree);
-        const stats = applyTalentStats(afterEquipment, talentBonus);
+        const afterTalents = applyTalentStats(afterEquipment, talentBonus);
 
-        // Only report keys equipment/talents actually contribute to —
-        // sumEquipmentStats/getTalentBonus always fill in every key they touch
-        // (0 for uninvested ones), which would otherwise show up as a
+        // Weapon proficiency (weapon-proficiency-system D4): apply after
+        // talents, one bonus per distinct weaponType currently in either
+        // hand, plus the dual-wield bonus only when both hands are weapons.
+        const {
+            equippedWeaponTypeLevels, bothHandsAreWeapons, 
+        } = this.getEquippedWeaponProficiency(character, equippedItems);
+        const afterProficiency = applyProficiencyStats(
+            afterTalents,
+            equippedWeaponTypeLevels,
+            character.dualWieldProficiency.level,
+            bothHandsAreWeapons,
+        );
+
+        // Full-body weight overload (weapon-weight-class D6): applied last,
+        // carryCapacity is final by this point.
+        const stats = applyWeightOverloadPenalty(afterProficiency, sumEquippedWeight(equippedItems));
+
+        // Proficiency's ATK/critChance delta (weapon-proficiency-system D4) is
+        // baked into `stats` like equipment/talents, but unlike those two it
+        // has no standalone "bonus object" from its apply function — derive it
+        // as the diff so the UI can break it out the same way (previously
+        // missing entirely, making the ATK/crit delta shown in the UI
+        // understate the real bonus — see user report).
+        const proficiencyBonus = {
+            ATK: afterProficiency.ATK - afterTalents.ATK,
+            critChance: afterProficiency.critChance - afterTalents.critChance,
+        };
+
+        // Only report keys equipment/talents/proficiency actually contribute
+        // to — sumEquipmentStats/getTalentBonus always fill in every key they
+        // touch (0 for uninvested ones), which would otherwise show up as a
         // misleading "+0" in the UI.
         const nonZeroBonus = Object.fromEntries(
             Object.entries(equipmentBonus).filter(([, value]) => value),
         );
         const nonZeroTalentBonus = Object.fromEntries(
             Object.entries(talentBonus).filter(([, value]) => value),
+        );
+        const nonZeroProficiencyBonus = Object.fromEntries(
+            Object.entries(proficiencyBonus).filter(([, value]) => value),
         );
 
         return {
@@ -405,7 +512,36 @@ export class CharacterService extends BaseService {
             },
             equipmentBonus: nonZeroBonus,
             talentBonus: nonZeroTalentBonus,
+            proficiencyBonus: nonZeroProficiencyBonus,
             talentTree,
+        };
+    }
+
+    /**
+     * Which WeaponType each currently-equipped hand item contributes (deduped
+     * by type — dual-wielding two same-type weapons counts once, weapon-
+     * proficiency-system D4) and whether both hands hold a weapon-type item
+     * (gates the dualWieldProficiency bonus).
+     */
+    private getEquippedWeaponProficiency(
+        character: Character, equippedItems: ItemInstance[],
+    ): { equippedWeaponTypeLevels: Partial<Record<WeaponType, number>>; bothHandsAreWeapons: boolean } {
+        const handItems = [EquipmentSlot.LEFT_HAND, EquipmentSlot.RIGHT_HAND]
+            .map(slot => character.equipment[slot])
+            .map(itemId => equippedItems.find(item => item.itemId === itemId));
+
+        const handWeaponTypes = handItems
+            .map(item => item?.weaponType)
+            .filter((type): type is WeaponType => Boolean(type));
+
+        const equippedWeaponTypeLevels: Partial<Record<WeaponType, number>> = {};
+        for (const type of new Set(handWeaponTypes)) {
+            equippedWeaponTypeLevels[type] = character.weaponProficiency[type]?.level ?? 1;
+        }
+
+        return {
+            equippedWeaponTypeLevels,
+            bothHandsAreWeapons: handWeaponTypes.length === 2,
         };
     }
 
@@ -430,16 +566,14 @@ export class CharacterService extends BaseService {
     }
 
     /**
-     * Look up the character's currently equipped items in the `items` collection
-     * and sum their rolled stats into an equipment bonus for stat calculation.
+     * Look up the character's currently equipped items in the `items` collection.
      */
-    private async getEquipmentBonus(character: Character) {
+    private async getEquippedItems(character: Character): Promise<ItemInstance[]> {
         const equippedItemIds = Object.values(character.equipment).filter((id): id is string => Boolean(id));
         if (equippedItemIds.length === 0) {
-            return {};
+            return [];
         }
 
-        const equippedItems = await this.itemRepo.getByIds(equippedItemIds);
-        return sumEquipmentStats(equippedItems, character.attributes);
+        return this.itemRepo.getByIds(equippedItemIds);
     }
 }

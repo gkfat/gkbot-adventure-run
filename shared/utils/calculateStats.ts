@@ -1,7 +1,13 @@
 import type {
-    Attributes, Stats,
+    Attributes, Stats, WeaponType,
 } from '../types/common';
 import { COMBAT_CONFIG } from '../types/adventure';
+import {
+    WEIGHT_OVERLOAD_PENALTY, BASE_CARRY_CAPACITY, CARRY_CAPACITY_PER_STAT_POINT,
+} from '../constants/equipmentWeight';
+import {
+    WEAPON_TYPE_STAT_BONUS_BY_LEVEL, DUAL_WIELD_STAT_BONUS_BY_LEVEL,
+} from '../constants/weaponProficiency';
 
 export const STATS_CONFIG = {
     // Base stats at level 1 with attributes = 1
@@ -75,7 +81,7 @@ export function calculateBaseStats(
         critChance,
         critMultiplier: COMBAT_CONFIG.CRIT_MULTIPLIER,
         dodgeChance,
-        carryCapacity: STR + CON,
+        carryCapacity: BASE_CARRY_CAPACITY + (STR + CON) * CARRY_CAPACITY_PER_STAT_POINT,
     };
 }
 
@@ -197,5 +203,89 @@ export function applyTalentStats(
             ),
         ),
         carryCapacity: stats.carryCapacity + (talentBonus.carryCapacity || 0),
+    };
+}
+
+/**
+ * Apply weapon-type + dual-wield proficiency stat bonuses (ATK%/critChance),
+ * applied after applyTalentStats in the pipeline (weapon-proficiency-system
+ * D4). Each currently-equipped hand item carrying a `weaponType` contributes
+ * its type's bonus once (a duplicate type across both hands isn't doubled —
+ * callers pass distinct types); the dual-wield bonus is added only when
+ * `bothHandsAreWeapons` is true.
+ */
+export function applyProficiencyStats(
+    stats: Omit<Stats, 'HP_CURRENT'>,
+    equippedWeaponTypeLevels: Partial<Record<WeaponType, number>>,
+    dualWieldLevel: number,
+    bothHandsAreWeapons: boolean,
+): Omit<Stats, 'HP_CURRENT'> {
+    let atkPercent = 0;
+    let critChanceBonus = 0;
+
+    for (const level of Object.values(equippedWeaponTypeLevels)) {
+        const bonus = WEAPON_TYPE_STAT_BONUS_BY_LEVEL[level as number] ?? WEAPON_TYPE_STAT_BONUS_BY_LEVEL[1];
+        atkPercent += bonus?.atkPercent ?? 0;
+        critChanceBonus += bonus?.critChance ?? 0;
+    }
+
+    if (bothHandsAreWeapons) {
+        const dualBonus = DUAL_WIELD_STAT_BONUS_BY_LEVEL[dualWieldLevel] ?? DUAL_WIELD_STAT_BONUS_BY_LEVEL[1];
+        atkPercent += dualBonus?.atkPercent ?? 0;
+        critChanceBonus += dualBonus?.critChance ?? 0;
+    }
+
+    return {
+        ...stats,
+        ATK: Math.floor(stats.ATK * (1 + atkPercent)),
+        critChance: Math.max(
+            0,
+            Math.min(COMBAT_CONFIG.CRIT_CAP, stats.critChance + critChanceBonus),
+        ),
+    };
+}
+
+/**
+ * Apply the full-body weight-overload penalty (weapon-weight-class D6):
+ * stacking, fixed penalties when `totalEquippedWeight` exceeds
+ * `stats.carryCapacity`. Applied after applyTalentStats (carryCapacity is
+ * final by then) — independent of, and additive with, a HEAVY item's own
+ * actionSpeedMod/dodgeChanceMod penalty.
+ */
+export function applyWeightOverloadPenalty(
+    stats: Omit<Stats, 'HP_CURRENT'>,
+    totalEquippedWeight: number,
+): Omit<Stats, 'HP_CURRENT'> {
+    const overage = totalEquippedWeight - stats.carryCapacity;
+    if (overage <= 0) {
+        return stats;
+    }
+
+    let {
+        actionIntervalSec, dodgeChance, critChance, DEF,
+    } = stats;
+
+    if (overage >= 1) {
+        actionIntervalSec += WEIGHT_OVERLOAD_PENALTY.ACTION_INTERVAL_SEC_AT_OVERAGE_1;
+    }
+    if (overage >= 2) {
+        dodgeChance -= WEIGHT_OVERLOAD_PENALTY.DODGE_CHANCE_AT_OVERAGE_2;
+    }
+    if (overage >= 3) {
+        critChance -= WEIGHT_OVERLOAD_PENALTY.CRIT_CHANCE_AT_OVERAGE_3;
+    }
+    if (overage >= 4) {
+        DEF -= Math.floor(overage - 3) * WEIGHT_OVERLOAD_PENALTY.DEF_PER_POINT_BEYOND_OVERAGE_3;
+    }
+
+    return {
+        ...stats,
+        DEF: Math.max(0, DEF),
+        actionIntervalSec: Math.max(
+            STATS_CONFIG.ACTION_INTERVAL_MIN,
+            Math.min(STATS_CONFIG.ACTION_INTERVAL_MAX, actionIntervalSec),
+        ),
+        critChance: Math.max(0, Math.min(COMBAT_CONFIG.CRIT_CAP, critChance)),
+        dodgeChance: Math.max(0, Math.min(COMBAT_CONFIG.DODGE_CAP, dodgeChance)),
     };
 }

@@ -31,10 +31,16 @@
                     {{ name }}
                 </div>
                 <div
-                    v-if="item.weaponWeightClass"
+                    v-if="item.type === 'EQUIPMENT' && item.weight !== undefined"
                     class="text-caption text-medium-emphasis"
                 >
-                    {{ WEIGHT_CLASS_LABEL[item.weaponWeightClass] }}
+                    {{ WEIGHT_CLASS_LABEL[resolveWeaponWeightClass(item)] }}・重量 {{ item.weight }}
+                </div>
+                <div
+                    v-if="item.weaponType"
+                    class="text-caption text-medium-emphasis"
+                >
+                    武器類型：{{ WEAPON_TYPE_LABEL[item.weaponType] }}
                 </div>
                 <div class="text-caption text-medium-emphasis">
                     稀有度 {{ item.rarity }}
@@ -73,7 +79,7 @@
 
 <script setup lang="ts">
 import {
-    RARITY_COLOR, SLOT_LABEL, WEIGHT_CLASS_LABEL, resolvePixelIcon, type ItemLike,
+    RARITY_COLOR, SLOT_LABEL, WEIGHT_CLASS_LABEL, WEAPON_TYPE_LABEL, resolvePixelIcon, resolveWeaponWeightClass, type ItemLike,
 } from '../../../utils/equipmentDisplay';
 
 defineProps<{

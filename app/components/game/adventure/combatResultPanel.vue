@@ -265,7 +265,7 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     // damageTextFx）。一般命中用中性色、爆擊用警示色放大、閃避用純文字。
     &__damage-text {
         position: absolute;
-        top: -4px;
+        top: 50%;
         left: 50%;
         transform: translate(-50%, 0);
         font-weight: 700;
@@ -274,25 +274,31 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
         pointer-events: none;
         white-space: nowrap;
-        animation: combat-result-panel-damage-text-float 0.7s ease-out forwards;
+        // 傷害數字時長延長至 1.5s（原 0.7s），爆擊再加長到 2s、閃避維持 0.7s
+        // 不變（adventure-run-presentation D11）——JS 計時器（useCombat.ts 的
+        // DAMAGE_TEXT_FX_MS_NORMAL/_CRIT/_DODGE）跟這裡的 animation-duration
+        // 需要對齊，避免動畫還在飄但 DOM 已經被拔掉的閃爍。
+        animation: combat-result-panel-damage-text-float 1.5s ease-out forwards;
 
         &--crit {
             display: inline-flex;
             flex-direction: column;
             align-items: center;
             gap: 1px;
-            font-size: 18px;
+            font-size: 22px;
             color: rgb(var(--v-theme-warning));
+            animation-duration: 2s;
         }
 
         &--dodge {
             font-size: 12px;
             color: rgba(255, 255, 255, 0.75);
+            animation-duration: 0.7s;
         }
     }
 
     &__damage-text-crit-label {
-        font-size: 10px;
+        font-size: 13px;
         font-weight: 800;
         letter-spacing: 0.05em;
     }

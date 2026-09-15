@@ -4,8 +4,18 @@
 
 import { z } from 'zod';
 import {
-    Rarity, EquipmentSlot, RESOURCE_LIMITS, 
+    Rarity, EquipmentSlot, WeaponType, RESOURCE_LIMITS,
 } from '../../types';
+
+/**
+ * Weapon proficiency (weapon-proficiency-system D2/D2b): Lv.1-10 exp/level
+ * pair, shared shape for both the 5 per-WeaponType buckets and the single
+ * dualWieldProficiency bucket.
+ */
+export const proficiencyProgressSchema = z.object({
+    exp: z.number().int().min(0),
+    level: z.number().int().min(1).max(10),
+}).strict();
 
 /**
  * Attributes schema
@@ -52,6 +62,14 @@ export const characterSchema = z.object({
     talentPoints: z.number().int().min(0).default(0),
     talents: z.record(z.string(), z.number().int().min(0)).default({}),
 
+    // Weapon proficiency (weapon-proficiency-system D2/D2b): sparse record,
+    // a WeaponType key only exists once the character has landed a hit with
+    // it. dualWieldProficiency is a single bucket, not per-type.
+    weaponProficiency: z.partialRecord(z.nativeEnum(WeaponType), proficiencyProgressSchema).default({}),
+    dualWieldProficiency: proficiencyProgressSchema.default({
+        exp: 0, level: 1,
+    }),
+
     // Equipment
     equipment: equipmentSchema,
 
@@ -86,3 +104,4 @@ export const characterSchema = z.object({
 
 export type Character = z.infer<typeof characterSchema>;
 export type Attributes = z.infer<typeof attributesSchema>;
+export type ProficiencyProgress = z.infer<typeof proficiencyProgressSchema>;

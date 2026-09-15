@@ -93,6 +93,10 @@ function fighterCharacter(overrides: Partial<Character> = {}): Character {
         unspentAttributePoints: 0,
         talentPoints: 5,
         talents: {},
+        weaponProficiency: {},
+        dualWieldProficiency: {
+            exp: 0, level: 1,
+        },
         equipment: {},
         nextChapterIndex: 0,
         currentLevelIndex: 0,
@@ -262,7 +266,143 @@ describe('CharacterService.getCharacterWithStats — talentBonus', () => {
 
         const result = await service.getCharacterWithStats('account-1', 'char-1');
 
-        // STR(2) + CON(3) = 5, + talent carryCapacity (+1/rank * 3 ranks = 3) = 8
-        expect(result.stats.carryCapacity).toBe(8);
+        // base 10 + (STR(2) + CON(3)) * 2 = 20, + talent carryCapacity (+1/rank * 3 ranks = 3) = 23
+        expect(result.stats.carryCapacity).toBe(23);
+    });
+});
+
+describe('CharacterService.getCharacterWithStats — weapon proficiency & weight overload', () => {
+    function weaponItem(itemId: string, weaponType: string, overrides: Record<string, unknown> = {}) {
+        return {
+            itemId, templateId: `tmpl-${itemId}`, type: 'EQUIPMENT', equipSlot: 'RIGHT_HAND',
+            weaponType, weight: 0, rarity: 'N', stats: {}, name: itemId, description: '', source: 'DROP',
+            characterId: 'char-1', createdAt: Date.now(), ...overrides,
+        };
+    }
+
+    it('applies the weaponType\'s ATK% bonus when a single weapon is equipped', async () => {
+        const withoutWeapon = fighterCharacter({ equipment: {} });
+        getByIdForAccountMock.mockResolvedValue(withoutWeapon);
+        const service = new CharacterService();
+        const baseline = await service.getCharacterWithStats('account-1', 'char-1');
+
+        const withWeapon = fighterCharacter({
+            equipment: { RIGHT_HAND: 'w1' },
+            weaponProficiency: {
+                FIST: {
+                    exp: 3600, level: 5, 
+                }, 
+            },
+        });
+        getByIdForAccountMock.mockResolvedValue(withWeapon);
+        itemGetByIdsMock.mockResolvedValue([weaponItem('w1', 'FIST')]);
+
+        const result = await service.getCharacterWithStats('account-1', 'char-1');
+
+        // Lv.5 FIST bonus: ATK +4% (see shared/constants/weaponProficiency.ts)
+        expect(result.stats.ATK).toBe(Math.floor(baseline.stats.ATK * 1.04));
+    });
+
+    it('does not apply the dualWieldProficiency bonus when only one hand is a weapon', async () => {
+        const single = fighterCharacter({
+            equipment: { RIGHT_HAND: 'w1' },
+            weaponProficiency: {
+                FIST: {
+                    exp: 0, level: 1, 
+                }, 
+            },
+            dualWieldProficiency: {
+                exp: 42000, level: 10, 
+            },
+        });
+        getByIdForAccountMock.mockResolvedValue(single);
+        itemGetByIdsMock.mockResolvedValue([weaponItem('w1', 'FIST')]);
+        const service = new CharacterService();
+        const singleHanded = await service.getCharacterWithStats('account-1', 'char-1');
+
+        const noWeapon = fighterCharacter({ equipment: {} });
+        getByIdForAccountMock.mockResolvedValue(noWeapon);
+        itemGetByIdsMock.mockResolvedValue([]);
+        const baseline = await service.getCharacterWithStats('account-1', 'char-1');
+
+        // Lv.1 FIST bonus is 0, and the maxed-out dualWieldProficiency must
+        // NOT apply since the character isn't actually dual-wielding.
+        expect(singleHanded.stats.ATK).toBe(baseline.stats.ATK);
+    });
+
+    it('applies both the weaponType and dualWieldProficiency bonuses when both hands are weapons', async () => {
+        const noWeapon = fighterCharacter({ equipment: {} });
+        getByIdForAccountMock.mockResolvedValue(noWeapon);
+        itemGetByIdsMock.mockResolvedValue([]);
+        const service = new CharacterService();
+        const baseline = await service.getCharacterWithStats('account-1', 'char-1');
+
+        const dualWielding = fighterCharacter({
+            equipment: {
+                RIGHT_HAND: 'w1', LEFT_HAND: 'w2', 
+            },
+            weaponProficiency: {
+                FIST: {
+                    exp: 0, level: 1, 
+                }, 
+            },
+            dualWieldProficiency: {
+                exp: 300, level: 2, 
+            },
+        });
+        getByIdForAccountMock.mockResolvedValue(dualWielding);
+        itemGetByIdsMock.mockResolvedValue([weaponItem('w1', 'FIST'), weaponItem('w2', 'FIST')]);
+        const result = await service.getCharacterWithStats('account-1', 'char-1');
+
+        // FIST Lv.1 contributes 0%; dualWieldProficiency Lv.2 contributes +1% ATK.
+        expect(result.stats.ATK).toBe(Math.floor(baseline.stats.ATK * 1.01));
+    });
+
+    it('applies the full-body weight-overload penalty when equipped weight exceeds carryCapacity', async () => {
+        const noOverload = fighterCharacter({
+            equipment: {}, attributes: {
+                STR: 1, AGI: 1, CON: 1, LUCK: 1,
+            },
+        });
+        getByIdForAccountMock.mockResolvedValue(noOverload);
+        itemGetByIdsMock.mockResolvedValue([]);
+        const service = new CharacterService();
+        const baseline = await service.getCharacterWithStats('account-1', 'char-1');
+
+        // carryCapacity = 10 + (STR(1)+CON(1)) * 2 = 14; one item weighing 15 overshoots by 1.
+        const overloaded = fighterCharacter({
+            equipment: { RIGHT_HAND: 'w1' }, attributes: {
+                STR: 1, AGI: 1, CON: 1, LUCK: 1,
+            },
+        });
+        getByIdForAccountMock.mockResolvedValue(overloaded);
+        itemGetByIdsMock.mockResolvedValue([weaponItem('w1', 'FIST', { weight: 15 })]);
+        const result = await service.getCharacterWithStats('account-1', 'char-1');
+
+        expect(result.stats.actionIntervalSec).toBeCloseTo(baseline.stats.actionIntervalSec + 0.5);
+    });
+
+    it('lifts the weight-overload penalty once equipped weight no longer exceeds carryCapacity', async () => {
+        const overloaded = fighterCharacter({
+            equipment: { RIGHT_HAND: 'w1' }, attributes: {
+                STR: 1, AGI: 1, CON: 1, LUCK: 1,
+            },
+        });
+        getByIdForAccountMock.mockResolvedValue(overloaded);
+        itemGetByIdsMock.mockResolvedValue([weaponItem('w1', 'FIST', { weight: 25 })]);
+        const service = new CharacterService();
+        const withPenalty = await service.getCharacterWithStats('account-1', 'char-1');
+        expect(withPenalty.stats.actionIntervalSec).toBeGreaterThan(3 - 1 * 0.02);
+
+        const unequipped = fighterCharacter({
+            equipment: {}, attributes: {
+                STR: 1, AGI: 1, CON: 1, LUCK: 1,
+            },
+        });
+        getByIdForAccountMock.mockResolvedValue(unequipped);
+        itemGetByIdsMock.mockResolvedValue([]);
+        const withoutPenalty = await service.getCharacterWithStats('account-1', 'char-1');
+
+        expect(withoutPenalty.stats.actionIntervalSec).toBeLessThan(withPenalty.stats.actionIntervalSec);
     });
 });

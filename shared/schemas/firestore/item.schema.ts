@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import {
-    ItemType, ItemSource, Rarity, EquipmentSlot, WeaponWeightClass, RESOURCE_LIMITS,
+    ItemType, ItemSource, Rarity, EquipmentSlot, WeaponType, RESOURCE_LIMITS,
 } from '../../types';
 
 /**
@@ -29,7 +29,10 @@ export const itemInstanceSchema = z.object({
     templateId: z.string(),
     type: z.nativeEnum(ItemType),
     equipSlot: z.nativeEnum(EquipmentSlot).optional(),
-    weaponWeightClass: z.nativeEnum(WeaponWeightClass).optional(),
+    weight: z.number().optional(),
+    weaponType: z.nativeEnum(WeaponType).optional(),
+    aoeChance: z.number().min(0).max(1).optional(),
+    splashChance: z.number().min(0).max(1).optional(),
 
     // Generated properties
     rarity: z.nativeEnum(Rarity),

@@ -11,6 +11,9 @@ import {
 import {
     AdventureStateType, NodeType, type AdventureRun, type CombatContext, type RunModifier,
 } from '../../shared/types/adventure';
+import {
+    EquipmentSlot, WeaponType,
+} from '../../shared/types/common';
 
 describe('computeDamage', () => {
     it('decays with DEF but never zeroes out as long as ATK > 0', () => {
@@ -116,11 +119,15 @@ describe('resolveActiveModifiers (blessing-leveling)', () => {
 
 const {
     getCharacterWithStatsMock, createCursorMock, recordEncounteredArchetypesMock, recordDefeatedArchetypesMock,
+    recordWeaponProficiencyMock, itemRepoGetByIdsMock, incrementProgressMock,
 } = vi.hoisted(() => ({
     getCharacterWithStatsMock: vi.fn(),
     createCursorMock: vi.fn(),
     recordEncounteredArchetypesMock: vi.fn(),
     recordDefeatedArchetypesMock: vi.fn(),
+    recordWeaponProficiencyMock: vi.fn(),
+    itemRepoGetByIdsMock: vi.fn(),
+    incrementProgressMock: vi.fn(),
 }));
 
 vi.mock('./character.service', () => ({
@@ -129,7 +136,20 @@ vi.mock('./character.service', () => ({
             getCharacterWithStats: getCharacterWithStatsMock,
             recordEncounteredArchetypes: recordEncounteredArchetypesMock,
             recordDefeatedArchetypes: recordDefeatedArchetypesMock,
+            recordWeaponProficiency: recordWeaponProficiencyMock,
         };
+    }),
+}));
+
+vi.mock('../repositories/item.repository', () => ({
+    ItemRepository: vi.fn().mockImplementation(function ItemRepositoryMock() {
+        return { getByIds: itemRepoGetByIdsMock };
+    }),
+}));
+
+vi.mock('./progress-tracker.service', () => ({
+    QuestAchievementProgressTracker: vi.fn().mockImplementation(function ProgressTrackerMock() {
+        return { incrementProgress: incrementProgressMock };
     }),
 }));
 
@@ -191,10 +211,17 @@ beforeEach(() => {
         attributes: { LUCK: 0 },
         encounteredArchetypeSlugs: [],
         defeatedArchetypeCounts: {},
+        equipment: {},
+        weaponProficiency: {},
+        dualWieldProficiency: {
+            exp: 0, level: 1,
+        },
         stats: {
             ATK: 1000, DEF: 1000, HP_MAX: 1000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
         },
     });
+    itemRepoGetByIdsMock.mockResolvedValue([]);
+    recordWeaponProficiencyMock.mockResolvedValue({ weaponTypeLevelUps: [] });
 });
 
 describe('CombatService.resolve', () => {
@@ -260,6 +287,11 @@ describe('CombatService.resolve', () => {
             attributes: { LUCK: 0 },
             encounteredArchetypeSlugs: [],
             defeatedArchetypeCounts: {},
+            equipment: {},
+            weaponProficiency: {},
+            dualWieldProficiency: {
+                exp: 0, level: 1, 
+            },
             stats: {
                 ATK: 0, DEF: 0, HP_MAX: 1, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
             },
@@ -290,6 +322,11 @@ describe('CombatService.resolve', () => {
             attributes: { LUCK: 0 },
             encounteredArchetypeSlugs: [],
             defeatedArchetypeCounts: {},
+            equipment: {},
+            weaponProficiency: {},
+            dualWieldProficiency: {
+                exp: 0, level: 1, 
+            },
             stats: {
                 ATK: 1000, DEF: 1000, HP_MAX: 1000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
             },
@@ -375,6 +412,11 @@ describe('CombatService.resolve', () => {
             attributes: { LUCK: 0 },
             encounteredArchetypeSlugs: [],
             defeatedArchetypeCounts: {},
+            equipment: {},
+            weaponProficiency: {},
+            dualWieldProficiency: {
+                exp: 0, level: 1, 
+            },
             stats: {
                 ATK: 100, DEF: 0, HP_MAX: 100000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
             },
@@ -416,6 +458,11 @@ describe('CombatService.resolve', () => {
             attributes: { LUCK: 0 },
             encounteredArchetypeSlugs: [],
             defeatedArchetypeCounts: {},
+            equipment: {},
+            weaponProficiency: {},
+            dualWieldProficiency: {
+                exp: 0, level: 1, 
+            },
             stats: {
                 ATK: 100, DEF: 0, HP_MAX: 100000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
             },
@@ -546,6 +593,11 @@ describe('CombatService.resolve', () => {
                 attributes: { LUCK: 0 },
                 encounteredArchetypeSlugs: [],
                 defeatedArchetypeCounts: {},
+                equipment: {},
+                weaponProficiency: {},
+                dualWieldProficiency: {
+                    exp: 0, level: 1, 
+                },
                 stats: {
                     ATK: 1, DEF: 100000, HP_MAX: 100000, actionIntervalSec: 2, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
                 },
@@ -626,6 +678,12 @@ describe('CombatService.resolve', () => {
                 nickname: 'Tester',
                 attributes: { LUCK: 0 },
                 encounteredArchetypeSlugs: [ENEMY_ARCHETYPES[0]?.slug],
+                defeatedArchetypeCounts: {},
+                equipment: {},
+                weaponProficiency: {},
+                dualWieldProficiency: {
+                    exp: 0, level: 1,
+                },
                 stats: {
                     ATK: 1000, DEF: 1000, HP_MAX: 1000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
                 },
@@ -650,6 +708,11 @@ describe('CombatService.resolve', () => {
                 attributes: { LUCK: 0 },
                 encounteredArchetypeSlugs: [],
                 defeatedArchetypeCounts: {},
+                equipment: {},
+                weaponProficiency: {},
+                dualWieldProficiency: {
+                    exp: 0, level: 1, 
+                },
                 stats: {
                     ATK: 0, DEF: 0, HP_MAX: 1, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
                 },
@@ -724,6 +787,11 @@ describe('CombatService.resolve', () => {
                 attributes: { LUCK: 0 },
                 encounteredArchetypeSlugs: [],
                 defeatedArchetypeCounts: {},
+                equipment: {},
+                weaponProficiency: {},
+                dualWieldProficiency: {
+                    exp: 0, level: 1, 
+                },
                 stats: {
                     ATK: 1000, DEF: 0, HP_MAX: 1, actionIntervalSec: 2, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
                 },
@@ -756,6 +824,11 @@ describe('CombatService.resolve', () => {
                 attributes: { LUCK: 0 },
                 encounteredArchetypeSlugs: [],
                 defeatedArchetypeCounts: {},
+                equipment: {},
+                weaponProficiency: {},
+                dualWieldProficiency: {
+                    exp: 0, level: 1, 
+                },
                 stats: {
                     ATK: 0, DEF: 0, HP_MAX: 1, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
                 },
@@ -773,5 +846,198 @@ describe('CombatService.resolve', () => {
             expect(result.victory).toBe(false);
             expect(recordDefeatedArchetypesMock).toHaveBeenCalledWith('char-1', {}, []);
         });
+    });
+});
+
+describe('CombatService.resolve — weapon proficiency (weapon-proficiency-system)', () => {
+    function fistWeapon(overrides: Record<string, unknown> = {}) {
+        return {
+            itemId: 'weapon-fist', templateId: 'tmpl-fist', type: 'EQUIPMENT', equipSlot: EquipmentSlot.RIGHT_HAND,
+            weaponType: WeaponType.FIST, rarity: 'N', stats: {}, name: 'Fist', description: '', source: 'DROP',
+            characterId: 'char-1', createdAt: Date.now(), ...overrides,
+        };
+    }
+    function bladeWeapon(overrides: Record<string, unknown> = {}) {
+        return {
+            itemId: 'weapon-blade', templateId: 'tmpl-blade', type: 'EQUIPMENT', equipSlot: EquipmentSlot.LEFT_HAND,
+            weaponType: WeaponType.BLADE, rarity: 'N', stats: {}, name: 'Blade', description: '', source: 'DROP',
+            characterId: 'char-1', createdAt: Date.now(), ...overrides,
+        };
+    }
+
+    function overpoweredCharacter(overrides: Record<string, unknown> = {}) {
+        return {
+            nickname: 'Tester',
+            attributes: { LUCK: 0 },
+            encounteredArchetypeSlugs: [],
+            defeatedArchetypeCounts: {},
+            equipment: {},
+            weaponProficiency: {},
+            dualWieldProficiency: {
+                exp: 0, level: 1, 
+            },
+            stats: {
+                ATK: 1000, DEF: 1000, HP_MAX: 1000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+            },
+            ...overrides,
+        };
+    }
+
+    it('does not accrue any proficiency exp when no weapon is equipped', async () => {
+        getCharacterWithStatsMock.mockResolvedValue(overpoweredCharacter());
+        itemRepoGetByIdsMock.mockResolvedValue([]);
+
+        const service = new CombatService();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [],
+        };
+        await service.resolve(baseRun(), context);
+
+        expect(recordWeaponProficiencyMock).toHaveBeenCalledWith('char-1', {}, {
+            exp: 0, level: 1, 
+        }, {}, 0);
+    });
+
+    it('accrues exp for a single equipped weaponType on a normal hit, no dualWield exp', async () => {
+        getCharacterWithStatsMock.mockResolvedValue(overpoweredCharacter({ equipment: { [EquipmentSlot.RIGHT_HAND]: 'weapon-fist' } }));
+        itemRepoGetByIdsMock.mockResolvedValue([fistWeapon()]);
+
+        const service = new CombatService();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [],
+        };
+        await service.resolve(baseRun(), context);
+
+        expect(recordWeaponProficiencyMock).toHaveBeenCalledWith(
+            'char-1', {}, {
+                exp: 0, level: 1, 
+            }, { [WeaponType.FIST]: 1 }, 0,
+        );
+    });
+
+    it('dual-wielding two different types accrues both types + dualWieldProficiency in the same hit', async () => {
+        getCharacterWithStatsMock.mockResolvedValue(overpoweredCharacter({
+            equipment: {
+                [EquipmentSlot.RIGHT_HAND]: 'weapon-fist', [EquipmentSlot.LEFT_HAND]: 'weapon-blade', 
+            }, 
+        }));
+        itemRepoGetByIdsMock.mockResolvedValue([fistWeapon(), bladeWeapon()]);
+
+        const service = new CombatService();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [],
+        };
+        await service.resolve(baseRun(), context);
+
+        expect(recordWeaponProficiencyMock).toHaveBeenCalledWith(
+            'char-1', {}, {
+                exp: 0, level: 1, 
+            },
+            {
+                [WeaponType.FIST]: 1, [WeaponType.BLADE]: 1, 
+            },
+            1,
+        );
+    });
+
+    it('an aoeChance=1 weapon hits every alive enemy in the wave from a single player action', async () => {
+        getCharacterWithStatsMock.mockResolvedValue(overpoweredCharacter({ equipment: { [EquipmentSlot.RIGHT_HAND]: 'weapon-fist' } }));
+        itemRepoGetByIdsMock.mockResolvedValue([fistWeapon({ aoeChance: 1 })]);
+
+        const service = new CombatService();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 3, firstWaveArchetypeIndices: [],
+        };
+        const result = await service.resolve(baseRun(), context);
+
+        expect(result.enemies).toHaveLength(3);
+        expect(result.combatLog.filter(entry => entry.action === 'DEATH')).toHaveLength(3);
+        // All 3 deaths land on the same player action (same timestamp) since
+        // it's one AoE swing, not 3 separate attacks.
+        const deathTimestamps = new Set(result.combatLog.filter(entry => entry.action === 'DEATH').map(entry => entry.timestamp));
+        expect(deathTimestamps.size).toBe(1);
+    });
+
+    it('a splashChance=1 weapon damages the main target fully and up to 2 secondary targets at a reduced ratio', async () => {
+        getCharacterWithStatsMock.mockResolvedValue(overpoweredCharacter({
+            equipment: { [EquipmentSlot.RIGHT_HAND]: 'weapon-fist' },
+            stats: {
+                ATK: 20, DEF: 1000, HP_MAX: 1000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+            },
+        }));
+        itemRepoGetByIdsMock.mockResolvedValue([fistWeapon({ splashChance: 1 })]);
+
+        const service = new CombatService();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 3, firstWaveArchetypeIndices: [],
+        };
+        const result = await service.resolve(baseRun(), context);
+
+        const firstActionEntries = result.combatLog.filter(entry => entry.actorId === 'player' && entry.action !== 'DEATH')
+            .filter(entry => entry.timestamp === result.combatLog[0]?.timestamp);
+        // Main target + up to 2 secondaries = at most 3 damage entries in one action.
+        expect(firstActionEntries.length).toBeGreaterThanOrEqual(2);
+        expect(firstActionEntries.length).toBeLessThanOrEqual(3);
+        const damages = firstActionEntries.map(entry => entry.damage as number);
+        const mainDamage = damages[0] as number;
+        for (const secondaryDamage of damages.slice(1)) {
+            expect(secondaryDamage).toBeLessThan(mainDamage);
+        }
+    });
+
+    it('fires WEAPON_LEVEL_REACHED + WEAPON_LEVEL_REACHED_<TYPE> achievement events when a weaponType levels up', async () => {
+        getCharacterWithStatsMock.mockResolvedValue(overpoweredCharacter({ equipment: { [EquipmentSlot.RIGHT_HAND]: 'weapon-fist' } }));
+        itemRepoGetByIdsMock.mockResolvedValue([fistWeapon()]);
+        recordWeaponProficiencyMock.mockResolvedValue({
+            weaponTypeLevelUps: [
+                {
+                    weaponType: WeaponType.FIST, oldLevel: 2, newLevel: 3, 
+                },
+            ], 
+        });
+
+        const service = new CombatService();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [],
+        };
+        await service.resolve(baseRun(), context);
+
+        expect(incrementProgressMock).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'WEAPON_LEVEL_REACHED', amount: 3,
+        }));
+        expect(incrementProgressMock).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'WEAPON_LEVEL_REACHED_FIST', amount: 3,
+        }));
+    });
+
+    it('fires WEAPON_TYPE_MASTERED when a weaponType first crosses Lv.10, and WEAPON_LEVEL_REACHED_DUAL_WIELD (not the generic event) for dualWield level-ups', async () => {
+        getCharacterWithStatsMock.mockResolvedValue(overpoweredCharacter({ equipment: { [EquipmentSlot.RIGHT_HAND]: 'weapon-fist' } }));
+        itemRepoGetByIdsMock.mockResolvedValue([fistWeapon()]);
+        recordWeaponProficiencyMock.mockResolvedValue({
+            weaponTypeLevelUps: [
+                {
+                    weaponType: WeaponType.FIST, oldLevel: 9, newLevel: 10, 
+                },
+            ],
+            dualWieldLevelUp: {
+                oldLevel: 3, newLevel: 4, 
+            },
+        });
+
+        const service = new CombatService();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [],
+        };
+        await service.resolve(baseRun(), context);
+
+        expect(incrementProgressMock).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'WEAPON_TYPE_MASTERED', amount: 1,
+        }));
+        expect(incrementProgressMock).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'WEAPON_LEVEL_REACHED_DUAL_WIELD', amount: 4,
+        }));
+        expect(incrementProgressMock).not.toHaveBeenCalledWith(expect.objectContaining({
+            type: 'WEAPON_LEVEL_REACHED', amount: 4,
+        }));
     });
 });

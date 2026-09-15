@@ -105,8 +105,25 @@ function withRenameDefaults(character: Character): Character {
     };
 }
 
+/**
+ * Backfill `weaponProficiency`/`dualWieldProficiency` for character documents
+ * written before `weapon-proficiency-system` shipped — same "不做資料回填"
+ * tolerance pattern as withTalentDefaults/withBestiaryDefaults.
+ */
+function withWeaponProficiencyDefaults(character: Character): Character {
+    return {
+        ...character,
+        weaponProficiency: character.weaponProficiency ?? {},
+        dualWieldProficiency: character.dualWieldProficiency ?? {
+            exp: 0, level: 1,
+        },
+    };
+}
+
 function withCharacterDefaults(character: Character): Character {
-    return withRenameDefaults(withBestiaryDefaults(withTalentDefaults(withLevelDefaults(withNextChapterDefault(character)))));
+    return withWeaponProficiencyDefaults(
+        withRenameDefaults(withBestiaryDefaults(withTalentDefaults(withLevelDefaults(withNextChapterDefault(character))))),
+    );
 }
 
 export class CharacterRepository extends BaseRepository<Character> {
@@ -351,6 +368,19 @@ export class CharacterRepository extends BaseRepository<Character> {
      */
     async updateDefeatedArchetypeCounts(characterId: string, defeatedArchetypeCounts: Record<string, number>): Promise<Character> {
         return this.update(characterId, { defeatedArchetypeCounts });
+    }
+
+    /**
+     * Overwrite a character's weapon proficiency (weapon-proficiency-system
+     * D2/D2b). Caller (CharacterService.recordWeaponProficiency) already
+     * merges the new exp/level into the existing values, so this always
+     * writes — no-op guard (no combat exp gained) lives upstream.
+     */
+    async updateWeaponProficiency(
+        characterId: string,
+        patch: { weaponProficiency: Character['weaponProficiency']; dualWieldProficiency: Character['dualWieldProficiency'] },
+    ): Promise<Character> {
+        return this.update(characterId, patch);
     }
 
     /**

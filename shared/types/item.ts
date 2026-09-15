@@ -3,7 +3,7 @@
  */
 
 import type {
-    Rarity, EquipmentSlot, Timestamp, WeaponWeightClass,
+    Rarity, EquipmentSlot, Timestamp, WeaponType,
 } from './common';
 
 /**
@@ -68,9 +68,19 @@ export type ItemTemplate = {
   type: ItemType;
   equipSlot?: EquipmentSlot; // Required for type: EQUIPMENT
 
-  // Weight class (speed/power/dodge tradeoff) — required for type: EQUIPMENT,
-  // fixed per template regardless of rolled rarity.
-  weaponWeightClass?: WeaponWeightClass;
+  // Weight (kg-equivalent, arbitrary unit) — required for type: EQUIPMENT,
+  // fixed per template regardless of rolled rarity. `weaponWeightClass`
+  // (LIGHT/MEDIUM/HEAVY) is derived from this value, see
+  // server/constants/weapon-weight-class.ts.
+  weight?: number;
+
+  // Weapon type (FIST/BLADE/BLUNT/POLEARM/RANGED) — presence of this field is
+  // what marks an EQUIPMENT template as a weapon (see weapon-proficiency).
+  weaponType?: WeaponType;
+
+  // Attack target pattern chances — weapon-only, default 0 (single-target).
+  aoeChance?: number;
+  splashChance?: number;
 
   // Rarity weights for generation
   rarityWeights: Record<Rarity, number>;
@@ -96,7 +106,10 @@ export type ItemInstance = {
   templateId: string;          // Reference to template
   type: ItemType;
   equipSlot?: EquipmentSlot;
-  weaponWeightClass?: WeaponWeightClass; // Carried from template — type: EQUIPMENT only
+  weight?: number; // Carried from template — type: EQUIPMENT only
+  weaponType?: WeaponType; // Carried from template — weapon-type EQUIPMENT only
+  aoeChance?: number; // Carried from template — weapon-type EQUIPMENT only
+  splashChance?: number; // Carried from template — weapon-type EQUIPMENT only
 
   // Name/description resolved from the template at roll time and fixed
   // thereafter — a later template text edit doesn't change items already

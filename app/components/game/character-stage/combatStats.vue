@@ -11,14 +11,14 @@
                 <span class="character-stage__stat-value-block">
                     <span
                         class="font-pixel character-stage__stat-value"
-                        :style="{ color: stat.buffed ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-primary))' }"
+                        :style="{ color: stat.buffed ? (stat.favorable ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-error))') : 'rgb(var(--v-theme-primary))' }"
                     >
                         {{ stat.value }}
                     </span>
                     <span
                         v-if="stat.delta"
                         class="character-stage__stat-delta"
-                        style="color: rgb(var(--v-theme-green));"
+                        :style="{ color: stat.favorable ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-error))' }"
                     >
                         {{ stat.delta }}
                     </span>
@@ -44,25 +44,30 @@ const props = defineProps<{
     stats: Stats;
     equipmentBonus: Partial<Stats>;
     talentBonus: Partial<Stats>;
+    proficiencyBonus: Partial<Stats>;
     pendingAllocation: Partial<Attributes>;
     totalPending: number;
 }>();
 
-// 裝備與天賦都是已經反映在 `stats` 裡的加成來源,顯示時合併成單一括號差值
-// (例如 "(+3)" 可能是裝備+2、天賦+1 的總和),不特別區分來源。
+// 裝備、天賦、武器熟練度都是已經反映在 `stats` 裡的加成來源,顯示時合併成單一
+// 括號差值(例如 "(+3)" 可能是裝備+2、熟練度+1 的總和),不特別區分來源。
 const totalBonus = (stat: keyof Stats): number | undefined => {
     const fromEquipment = props.equipmentBonus[stat] ?? 0;
     const fromTalent = props.talentBonus[stat] ?? 0;
-    const total = fromEquipment + fromTalent;
+    const fromProficiency = props.proficiencyBonus[stat] ?? 0;
+    const total = fromEquipment + fromTalent + fromProficiency;
     return total || undefined;
 };
 
 // 分配過程中的即時狀態值預覽：以暫定屬性（現有值 + 待分配點數）套用純前端的
 // calculateBaseStats/applyEquipmentStats/applyTalentStats（與後端同一份公式，見
-// shared/utils/calculateStats），疊上目前裝備＋天賦加成後與伺服端目前的 stats
-// 比較差值，顯示在下方戰鬥數值旁。天賦加成不會因為分配屬性點而改變，但仍要疊
-// 上去──否則拿掉裝備/天賦後的 preview 會比已經含裝備/天賦加成的 `stats` 低，
-// 明明只加點卻算出負的 pendingDelta（見使用者回報）。
+// shared/utils/calculateStats），疊上目前裝備＋天賦＋熟練度加成後與伺服端目前的
+// stats 比較差值，顯示在下方戰鬥數值旁。裝備/天賦/熟練度加成不會因為分配屬性點
+// 而改變，但仍要疊上去──否則拿掉這些加成後的 preview 會比已經含加成的 `stats`
+// 低，明明只加點卻算出負的 pendingDelta（見使用者回報）。熟練度的 ATK%/暴擊率
+// 加成在後端是套用當下 ATK 的百分比（見 applyProficiencyStats），但這裡跟
+// equipment/talent 一樣用 applyTalentStats 疊加固定差值近似處理，屬性點分配不
+// 會動到熟練度等級，誤差可忽略。
 const previewStats = computed(() => {
     if (props.totalPending === 0) return null;
     const previewAttributes = {
@@ -73,7 +78,8 @@ const previewStats = computed(() => {
     };
     const base = calculateBaseStats(previewAttributes);
     const afterEquipment = applyEquipmentStats(base, props.equipmentBonus);
-    return applyTalentStats(afterEquipment, props.talentBonus);
+    const afterTalents = applyTalentStats(afterEquipment, props.talentBonus);
+    return applyTalentStats(afterTalents, props.proficiencyBonus);
 });
 
 type StatFormat = 'int' | 'seconds';
@@ -86,15 +92,21 @@ const formatStat = (value: number, format: StatFormat) => (
 // in — it is the number actually used in combat. Only the delta (`bonus`)
 // is worth surfacing separately, in parentheses; the pre-equipment base
 // value is not shown anywhere.
-const withEquipmentBonus = (finalValue: number, bonus: number | undefined, format: StatFormat) => {
+//
+// `inverse` 為攻速（actionIntervalSec）專用：數值是「行動間隔秒數」，越低
+// 代表出手越快，所以正加成（間隔變長）其實是變弱，delta 顏色要反過來判斷。
+const withEquipmentBonus = (finalValue: number, bonus: number | undefined, format: StatFormat, inverse = false) => {
     if (!bonus) {
-        return { value: formatStat(finalValue, format), delta: '', buffed: false };
+        return {
+            value: formatStat(finalValue, format), delta: '', buffed: false, favorable: true,
+        };
     }
     const sign = bonus > 0 ? '+' : '';
     return {
         value: formatStat(finalValue, format),
         delta: `(${sign}${formatStat(bonus, format)})`,
         buffed: true,
+        favorable: inverse ? bonus < 0 : bonus > 0,
     };
 };
 
@@ -117,12 +129,14 @@ const pendingPercentDeltaText = (current: number, preview: number | undefined) =
 const withEquipmentBonusPercent = (finalValue: number, bonus: number | undefined) => {
     const percentValue = `${Math.round(finalValue * 100)}%`;
     if (!bonus) {
-        return { value: percentValue, delta: '', buffed: false };
+        return {
+            value: percentValue, delta: '', buffed: false, favorable: true,
+        };
     }
     const diff = Math.round(bonus * 100);
     const sign = diff > 0 ? '+' : '';
     return {
-        value: percentValue, delta: `(${sign}${diff}%)`, buffed: true,
+        value: percentValue, delta: `(${sign}${diff}%)`, buffed: true, favorable: diff > 0,
     };
 };
 
@@ -148,7 +162,7 @@ const statEntries = computed(() => {
         },
         {
             label: '攻速',
-            ...withEquipmentBonus(stats.actionIntervalSec, totalBonus('actionIntervalSec'), 'seconds'),
+            ...withEquipmentBonus(stats.actionIntervalSec, totalBonus('actionIntervalSec'), 'seconds', true),
             pendingDelta: pendingDeltaText(stats.actionIntervalSec, preview?.actionIntervalSec, 'seconds'),
         },
         {

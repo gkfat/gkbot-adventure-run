@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { RENAME_COST_GEMS } from '../../../composables/useCharacter';
+import { RENAME_COST_GEMS } from '../../../../shared/types/character';
 
 const {
     character, renameCharacter,

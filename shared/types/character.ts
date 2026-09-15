@@ -1,6 +1,16 @@
 import type {
-    Timestamp, Attributes, EquipmentSlot, Stats,
+    Timestamp, Attributes, EquipmentSlot, Stats, WeaponType,
 } from './common';
+
+/**
+ * Weapon proficiency (weapon-proficiency-system D2/D2b): Lv.1-10 exp/level
+ * pair, shared shape for both the 5 per-WeaponType buckets and the single
+ * dualWieldProficiency bucket.
+ */
+export type ProficiencyProgress = {
+  exp: number;
+  level: number; // 1-10
+};
 
 /**
  * A single stat contribution of a talent node, applied `perRank` times the
@@ -66,6 +76,12 @@ export type Character = {
   talentPoints: number;
   talents: Record<string, number>; // nodeId -> current rank (0/missing = not invested)
 
+  // Weapon proficiency (weapon-proficiency-system D2/D2b): per-WeaponType
+  // exp/level, sparse (a key only exists once a hit has landed with it).
+  weaponProficiency: Partial<Record<WeaponType, ProficiencyProgress>>;
+  // Independent "dual-wield" dimension — not a 6th WeaponType (see D2b).
+  dualWieldProficiency: ProficiencyProgress;
+
   // Equipment (slot -> itemId mapping)
   equipment: Partial<Record<EquipmentSlot, string>>;
 
@@ -113,6 +129,10 @@ export type CharacterWithStats = Character & {
   // The portion of `stats` contributed by invested talent nodes — same
   // shape as equipmentBonus, present only for keys with a non-zero total.
   talentBonus: Partial<Stats>;
+  // The portion of `stats` (ATK/critChance only) contributed by weapon
+  // proficiency levels — same shape as equipmentBonus, present only for
+  // keys with a non-zero total.
+  proficiencyBonus: Partial<Stats>;
   // This character's archetype's full talent tree definition, for the
   // frontend talent tree UI (see character-talents design decision 1).
   talentTree: TalentTree;

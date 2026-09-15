@@ -101,6 +101,16 @@ export enum AchievementType {
   ATTACK_SPEED = 'ATTACK_SPEED',         // Character's computed actionIntervalSec crosses a threshold
   CHARACTER_LEVEL = 'CHARACTER_LEVEL',   // Character reaches level X
   NO_DAMAGE_CLEAR = 'NO_DAMAGE_CLEAR',   // Complete a run without ever taking damage
+
+  // weapon-proficiency-system (design.md D9)
+  WEAPON_PROFICIENCY_LEVEL = 'WEAPON_PROFICIENCY_LEVEL', // Any single WeaponType reaches level X (PEAK/GTE)
+  WEAPON_TYPES_MASTERED = 'WEAPON_TYPES_MASTERED',       // Distinct WeaponTypes that reached Lv.10 (CUMULATIVE, targetCount 5)
+  WEAPON_MASTERY_FIST = 'WEAPON_MASTERY_FIST',           // FIST proficiency reaches Lv.10 (PEAK/GTE)
+  WEAPON_MASTERY_BLADE = 'WEAPON_MASTERY_BLADE',         // BLADE proficiency reaches Lv.10 (PEAK/GTE)
+  WEAPON_MASTERY_BLUNT = 'WEAPON_MASTERY_BLUNT',         // BLUNT proficiency reaches Lv.10 (PEAK/GTE)
+  WEAPON_MASTERY_POLEARM = 'WEAPON_MASTERY_POLEARM',     // POLEARM proficiency reaches Lv.10 (PEAK/GTE)
+  WEAPON_MASTERY_RANGED = 'WEAPON_MASTERY_RANGED',       // RANGED proficiency reaches Lv.10 (PEAK/GTE)
+  WEAPON_MASTERY_DUAL_WIELD = 'WEAPON_MASTERY_DUAL_WIELD', // dualWieldProficiency reaches Lv.10 (PEAK/GTE)
 }
 
 /**

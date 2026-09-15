@@ -152,6 +152,10 @@ describe('CharacterService.createCharacterFromArchetype', () => {
             },
             talentPoints: 0,
             talents: {},
+            weaponProficiency: {},
+            dualWieldProficiency: {
+                exp: 0, level: 1, 
+            },
             equipment: {},
         };
 
@@ -185,6 +189,10 @@ describe('CharacterService.createCharacterFromArchetype', () => {
             },
             talentPoints: 0,
             talents: {},
+            weaponProficiency: {},
+            dualWieldProficiency: {
+                exp: 0, level: 1, 
+            },
             equipment: {},
         };
 
@@ -223,6 +231,10 @@ describe('CharacterService.createCharacterFromArchetype', () => {
             },
             talentPoints: 0,
             talents: {},
+            weaponProficiency: {},
+            dualWieldProficiency: {
+                exp: 0, level: 1, 
+            },
             equipment: {},
         };
 

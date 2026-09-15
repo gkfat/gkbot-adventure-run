@@ -48,32 +48,6 @@
             class="w-100 d-flex flex-column fill-height character-stage__portrait"
         >
             <div class="w-100 text-center character-stage__content">
-                <!-- LV / 職業 + 屬性 + 可分配屬性點：合併為單一精簡區塊，寬度 100% -->
-                <GameCharacterStageAttributePanel
-                    :attributes="character.attributes"
-                    :unspent-attribute-points="character.unspentAttributePoints"
-                    :allocating="allocating"
-                    :saving-allocation="savingAllocation"
-                    :pending-allocation="pendingAllocation"
-                    :remaining-points="remainingPoints"
-                    :total-pending="totalPending"
-                    @start-allocating="startAllocating"
-                    @cancel-allocating="cancelAllocating"
-                    @save-allocation="saveAllocation"
-                    @increment="incrementAttribute"
-                    @decrement="decrementAttribute"
-                />
-
-                <!-- 戰鬥數值：每格 col-4 -->
-                <GameCharacterStageCombatStats
-                    :attributes="character.attributes"
-                    :stats="character.stats"
-                    :equipment-bonus="character.equipmentBonus"
-                    :talent-bonus="character.talentBonus"
-                    :pending-allocation="pendingAllocation"
-                    :total-pending="totalPending"
-                />
-
                 <!-- 裝備欄位：角色圖像左右各 3 格 -->
                 <div class="character-stage__equip-row mt-2">
                     <GameCharacterStageEquipSlots
@@ -163,7 +137,7 @@ import { EQUIP_SLOTS_LEFT, EQUIP_SLOTS_RIGHT, type ItemLike } from '../../../uti
 import { idleFrameUrl } from '../../../utils/spriteDisplay';
 
 const {
-    character, loading, error, fetchCharacter, allocateAttributes,
+    character, loading, error, fetchCharacter,
 } = useCharacter();
 const {
     itemById, fetchInventory, loaded: inventoryLoaded,
@@ -237,58 +211,6 @@ const renameCharacterDialogRef = ref<RenameCharacterDialog | null>(null);
 
 const openRenameDialog = () => {
     renameCharacterDialogRef.value?.open();
-};
-
-type AttributeKey = 'STR' | 'AGI' | 'CON' | 'LUCK';
-
-const emptyAllocation = (): Record<AttributeKey, number> => ({
-    STR: 0, AGI: 0, CON: 0, LUCK: 0,
-});
-
-// 屬性點分配：進入分配模式後，玩家可用左側 +/- 調整每項屬性的暫定加點
-// （pendingAllocation），下限為 0（不可倒扣現有屬性），上限受剩餘可分配點數
-// 限制。儲存時才呼叫 API 落地；取消則直接捨棄暫定值。
-const allocating = ref(false);
-const savingAllocation = ref(false);
-const pendingAllocation = ref(emptyAllocation());
-
-const totalPending = computed(() => (
-    Object.values(pendingAllocation.value).reduce((sum, value) => sum + value, 0)
-));
-
-const remainingPoints = computed(() => (
-    (character.value?.unspentAttributePoints ?? 0) - totalPending.value
-));
-
-const startAllocating = () => {
-    pendingAllocation.value = emptyAllocation();
-    allocating.value = true;
-};
-
-const cancelAllocating = () => {
-    pendingAllocation.value = emptyAllocation();
-    allocating.value = false;
-};
-
-const incrementAttribute = (key: AttributeKey) => {
-    if (remainingPoints.value <= 0) return;
-    pendingAllocation.value[key] += 1;
-};
-
-const decrementAttribute = (key: AttributeKey) => {
-    if (pendingAllocation.value[key] <= 0) return;
-    pendingAllocation.value[key] -= 1;
-};
-
-const saveAllocation = async () => {
-    if (totalPending.value === 0) return;
-    savingAllocation.value = true;
-    const ok = await allocateAttributes({ ...pendingAllocation.value });
-    savingAllocation.value = false;
-    if (ok) {
-        allocating.value = false;
-        pendingAllocation.value = emptyAllocation();
-    }
 };
 
 const combatPower = computed(() => {

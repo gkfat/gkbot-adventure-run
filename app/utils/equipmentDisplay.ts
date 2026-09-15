@@ -3,8 +3,9 @@
  * equipment mini-slots (game/character-stage/equipSlots.vue) and the inventory page.
  */
 import {
-    EquipmentSlot, Rarity, HAND_SLOTS, WeaponWeightClass,
+    EquipmentSlot, Rarity, HAND_SLOTS, WeaponWeightClass, WeaponType,
 } from '../../shared/types/common';
+import { deriveWeaponWeightClass } from '../../shared/constants/equipmentWeight';
 import type { PixelIconName } from './pixelIcons';
 
 export const EQUIP_SLOTS_LEFT: EquipmentSlot[] = [
@@ -58,6 +59,22 @@ export const WEIGHT_CLASS_LABEL: Record<WeaponWeightClass, string> = {
     [WeaponWeightClass.MEDIUM]: '中等',
     [WeaponWeightClass.HEAVY]: '重型',
 };
+
+export const WEAPON_TYPE_LABEL: Record<WeaponType, string> = {
+    [WeaponType.FIST]: '拳套',
+    [WeaponType.BLADE]: '刀劍',
+    [WeaponType.BLUNT]: '鈍器',
+    [WeaponType.POLEARM]: '長柄',
+    [WeaponType.RANGED]: '槍械',
+};
+
+/**
+ * An item's WeaponWeightClass, derived from its `weight` (weapon-weight-class
+ * D6) — `weaponWeightClass` is no longer a field on ItemInstance itself.
+ */
+export function resolveWeaponWeightClass(item: Pick<ItemLike, 'weight'>): WeaponWeightClass {
+    return deriveWeaponWeightClass(item.weight);
+}
 
 export const RARITY_COLOR: Record<Rarity, string> = {
     [Rarity.N]: '#8a8f98',
@@ -126,7 +143,8 @@ export type ItemLike = {
     templateId: string;
     type: string;
     equipSlot?: EquipmentSlot;
-    weaponWeightClass?: WeaponWeightClass;
+    weight?: number;
+    weaponType?: WeaponType;
     rarity: Rarity;
     name?: string;
     description?: string;

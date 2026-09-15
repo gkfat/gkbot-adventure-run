@@ -72,7 +72,7 @@ type NavItem = {
 
 const leftItems: NavItem[] = [
     { key: 'shop', label: '商店', icon: 'mdi-store' },
-    { key: 'inventory', label: '背包', icon: 'mdi-bag-personal-outline' },
+    { key: 'inventory', label: '角色', icon: 'mdi-account-outline' },
 ];
 
 const rightItems: NavItem[] = [

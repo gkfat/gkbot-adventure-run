@@ -12,30 +12,30 @@ const attributes = (overrides: Partial<Attributes> = {}): Attributes => ({
 });
 
 describe('calculateBaseStats — carryCapacity', () => {
-    it('equals STR + CON', () => {
+    it('equals 10 + (STR + CON) * 2', () => {
         const stats = calculateBaseStats(attributes({
-            STR: 5, CON: 3, 
+            STR: 5, CON: 3,
         }));
-        expect(stats.carryCapacity).toBe(8);
+        expect(stats.carryCapacity).toBe(26);
     });
 
     it('is unaffected by AGI/LUCK', () => {
         const stats = calculateBaseStats(attributes({
             STR: 2, CON: 2, AGI: 50, LUCK: 50,
         }));
-        expect(stats.carryCapacity).toBe(4);
+        expect(stats.carryCapacity).toBe(18);
     });
 });
 
 describe('applyEquipmentStats — carryCapacity and dodgeChance', () => {
     it('passes carryCapacity through unaffected by equipment', () => {
         const base = calculateBaseStats(attributes({
-            STR: 4, CON: 4, 
+            STR: 4, CON: 4,
         }));
         const result = applyEquipmentStats(base, {
-            ATK: 999, DEF: 999, 
+            ATK: 999, DEF: 999,
         });
-        expect(result.carryCapacity).toBe(8);
+        expect(result.carryCapacity).toBe(26);
     });
 
     it('sums equipment dodgeChance into the base dodgeChance', () => {

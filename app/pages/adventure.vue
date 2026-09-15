@@ -1666,7 +1666,10 @@ onMounted(() => {
         text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
         pointer-events: none;
         white-space: nowrap;
-        animation: adventure-page-stage-damage-text-float 0.7s ease-out forwards;
+        // 與 combatResultPanel.vue 同步：一般命中 1.5s、爆擊 2s、閃避維持
+        // 0.7s（adventure-run-presentation D11），對齊 useCombat.ts 的
+        // DAMAGE_TEXT_FX_MS_NORMAL/_CRIT/_DODGE 計時器。
+        animation: adventure-page-stage-damage-text-float 1.5s ease-out forwards;
 
         &--crit {
             display: inline-flex;
@@ -1675,11 +1678,13 @@ onMounted(() => {
             gap: 1px;
             font-size: 28px;
             color: rgb(var(--v-theme-warning));
+            animation-duration: 2s;
         }
 
         &--dodge {
             font-size: 16px;
             color: rgba(255, 255, 255, 0.8);
+            animation-duration: 0.7s;
         }
 
         &--heal {

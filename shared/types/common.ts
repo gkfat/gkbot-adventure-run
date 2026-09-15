@@ -49,6 +49,19 @@ export enum WeaponWeightClass {
 }
 
 /**
+ * Weapon type classification: determines proficiency tracking bucket and
+ * combat playstyle passives. Presence of `weaponType` on an ItemTemplate is
+ * the sole signal that it is a weapon (see weapon-proficiency-system design D1).
+ */
+export enum WeaponType {
+  FIST = 'FIST',
+  BLADE = 'BLADE',
+  BLUNT = 'BLUNT',
+  POLEARM = 'POLEARM',
+  RANGED = 'RANGED',
+}
+
+/**
  * Character attributes (permanent, player-controlled growth)
  */
 export type Attributes = {

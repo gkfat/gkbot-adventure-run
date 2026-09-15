@@ -3,4 +3,5 @@
 // the implementation lives in shared/utils/calculateStats.ts.
 export {
     STATS_CONFIG, calculateBaseStats, applyEquipmentStats, applyTalentStats,
+    applyProficiencyStats, applyWeightOverloadPenalty,
 } from '../../shared/utils/calculateStats';
