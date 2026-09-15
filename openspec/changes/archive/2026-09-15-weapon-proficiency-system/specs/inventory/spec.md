@@ -10,8 +10,8 @@
 - **THEN** 頂端 6 個槽位依角色目前的 `equipment`（slot -> itemId）顯示對應物品，未裝備的槽位顯示空槽位樣式
 
 #### Scenario: 裝備總覽顯示負重狀態
-- **WHEN** 玩家進入角色頁，角色目前已裝備道具的 `weight` 總和為 18，`stats.carryCapacity` 為 20
-- **THEN** 裝備總覽旁顯示「18 / 20」，未超過上限時不使用警示樣式
+- **WHEN** 玩家進入角色頁，角色目前已裝備道具的 `weight` 總和為 12，`stats.carryCapacity` 為 14
+- **THEN** 裝備總覽旁顯示「12 / 14」，未超過上限時不使用警示樣式
 
 #### Scenario: 超重時裝備總覽以警示樣式呈現
 - **WHEN** 角色目前已裝備道具的 `weight` 總和超過 `stats.carryCapacity`

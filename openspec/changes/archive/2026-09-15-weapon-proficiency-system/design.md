@@ -6,7 +6,7 @@
 - 角色 stats 計算管線為 `calculateBaseStats → applyEquipmentStats → applyTalentStats`（`shared/utils/calculateStats.ts`），三段疊加後才是最終 `Stats`。
 - `equipment.service.ts` 已允許 HAND 類道具透過 `requestedSlot` 裝到 `LEFT_HAND`/`RIGHT_HAND` 任一槽，雙武器/雙防具組合皆合法；裝備驗證邏輯只檢查「是否為 HAND 類道具」，不區分兩個槽位的身分（沒有「主手/副手」之分）——本次設計延續這個既有中立性，不新增任何以 `LEFT_HAND`/`RIGHT_HAND` 這個 enum 值本身做特殊判斷的邏輯。
 - `combat.service.ts` 的攻擊是「聚合數值」模型：`performAttack()` 對單一 `target`（`alive[0]`）做一次命中/爆擊/傷害判定，沒有 on-hit 效果、狀態、多目標機制。
-- `carryCapacity`（`STR+CON+talentBonus.carryCapacity`）已定義在 `Stats`，且已有一個既存用途：`item.service.ts` 的 `getHeavyPenaltyMitigation()` 用 `STR+CON` 折抵 HEAVY 分類裝備的 `actionSpeedMod`/`dodgeChanceMod` 懲罰。本次新增第二個獨立用途：全身裝備總重量預算（見 D6），兩者並存、互不取代。
+- `carryCapacity`（`BASE_CARRY_CAPACITY + (STR+CON)×CARRY_CAPACITY_PER_STAT_POINT + talentBonus.carryCapacity`）已定義在 `Stats`，且已有一個既存用途：`item.service.ts` 的 `getHeavyPenaltyMitigation()` 用 `STR+CON` 折抵 HEAVY 分類裝備的 `actionSpeedMod`/`dodgeChanceMod` 懲罰。本次新增第二個獨立用途：全身裝備總重量預算（見 D6），兩者並存、互不取代。
 
 ## Goals / Non-Goals
 
@@ -115,8 +115,26 @@
 
 > ASSUMPTION：追加攻擊固定用「本次攻擊的爆擊結果」而不獨立判定，是為了避免遞迴觸發（追加攻擊本身若又能觸發追加攻擊/AoE/濺射，複雜度會失控）——這是刻意的簡化邊界，tasks 階段不應該繞過這個限制。
 
-### D6. 全身裝備重量制：`weight` 取代 `weaponWeightClass` 成為權威欄位，超重不擋裝備、改為固定懲罰
-`ItemTemplate`/`ItemInstance` 新增 `weight: number`，涵蓋全部 6 個裝備槽位（比照既有 `weaponWeightClass` 的適用範圍）。`weaponWeightClass`（LIGHT/MEDIUM/HEAVY）不再是獨立指定的欄位，改為由 `weight` 落在哪個區間自動推導：
+### D6. 全身裝備重量制：`weight` 依稀有度與 roll 品質動態推導，超重不擋裝備、改為固定懲罰
+`ItemTemplate` 新增 `weight: number`，涵蓋全部 6 個裝備槽位（比照既有 `weaponWeightClass` 的適用範圍），代表該範本的**基準重量**（baseline），由內容端逐一設定（不做公式推導，design 只給建議區間讓內容維持手感一致，見下方推導表）。`ItemInstance` 的 `weight` 不再直接沿用 template 值，改為在 `generateItemInstance()` 時依稀有度與 roll 品質動態疊加：
+
+```
+instanceWeight = template.weight
+    + RARITY_WEIGHT_BONUS[rarity]
+    + ROLL_QUALITY_BONUS
+```
+
+| `rarity` | `RARITY_WEIGHT_BONUS` |
+|---|---|
+| N | 0 |
+| R | 0 |
+| SR | +1 |
+| SSR | +2 |
+| L | +3 |
+
+`ROLL_QUALITY_BONUS` 反映「加成效果好」：取該 instance 主屬性（`ATK` 或 `DEF`，兩者互斥，即既有 `PRIMARY_STAT_KEYS`）在該稀有度 `baseStatsRange` 區間中的 roll 結果，落在區間中位數 `(min+max)/2` 以上（含）為 `+1`，否則 `+0`。
+
+`weaponWeightClass`（LIGHT/MEDIUM/HEAVY）維持由 `weight`（此處指 instance 最終值）落在哪個區間自動推導，區間門檻不變：
 
 | `weight` 區間 | 推導出的 `weaponWeightClass` |
 |---|---|
@@ -124,9 +142,9 @@
 | 4～6 | MEDIUM |
 | 7 以上 | HEAVY |
 
-> ASSUMPTION：區間門檻為初版建議值，實作時抽成常數，方便配合既有 `weapon-weight-class` capability 的數值曲線一起調整。既有以 `weaponWeightClass` 做數值曲線/生成邏輯判斷的程式碼（`item.service.ts` 的 `rollStats`/`sumEquipmentStats`、`items.ts` 範本產生器）行為不變，只是這個分類值的來源從「範本直接寫死」改成「從 `weight` 算出來」。
+> ASSUMPTION：`RARITY_WEIGHT_BONUS`/`ROLL_QUALITY_BONUS` 與區間門檻皆為初版平衡起點，實作時一起抽成常數，方便日後調整。因為 instance `weight` 現在依 rarity/roll 結果變動，`deriveWeaponWeightClass()` 的呼叫時機必須區分清楚：`rollStats()` 內部用來判斷 HEAVY 保底鍵、LIGHT 護甲的既有用途，屬於「生成過程中、instance weight 尚未算出」，維持沿用 `template.weight`（baseline）不變；`sumEquipmentStats`/`applyWeightOverloadPenalty` 等「拿已存在 instance 算總重」的用途，一律改吃 `ItemInstance.weight`（已包含稀有度/roll 加成），不可再讀 template 值。
 
-裝備動作（`equipItem()`）**不**因總重超過 `carryCapacity` 而拒絕——移除先前版本設計中「雙手重量驗證擋裝備」的規則。改為在角色 stats 計算管線新增 `applyWeightOverloadPenalty`，接在 `applyTalentStats`（`carryCapacity` 已確定最終值）之後：加總角色目前 6 個槽位已裝備道具的 `weight`，若總和超過 `carryCapacity`，依超出量套用固定懲罰表（疊加，非只取最高一級）：
+裝備動作（`equipItem()`）**不**因總重超過 `carryCapacity` 而拒絕——維持既有規則，移除先前版本設計中「雙手重量驗證擋裝備」的規則不變。角色 stats 計算管線的 `applyWeightOverloadPenalty`（接在 `applyTalentStats`，`carryCapacity` 已確定最終值之後）：加總角色目前 6 個槽位已裝備道具的 `weight`（此時已是 instance weight），若總和超過 `carryCapacity`，依超出量套用固定懲罰表（疊加，非只取最高一級）：
 
 | 超出量 | 額外懲罰 |
 |---|---|
@@ -137,7 +155,8 @@
 
 > ASSUMPTION：懲罰表數值與級距為初版平衡起點，實作時抽成常數表。此懲罰**獨立於**既有 HEAVY 道具本身的 `actionSpeedMod`/`dodgeChanceMod` 懲罰（及其 STR+CON 折扣）——兩者並存，不互相取代、不互相折抵。
 
-`weight` 數值由內容端逐一設定（不做公式推導），design 只給建議區間讓內容維持手感一致（對應上面的推導表）。
+### D6b. `carryCapacity` 基準值下修，STR+CON 倍率不變
+`BASE_CARRY_CAPACITY` 從 20 降為 10，`CARRY_CAPACITY_PER_STAT_POINT` 維持既有的 2：`carryCapacity = BASE_CARRY_CAPACITY(10) + (STR + CON) × CARRY_CAPACITY_PER_STAT_POINT(2) + talentBonus.carryCapacity`。因為 D6 讓高稀有度/高品質裝備的 `weight` 變重，若基準值仍維持 20，角色靠裸 `STR`/`CON` 就能長期扛住整套高稀有度裝備、幾乎不觸發超重懲罰，`weight` 的稀有度加成會失去意義；下修基準值讓超重懲罰在稀有度爬升後更容易實際發生。
 
 ### D7. 攻擊目標型態：AoE／濺射／單體，雙持時取兩手較高機率
 `ItemTemplate` 新增 `aoeChance?: number`（預設 0）與 `splashChance?: number`（預設 0），只對帶 `weaponType` 的武器類道具有意義。`performAttack()` 命中判定通過（沒被閃避）後：
@@ -183,7 +202,7 @@
 - **主畫面**移除 `AttributePanel`／`CombatStats` 兩個子元件的掛載（元件檔本身不刪除，只是不再被 `characterStage.vue` 引用——遷移到角色頁後複用同一份元件）。主畫面只剩：LV/職業/暱稱/戰力 tag、裝備欄位（左右各 3 格）、角色圖像、章節進度、開始冒險 CTA。屬性點分配互動（`allocating`/`pendingAllocation` 那組邏輯）整包搬到角色頁的 script。
 - **角色頁**（`/inventory`，`BottomNav` label 改回「角色」）由上至下：`AttributePanel` → `CombatStats` → **新增**武器熟練度面板 → 頂部裝備總覽（含新增的負重狀態）→ 篩選 → 格狀背包物品列表。
 - **武器熟練度面板**（新元件，建議命名 `weaponProficiencyPanel.vue`，放在 `app/components/game/inventory-page/` 或現有 inventory 相關目錄下）：6 條進度（5 個 `weaponType` + `dualWieldProficiency`），每條顯示目前等級（Lv.1～10）、往下一級的 exp 進度條、已解鎖的被動技能名稱清單（達到 Lv.4/6/8/10 的類型才顯示對應被動，未解鎖的不列出，不做「灰階顯示鎖定中」的额外設計——熟練度是長線資源，不需要提前劇透未來被動內容）；只列出角色曾經使用過的類型（`weaponProficiency` 有 key 的），從未使用過的類型顯示「尚未使用」的空狀態，不顯示成長曲線細節。
-- **裝備總覽負重顯示**：既有的 6 格裝備總覽區塊（`inventory.vue` 頂部）旁新增「目前重量／`carryCapacity`」文字（例如 `18 / 20`），總重超過上限時以警示色（比照既有 `warning` 色）呈現該數字，不需要額外彈窗說明（懲罰內容已經反映在下方 `CombatStats` 的數值上，玩家自己會看到 `actionIntervalSec`/`dodgeChance` 變差）。
+- **裝備總覽負重顯示**：既有的 6 格裝備總覽區塊（`inventory.vue` 頂部）旁新增「目前重量／`carryCapacity`」文字（例如 `12 / 14`），總重超過上限時以警示色（比照既有 `warning` 色）呈現該數字，不需要額外彈窗說明（懲罰內容已經反映在下方 `CombatStats` 的數值上，玩家自己會看到 `actionIntervalSec`/`dodgeChance` 變差）。
 - **物品詳情 dialog**（`itemDetailDialog.vue`）：非武器 `EQUIPMENT` 顯示 `weight`；武器類（有 `weaponType`）額外顯示武器類型的圖示/文字標籤（沿用現有稀有度色塊/圖示的呈現風格，不需要新的視覺語言）。
 - **戰鬥演出**：AoE/濺射/被動觸發都只是讓單場戰鬥的 `combatLog` 多幾筆 `ATTACK`/`CRIT` 事件（見「目前戰鬥是先算完再演」這一版對話的結論），不新增播放邏輯或元件；但既有的傷害飄字時間軸需要調整，見 D11。
 - **成就頁**：新增的 7 個成就範本走既有成就列表渲染邏輯，不需要新畫面/新元件。

@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: 查詢角色資料與計算後 Stats
-系統 SHALL 提供 `GET /api/character/:characterId`，回傳指定角色（須屬於呼叫者帳號）的 level/exp/gold/gems/attributes/unspentAttributePoints/talentPoints/talents/nickname/archetypeId/className，附上該職業對應的完整 `TalentTree` 定義，並附上 server 依 attributes + 已投入天賦 + 裝備 + 武器熟練度 + 全身負重狀態（+ 未來的 run modifiers）即時計算出的 stats（ATK/DEF/HP_MAX/actionIntervalSec/critChance/critMultiplier/dodgeChance/carryCapacity）與 `talentBonus`（結構同 `equipmentBonus`，只列出天賦貢獻的非零項）。`actionIntervalSec` 的計算 SHALL 在套用裝備 `actionSpeedMod` 加總時，對其中來自 `HEAVY` 分類裝備的部分，先依角色 `STR`+`CON` 套用負重折扣（`1 - min(MAX_HEAVY_PENALTY_MITIGATION, (STR + CON) × HEAVY_PENALTY_MITIGATION_PER_POINT)`，公式與 `weapon-weight-class` capability「負重能力抑制 HEAVY 懲罰」一致）再累加；`LIGHT`/`MEDIUM` 裝備的 `actionSpeedMod` 不受此折扣影響。計算順序為：天賦加成 → 武器熟練度對 `ATK`/`critChance` 的加成（`weapon-proficiency` capability，雙持時各 `weaponType` 各自疊加）→ 雙持熟練度加成（`dualWieldProficiency`，只在雙手皆為武器時套用）→ 全身裝備總重量超過 `carryCapacity` 時的固定懲罰（`weapon-weight-class` capability「全身總重超過負重上限時套用固定懲罰」）。`carryCapacity`（負重）SHALL 等於該角色的 `STR + CON` 加上天賦樹投點提供的 `carryCapacity` 加成（若有），不受裝備影響，供玩家理解「還能承受多少重裝備懲罰、目前是否已經超重」的狀態值。回應 SHALL 另外附上 `weaponProficiency`（角色目前每個已使用過的 `weaponType` 的 exp/level）與 `dualWieldProficiency`（角色的雙持熟練度 exp/level）。Stats SHALL NOT 被寫入 Firestore。
+系統 SHALL 提供 `GET /api/character/:characterId`，回傳指定角色（須屬於呼叫者帳號）的 level/exp/gold/gems/attributes/unspentAttributePoints/talentPoints/talents/nickname/archetypeId/className，附上該職業對應的完整 `TalentTree` 定義，並附上 server 依 attributes + 已投入天賦 + 裝備 + 武器熟練度 + 全身負重狀態（+ 未來的 run modifiers）即時計算出的 stats（ATK/DEF/HP_MAX/actionIntervalSec/critChance/critMultiplier/dodgeChance/carryCapacity）與 `talentBonus`（結構同 `equipmentBonus`，只列出天賦貢獻的非零項）。`actionIntervalSec` 的計算 SHALL 在套用裝備 `actionSpeedMod` 加總時，對其中來自 `HEAVY` 分類裝備的部分，先依角色 `STR`+`CON` 套用負重折扣（`1 - min(MAX_HEAVY_PENALTY_MITIGATION, (STR + CON) × HEAVY_PENALTY_MITIGATION_PER_POINT)`，公式與 `weapon-weight-class` capability「負重能力抑制 HEAVY 懲罰」一致）再累加；`LIGHT`/`MEDIUM` 裝備的 `actionSpeedMod` 不受此折扣影響。計算順序為：天賦加成 → 武器熟練度對 `ATK`/`critChance` 的加成（`weapon-proficiency` capability，雙持時各 `weaponType` 各自疊加）→ 雙持熟練度加成（`dualWieldProficiency`，只在雙手皆為武器時套用）→ 全身裝備總重量超過 `carryCapacity` 時的固定懲罰（`weapon-weight-class` capability「全身總重超過負重上限時套用固定懲罰」）。`carryCapacity`（負重）SHALL 等於 `BASE_CARRY_CAPACITY + (STR + CON) × CARRY_CAPACITY_PER_STAT_POINT` 加上天賦樹投點提供的 `carryCapacity` 加成（若有），不受裝備影響，供玩家理解「還能承受多少重裝備懲罰、目前是否已經超重」的狀態值。回應 SHALL 另外附上 `weaponProficiency`（角色目前每個已使用過的 `weaponType` 的 exp/level）與 `dualWieldProficiency`（角色的雙持熟練度 exp/level）。Stats SHALL NOT 被寫入 Firestore。
 
 #### Scenario: 查詢自己的角色
 - **WHEN** 已登入玩家呼叫 `GET /api/character/:characterId`，且該角色屬於自己帳號
@@ -23,9 +23,9 @@
 - **WHEN** 角色裝備一件 `LIGHT` 或 `MEDIUM` 分類道具
 - **THEN** 該道具對 `actionIntervalSec` 的影響不受角色 `STR`+`CON` 負重折扣調整
 
-#### Scenario: carryCapacity 反映角色的 STR+CON 與天賦加成
+#### Scenario: carryCapacity 反映 BASE_CARRY_CAPACITY、STR+CON 與天賦加成
 - **WHEN** 查詢角色資料
-- **THEN** 回傳的 `stats.carryCapacity` 等於該角色目前 `attributes.STR + attributes.CON` 再加上已投入天賦提供的 `carryCapacity` 加成（未投入相關天賦時等同過去純 attributes 的行為）
+- **THEN** 回傳的 `stats.carryCapacity` 等於 `BASE_CARRY_CAPACITY + (attributes.STR + attributes.CON) × CARRY_CAPACITY_PER_STAT_POINT`，再加上已投入天賦提供的 `carryCapacity` 加成（未投入相關天賦時等同純 `BASE_CARRY_CAPACITY + (STR+CON)×倍率` 的行為）
 
 #### Scenario: 不同職業初始 carryCapacity 不同
 - **WHEN** 分別查詢兩個剛建立、尚未分配任何屬性點或天賦點的不同職業角色
