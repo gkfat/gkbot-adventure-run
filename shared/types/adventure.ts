@@ -148,6 +148,10 @@ export type CombatResolution = CombatResult & {
   // RNG-batching: all rolls happen in-memory off a cursor started at
   // run.rngIndex, so this is the only point where the advance gets written back).
   finalRngIndex: number;
+  // Next unconsumed rewardRngIndex after this combat's loot rolls — same
+  // persistence contract as finalRngIndex, but for `run.rewardRngIndex`
+  // (dual-rng-stream, known-issue.md #1).
+  finalRewardRngIndex: number;
 };
 
 /**
@@ -316,7 +320,11 @@ export type AdventureRun = {
   // RNG
   seed: string;
   rngIndex: number;
-  
+  // Second, independent RNG stream keyed by runId (unique per attempt) —
+  // used only for rolls that must vary across retries of the same Stage
+  // (combat loot, event/blessing content). See RngService/consumeRewardRng.
+  rewardRngIndex: number;
+
   // Lifecycle
   state: AdventureStateType;
   step: number;

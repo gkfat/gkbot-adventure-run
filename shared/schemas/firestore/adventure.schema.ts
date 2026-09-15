@@ -89,6 +89,11 @@ export const adventureRunSchema = z.object({
     // RNG
     seed: z.string(),
     rngIndex: z.number().int().min(0),
+    // Second, independent RNG stream keyed by runId (unique per attempt,
+    // unlike `seed` which is fixed per character+chapter+level) — used only
+    // for rolls that must vary across retries of the same Stage: combat loot
+    // and event/blessing content. See RngService/consumeRewardRng.
+    rewardRngIndex: z.number().int().min(0),
   
     // Lifecycle
     state: z.nativeEnum(AdventureStateType),

@@ -1,10 +1,13 @@
 /**
  * Combat Service — implements the `CombatResolver` interface adventure-run-core
  * defined. Simulates one full combat (all waves) in a single call using a
- * discrete-event schedule (each unit's own `nextAttackAt`), consuming all
- * randomness off one in-memory RngService cursor (started at run.rngIndex)
- * for determinism/auditability (RULE-014) without a per-roll Firestore
- * round-trip — see the `cursor`/`finalRngIndex` wiring in resolve().
+ * discrete-event schedule (each unit's own `nextAttackAt`), consuming combat
+ * outcome/enemy randomness off one in-memory RngService cursor (started at
+ * run.rngIndex) for determinism/auditability (RULE-014) without a per-roll
+ * Firestore round-trip — see the `cursor`/`finalRngIndex` wiring in resolve().
+ * Loot rolls (computeRewards) use a second cursor keyed by run.runId
+ * (`rewardCursor`/`finalRewardRngIndex`) so drops vary across retries of the
+ * same Stage while enemies stay identical (known-issue.md #1).
  *
  * See combat-engine/design.md for the enemy stat table and reward formulas —
  * none of this is defined anywhere else (documented ASSUMPTIONs).
@@ -291,6 +294,11 @@ export class CombatService extends BaseService implements CombatResolver {
         // persist cursor.index (returned as finalRngIndex below) as the run's
         // new rngIndex once combat is fully resolved.
         const cursor = this.rngService.createCursor(run.seed, run.rngIndex);
+        // Loot rolls (computeRewards) go off a separate in-memory cursor
+        // keyed by `run.runId` (unique per attempt), not `seed`, so drops
+        // differ across retries of the same Stage while enemies (which stay
+        // on `cursor` above) keep reproducing identically (known-issue.md #1).
+        const rewardCursor = this.rngService.createCursor(run.runId, run.rewardRngIndex ?? 0);
 
         const player: CombatUnit = {
             id: 'player',
@@ -466,7 +474,7 @@ export class CombatService extends BaseService implements CombatResolver {
 
         const victory = player.hp > 0;
         const rewards = victory
-            ? this.computeRewards(run, cursor, context, defeated, character.attributes.LUCK, activeModifiers)
+            ? this.computeRewards(run, rewardCursor, context, defeated, character.attributes.LUCK, activeModifiers)
             : {
                 expGained: 0, goldDropped: 0, gemsDropped: 0, itemsDropped: [], blessingPointsGained: 0,
             };
@@ -481,6 +489,7 @@ export class CombatService extends BaseService implements CombatResolver {
             })),
             combatLog,
             finalRngIndex: cursor.index,
+            finalRewardRngIndex: rewardCursor.index,
         };
     }
 

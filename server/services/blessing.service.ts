@@ -49,12 +49,15 @@ export class BlessingService extends BaseService {
                 candidate => !chosen.some(c => c.template.modifierId === candidate.template.modifierId),
             );
 
-            const rarityRoll = await this.rngService.next(runId);
+            // Reward RNG stream (keyed by runId, not `seed`) so blessing
+            // candidates differ across retries of the same Stage
+            // (known-issue.md #1).
+            const rarityRoll = await this.rngService.nextReward(runId);
             const preferredRarity = pickWeightedRarity(weights, rarityRoll);
             const preferredPool = remaining.filter(candidate => candidate.template.rarity === preferredRarity);
             const pool = preferredPool.length > 0 ? preferredPool : remaining;
 
-            const pickRoll = await this.rngService.next(runId);
+            const pickRoll = await this.rngService.nextReward(runId);
             const picked = pool[Math.floor(pickRoll * pool.length)] as { template: BlessingTemplate; ownedLevel: number };
             chosen.push({
                 template: picked.template, nextLevel: picked.ownedLevel + 1,

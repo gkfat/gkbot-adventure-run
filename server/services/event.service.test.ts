@@ -18,7 +18,9 @@ const {
 
 vi.mock('./rng.service', () => ({
     RngService: vi.fn().mockImplementation(function RngServiceMock() {
-        return { next: rngNextMock };
+        return {
+            next: rngNextMock, nextReward: rngNextMock,
+        };
     }),
 }));
 

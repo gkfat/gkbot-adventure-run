@@ -60,6 +60,10 @@ function withStageDefaults(run: AdventureRun): AdventureRun {
         // chapter-level-node-diversity: missing on pre-migration run docs —
         // 0 means no power-based enemy bonus, matching pre-change behavior.
         progressionFactor: run.progressionFactor ?? 0,
+        // dual-rng-stream (known-issue.md #1): missing on pre-migration run
+        // docs — 0 reproduces the pre-change behavior (reward stream starts
+        // fresh from this run's own runId, same as any newly created run).
+        rewardRngIndex: run.rewardRngIndex ?? 0,
     };
 }
 
@@ -124,6 +128,9 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
                 // RngService/consumeRng sequence past them so it never
                 // replays an already-used draw.
                 rngIndex: 3,
+                // Reward stream (dual-rng-stream, known-issue.md #1) is keyed
+                // by this run's own runId, not `seed` — nothing consumed yet.
+                rewardRngIndex: 0,
 
                 state: AdventureStateType.INIT,
                 step: 0,
@@ -274,6 +281,45 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
             }
             const message = error instanceof Error ? error.message : 'Unknown error';
             throw new DatabaseError(`Failed to consume RNG: ${message}`);
+        }
+    }
+
+    /**
+     * Consume the next value from the run's *reward* RNG stream — same
+     * transactional shape as consumeRng, but seeded by `run.runId` (unique
+     * per attempt) instead of `run.seed` (fixed per character+chapter+level),
+     * and advancing `rewardRngIndex` instead of `rngIndex`. Used for rolls
+     * that must differ across retries of the same Stage — combat loot,
+     * event/blessing content (known-issue.md #1) — while node/enemy
+     * generation keeps reproducing identically via consumeRng/`seed`.
+     */
+    async consumeRewardRng(runId: string): Promise<number> {
+        const docRef = this.getDocumentRef(runId);
+
+        try {
+            return await this.db.runTransaction(async (tx) => {
+                const doc = await tx.get(docRef);
+                if (!doc.exists) {
+                    throw new NotFoundError('adventure run');
+                }
+
+                const run = doc.data() as AdventureRun;
+                const index = run.rewardRngIndex ?? 0;
+                const value = random(run.runId, index);
+
+                tx.update(docRef, {
+                    rewardRngIndex: index + 1,
+                    updatedAt: Date.now(),
+                });
+
+                return value;
+            });
+        } catch (error: unknown) {
+            if (error instanceof NotFoundError) {
+                throw error;
+            }
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new DatabaseError(`Failed to consume reward RNG: ${message}`);
         }
     }
 }

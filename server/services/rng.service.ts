@@ -66,6 +66,18 @@ export class RngService {
     }
 
     /**
+     * Consume the next value from the run's *reward* RNG stream — seeded by
+     * `runId` (unique per attempt) instead of the run's `seed` (fixed per
+     * character+chapter+level), so combat loot and event/blessing content
+     * vary across retries of the same Stage while node/enemy generation
+     * (which goes through `next()`/`seed`) keeps reproducing identically.
+     * See AdventureRunRepository.consumeRewardRng.
+     */
+    async nextReward(runId: string): Promise<number> {
+        return this.runRepo.consumeRewardRng(runId);
+    }
+
+    /**
      * Start a cursor at `startIndex` (the caller's already-loaded `run.rngIndex`)
      * that computes further values purely in-memory. No two callers may share
      * a run's rngIndex range concurrently — same "one request at a time"

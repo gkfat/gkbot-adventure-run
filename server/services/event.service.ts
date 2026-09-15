@@ -53,9 +53,13 @@ export class EventService extends BaseService implements EventResolver {
      * require-combat-before-heal note).
      */
     async selectEvent(runId: string, healEligible: boolean): Promise<EventTemplate> {
-        const familyRoll = await this.rngService.next(runId);
-        const typeRoll = await this.rngService.next(runId);
-        const variantRoll = await this.rngService.next(runId);
+        // Content selection uses the reward RNG stream (keyed by runId, not
+        // `seed`) so retrying the same Stage sees different event content
+        // each time (known-issue.md #1) — only node *type* sequencing
+        // (decideNextNode) stays on the seed-based stream.
+        const familyRoll = await this.rngService.nextReward(runId);
+        const typeRoll = await this.rngService.nextReward(runId);
+        const variantRoll = await this.rngService.nextReward(runId);
         return pickEventTemplate(familyRoll, typeRoll, variantRoll, healEligible);
     }
 
@@ -103,7 +107,7 @@ export class EventService extends BaseService implements EventResolver {
     }
 
     private async resolveCurse(run: AdventureRun, template: EventTemplate): Promise<EventResult> {
-        const roll = await this.rngService.next(run.runId);
+        const roll = await this.rngService.nextReward(run.runId);
         const curse = CURSE_TEMPLATES[Math.floor(roll * CURSE_TEMPLATES.length)];
         return {
             eventId: template.id, type: template.type, description: template.description, curseApplied: curse?.modifierId,
@@ -111,10 +115,10 @@ export class EventService extends BaseService implements EventResolver {
     }
 
     private async resolveWheel(run: AdventureRun, template: EventTemplate): Promise<EventResult> {
-        const roll = await this.rngService.next(run.runId);
+        const roll = await this.rngService.nextReward(run.runId);
 
         if (roll < WHEEL_GEMS_CHANCE) {
-            const amountRoll = await this.rngService.next(run.runId);
+            const amountRoll = await this.rngService.nextReward(run.runId);
             const gemsGained = WHEEL_GEMS_MIN + Math.round((WHEEL_GEMS_MAX - WHEEL_GEMS_MIN) * amountRoll);
             return {
                 eventId: template.id, type: template.type, description: template.description, gemsGained,
@@ -129,7 +133,7 @@ export class EventService extends BaseService implements EventResolver {
         }
 
         if (roll < WHEEL_GEMS_CHANCE + WHEEL_GOLD_CHANCE + WHEEL_ITEM_CHANCE) {
-            const pickRoll = await this.rngService.next(run.runId);
+            const pickRoll = await this.rngService.nextReward(run.runId);
             const templateId = EQUIPMENT_TEMPLATE_IDS[Math.floor(pickRoll * EQUIPMENT_TEMPLATE_IDS.length)] as string;
             const itemsGained: ItemInstance[] = getItemTemplate(templateId)
                 ? [
@@ -162,10 +166,10 @@ export class EventService extends BaseService implements EventResolver {
             };
         }
 
-        const roll = await this.rngService.next(run.runId);
+        const roll = await this.rngService.nextReward(run.runId);
         const failed = roll < WHEEL_RISK_CURSE_CHANCE;
         if (failed && choice.riskCurseOnFailure) {
-            const curseRoll = await this.rngService.next(run.runId);
+            const curseRoll = await this.rngService.nextReward(run.runId);
             const curse = CURSE_TEMPLATES[Math.floor(curseRoll * CURSE_TEMPLATES.length)];
             return {
                 eventId: template.id, type: template.type, description: template.description, curseApplied: curse?.modifierId,

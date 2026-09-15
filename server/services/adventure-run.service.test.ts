@@ -454,6 +454,71 @@ describe('AdventureRunService.advance — node generation priority', () => {
                 nodeTypeStreak: 1,
             }));
         });
+
+        it('blocks the fixed Elite cadence once the combat-tier streak hits the cap, falling back to the weighted pool', async () => {
+            // step=5 -> step % ELITE_INTERVAL(5) == 0 would normally force
+            // ELITE; lastNodeType=COMBAT/streak=2 (>= COMBAT_STREAK_CAP) means
+            // a 3rd combat-tier node in a row is not allowed, so ELITE must be
+            // skipped in favor of the weighted pool (which itself also
+            // excludes COMBAT for the same reason).
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 5, lastRestStep: 5, stageCombatEncountered: true, lastNodeType: NodeType.COMBAT, nodeTypeStreak: 2,
+            }));
+            rngNextMock.mockResolvedValue(0);
+            selectEventMock.mockResolvedValue({
+                id: 'medbay_leak', type: 'HEAL', description: 'flavor text', choices: undefined,
+            });
+
+            const service = new AdventureRunService();
+            const result = await service.advance('account-1', 'char-1');
+
+            expect(result.run.currentNodeType).not.toBe(NodeType.ELITE);
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({ currentNodeType: NodeType.EVENT }));
+        });
+    });
+
+    // known-issue.md #1: the node immediately before BOSS must always be
+    // REST, overriding every other priority (guaranteed-rest interval, elite
+    // cadence, weighted pool) — the Stage's final fight is always preceded
+    // by a chance to heal up.
+    describe('Boss-precedes-Rest rule', () => {
+        it('forces Rest on the node right before Boss, overriding the fixed Strong Elite cadence', async () => {
+            // stageNodeIndex=13, stageNodeCount=15 -> second-to-last node.
+            // step=9 -> step % STRONG_ELITE_INTERVAL(9) == 0 would normally
+            // force Strong Elite — Boss-precedes-Rest wins instead.
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 9, lastRestStep: 9, stageNodeIndex: 13, stageNodeCount: 15, stageCombatEncountered: true,
+            }));
+
+            const service = new AdventureRunService();
+            const result = await service.advance('account-1', 'char-1');
+
+            expect(rngNextMock).not.toHaveBeenCalled();
+            expect(result.run.currentNodeType).toBe(NodeType.REST);
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({ currentNodeType: NodeType.REST }));
+        });
+
+        it('forces Rest on the node right before Boss even before the run has encountered any combat', async () => {
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 0, lastRestStep: 0, stageNodeIndex: 0, stageNodeCount: 2, stageCombatEncountered: false,
+            }));
+
+            const service = new AdventureRunService();
+            const result = await service.advance('account-1', 'char-1');
+
+            expect(result.run.currentNodeType).toBe(NodeType.REST);
+        });
+
+        it('still resolves to Boss on the actual last node of the Stage (not one-off by the Rest rule)', async () => {
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 9, lastRestStep: 9, stageNodeIndex: 14, stageNodeCount: 15, stageCombatEncountered: true,
+            }));
+
+            const service = new AdventureRunService();
+            await service.advance('account-1', 'char-1');
+
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({ currentNodeType: NodeType.BOSS }));
+        });
     });
 });
 

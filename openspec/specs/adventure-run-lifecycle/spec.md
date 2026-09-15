@@ -86,23 +86,46 @@
 - **THEN** 系統以 `0`（等同不調整的既有行為）作為預設值，不中斷該 run
 
 ### Requirement: 節點生成優先序
-系統 SHALL 依序決定下一節點：目前節點是本 Stage 最後一個節點時強制為 BOSS（Stage 邊界，優先序最高）；否則距上次 Rest 節點 >= 4 step 時強制為 Rest（保底）；否則 `step % 9 == 0` 為 Strong Elite、`step % 5 == 0` 為 Elite；否則依權重隨機決定 combat/event/rest/choice。多個條件同時觸發時，優先序為：Stage 邊界（Boss） > 保底 Rest > 固定精英節奏 > 加權隨機。
+系統 SHALL 依序決定下一節點：目前節點是本 Stage 最後一個節點時強制為 BOSS（Stage 邊界，優先序最高）；否則若下一節點即為 BOSS（即目前為本 Stage 倒數第二個節點）時強制為 Rest（Boss 前置 Rest，見「節點連續性限制」）；否則距上次 Rest 節點 >= 4 step 時強制為 Rest（保底）；否則 `step % 9 == 0` 為 Strong Elite、`step % 5 == 0` 為 Elite（惟受「節點連續性限制」約束，可能被跳過改走加權隨機）；否則依權重隨機決定 combat/event/rest/choice。多個條件同時觸發時，優先序為：Stage 邊界（Boss） > Boss 前置 Rest > 保底 Rest > 固定精英節奏 > 加權隨機。
 
 #### Scenario: Stage 邊界優先於保底 Rest
 - **WHEN** 目前節點同時是本 Stage 的最後一個節點，且距上次 Rest 已達保底條件
 - **THEN** 下一節點為 BOSS（Stage 邊界優先於保底 Rest）
 
+#### Scenario: Boss 前置 Rest 優先於固定精英節奏
+- **WHEN** 目前節點是本 Stage 倒數第二個節點（下一節點即為 BOSS），且本次同時符合 `step % 9 == 0`
+- **THEN** 下一節點為 Rest（Boss 前置 Rest 優先於固定精英節奏），不受「距上次 Rest 是否已達保底」影響
+
 #### Scenario: 保底 Rest 觸發
-- **WHEN** 距上次 Rest 已經過 4 個 step，且本次同時符合 `step % 5 == 0`，且本次不是 Stage 最後一個節點
+- **WHEN** 距上次 Rest 已經過 4 個 step，且本次同時符合 `step % 5 == 0`，且本次不是 Stage 最後一個節點也不是倒數第二個節點
 - **THEN** 下一節點為 Rest（保底優先於精英節奏）
 
 #### Scenario: 固定精英節奏
-- **WHEN** 未觸發 Stage 邊界與保底，且 `step % 9 == 0`
+- **WHEN** 未觸發 Stage 邊界、Boss 前置 Rest 與保底，且 `step % 9 == 0`，且插入 Strong Elite 不會讓連續 combat 類節點超過上限
 - **THEN** 下一節點為 Strong Elite combat
 
 #### Scenario: 敵人難度隨 step 提升
 - **WHEN** 下一節點為一般 combat，且 `step = 10`，run 的 `progressionFactor = 0`
 - **THEN** `enemyLevel = 1 + floor(10/2) + 0 = 6`，對應的 hp/atk/def 倍率依公式套用（`progressionFactor` 對 `enemyLevel` 的額外加成見「玩家戰力對敵人難度的加成」）
+
+### Requirement: 節點連續性限制
+系統 SHALL 限制連續節點類型：非 combat 類節點（EVENT/REST/CHOICE）不得連續出現相同類型兩次；combat 類節點（COMBAT/ELITE/STRONG_ELITE，統稱「連續 combat 類節點」，見 `isCombatNodeType`）最多可連續出現 `NODE_CONFIG.COMBAT_STREAK_CAP`（2）次，且此上限以類別（是否為 combat 類）計算，不僅限於完全相同的節點類型（例如 COMBAT、COMBAT 後接 ELITE 仍視為第 3 個連續 combat 類節點，須被阻擋）。加權隨機分支 SHALL 依此規則排除會違反上限的節點類型；固定精英節奏（Strong Elite/Elite）分支 SHALL 在插入會違反上限時改為落入加權隨機分支（而非強制插入）。
+
+#### Scenario: 加權隨機分支排除已達上限的類型
+- **WHEN** 上一節點類型為 EVENT（非 combat 類，已連續 1 次）
+- **THEN** 加權隨機分支的候選池排除 EVENT，改由 COMBAT/REST/CHOICE 按權重比例決定
+
+#### Scenario: combat 類節點連續兩次內仍允許
+- **WHEN** 上一節點類型為 COMBAT，且連續 1 次
+- **THEN** 加權隨機分支仍可能再次選中 COMBAT（成為連續 2 次）
+
+#### Scenario: combat 類節點達上限後排除
+- **WHEN** 上一節點類型為 COMBAT，且已連續 2 次（達 `COMBAT_STREAK_CAP`）
+- **THEN** 加權隨機分支的候選池排除 COMBAT，改由 EVENT/REST/CHOICE 按權重比例決定
+
+#### Scenario: 固定精英節奏達上限時改走加權隨機
+- **WHEN** 上一節點類型為 COMBAT 且已連續 2 次（達上限），同時本次 `step % 5 == 0`（原本會強制插入 Elite）
+- **THEN** 系統 SHALL NOT 插入 Elite（避免產生 3 個連續 combat 類節點），改依加權隨機分支決定（此時 COMBAT 也已被排除）
 
 ### Requirement: 斷線重連與逾時結束
 系統 SHALL 允許在 15 分鐘內（以 `lastActivityAt` 判斷）恢復中斷的 run；超過窗口時 SHALL 以 `endReason = DISCONNECT` 結束該 run。

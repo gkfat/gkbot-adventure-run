@@ -245,6 +245,26 @@ describe('CombatService.resolve', () => {
         expect(result.gemsDropped).toBe(0);
     });
 
+    // dual-rng-stream (known-issue.md #1): loot must roll off a cursor keyed
+    // by run.runId (varies per attempt), not run.seed (fixed per
+    // character+chapter+level, shared with enemy/combat-outcome rolls) — so
+    // retrying the same Stage sees different drops while enemies stay identical.
+    it('rolls loot off a separate cursor keyed by run.runId/rewardRngIndex, distinct from the seed-based combat cursor', async () => {
+        const service = new CombatService();
+        const run = baseRun({
+            seed: 'seed-1', rngIndex: 3, runId: 'run-1', rewardRngIndex: 7,
+        });
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [],
+        };
+
+        const result = await service.resolve(run, context);
+
+        expect(createCursorMock).toHaveBeenCalledWith('seed-1', 3);
+        expect(createCursorMock).toHaveBeenCalledWith('run-1', 7);
+        expect(result.finalRewardRngIndex).toBeGreaterThan(7);
+    });
+
     it('produces one DEATH log entry per defeated enemy across multiple waves/enemies', async () => {
         const service = new CombatService();
         const run = baseRun();

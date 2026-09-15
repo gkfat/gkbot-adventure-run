@@ -152,10 +152,14 @@ const WEIGHTED_NODE_TYPES: { type: NodeType; weight: number }[] = [
 ];
 
 // Todo #7 (known-issue.md): non-combat node types (EVENT/REST/CHOICE) must
-// never repeat back-to-back; COMBAT may repeat up to NODE_CONFIG.COMBAT_STREAK_CAP
-// times. Only applies to this weighted-random pool — ELITE/STRONG_ELITE/BOSS
-// are decided deterministically by cadence/priority before this pool is ever
-// consulted (see decideNextNode), so they're outside its scope.
+// never repeat back-to-back; combat-tier nodes (COMBAT/ELITE/STRONG_ELITE —
+// see isCombatNodeType) may repeat up to NODE_CONFIG.COMBAT_STREAK_CAP times
+// *as a category*, not just the same exact type — e.g. COMBAT, COMBAT,
+// ELITE is still 3 combat-tier nodes in a row and must be blocked
+// (known-issue.md #1). `streak` (run.nodeTypeStreak) is tracked by that same
+// category rule — see advanceFromExploring. This pool only covers
+// COMBAT/EVENT/REST/CHOICE; ELITE/STRONG_ELITE cadence is guarded
+// separately in decideNextNode using the same streak value.
 //
 // `restEligible` (require-combat-before-rest): REST is also excluded from the
 // pool until the run has encountered at least one combat-tier node
@@ -165,9 +169,10 @@ function weightedNodePoolExcludingStreak(
 ): { type: NodeType; weight: number }[] {
     const base = restEligible ? WEIGHTED_NODE_TYPES : WEIGHTED_NODE_TYPES.filter(entry => entry.type !== NodeType.REST);
     if (!lastNodeType) return base;
-    const cap = isCombatNodeType(lastNodeType) ? NODE_CONFIG.COMBAT_STREAK_CAP : 1;
+    const lastIsCombatTier = isCombatNodeType(lastNodeType);
+    const cap = lastIsCombatTier ? NODE_CONFIG.COMBAT_STREAK_CAP : 1;
     if (streak < cap) return base;
-    const filtered = base.filter(entry => entry.type !== lastNodeType);
+    const filtered = base.filter(entry => (lastIsCombatTier ? !isCombatNodeType(entry.type) : entry.type !== lastNodeType));
     // Pool never actually empties in practice — lastNodeType is always one of
     // the weighted types when this branch runs — but fall back defensively.
     return filtered.length > 0 ? filtered : base;
@@ -418,8 +423,9 @@ export class AdventureRunService extends BaseService {
         const combatResult: Partial<CombatResolution> = { ...resolution };
         delete combatResult.combatLog;
         delete combatResult.finalRngIndex;
+        delete combatResult.finalRewardRngIndex;
         const summary: CombatSummary = {
-            ...(combatResult as Omit<CombatResolution, 'combatLog' | 'finalRngIndex'>), completedAt: Date.now(),
+            ...(combatResult as Omit<CombatResolution, 'combatLog' | 'finalRngIndex' | 'finalRewardRngIndex'>), completedAt: Date.now(),
         };
 
         const runInventory = [...run.runInventory, ...resolution.itemsDropped]
@@ -442,6 +448,7 @@ export class AdventureRunService extends BaseService {
                 currentNodeData: FieldValue.delete(),
                 lastActivityAt: Date.now(),
                 rngIndex: resolution.finalRngIndex,
+                rewardRngIndex: resolution.finalRewardRngIndex,
             });
             await this.progressTracker.incrementProgress({
                 accountId: run.accountId, characterId: run.characterId, type: 'ENEMY_KILLED', amount: resolution.enemies.length,
@@ -463,6 +470,7 @@ export class AdventureRunService extends BaseService {
             playerHp: 0,
             lastCombatSummary: summary,
             rngIndex: resolution.finalRngIndex,
+            rewardRngIndex: resolution.finalRewardRngIndex,
         });
 
         return {
@@ -595,17 +603,30 @@ export class AdventureRunService extends BaseService {
     }
 
     /**
-     * Node generation priority: Stage boundary (Boss) > guaranteed Rest >
-     * fixed elite cadence > weighted random (see spec.md "節點生成優先序").
-     * The weighted-random branch excludes types that would break the
-     * no-consecutive-non-combat-node rule (todo #7) — see
+     * Node generation priority: Stage boundary (Boss) > Boss-precedes-Rest >
+     * guaranteed Rest > fixed elite cadence > weighted random (see spec.md
+     * "節點生成優先序"). The weighted-random branch excludes types that would
+     * break the no-consecutive-non-combat-node rule (todo #7) — see
      * weightedNodePoolExcludingStreak.
      *
-     * require-combat-before-rest: REST (guaranteed or weighted) never appears
+     * Boss-precedes-Rest (known-issue.md #1): the node immediately before
+     * BOSS is unconditionally REST, overriding guaranteed-rest cadence,
+     * elite cadence, and the weighted pool — a Stage's final fight is always
+     * preceded by a chance to heal up.
+     *
+     * require-combat-before-rest: guaranteed/weighted REST never appears
      * until the run has encountered at least one combat-tier node
      * (COMBAT/ELITE/STRONG_ELITE/BOSS) — otherwise a run could open on Rest
      * before the player has fought anything. Once that first encounter
-     * happens, REST is unlocked for the rest of the run.
+     * happens, REST is unlocked for the rest of the run. (Boss-precedes-Rest
+     * above is exempt from this gate — it fires unconditionally.)
+     *
+     * Elite cadence streak guard (known-issue.md #1): STRONG_ELITE/ELITE
+     * cadence is skipped (falling through to the weighted pool, which
+     * already excludes combat-tier types once capped) when inserting it
+     * would push the combat-tier streak past NODE_CONFIG.COMBAT_STREAK_CAP —
+     * e.g. COMBAT, COMBAT, then a step that would cadence-insert ELITE must
+     * not create 3 combat-tier nodes in a row.
      */
     private async decideNextNode(run: AdventureRun): Promise<NodeType> {
         const {
@@ -615,13 +636,18 @@ export class AdventureRunService extends BaseService {
         if (stageNodeIndex === stageNodeCount - 1) {
             return NodeType.BOSS;
         }
+        if (stageNodeIndex === stageNodeCount - 2) {
+            return NodeType.REST;
+        }
         if (restEligible && run.step - run.lastRestStep >= NODE_CONFIG.REST_GUARANTEED_INTERVAL) {
             return NodeType.REST;
         }
-        if (run.step > 0 && run.step % NODE_CONFIG.STRONG_ELITE_INTERVAL === 0) {
+        const combatTierStreak = (run.lastNodeType && isCombatNodeType(run.lastNodeType)) ? (run.nodeTypeStreak ?? 0) : 0;
+        const eliteCadenceBlocked = combatTierStreak >= NODE_CONFIG.COMBAT_STREAK_CAP;
+        if (!eliteCadenceBlocked && run.step > 0 && run.step % NODE_CONFIG.STRONG_ELITE_INTERVAL === 0) {
             return NodeType.STRONG_ELITE;
         }
-        if (run.step > 0 && run.step % NODE_CONFIG.ELITE_INTERVAL === 0) {
+        if (!eliteCadenceBlocked && run.step > 0 && run.step % NODE_CONFIG.ELITE_INTERVAL === 0) {
             return NodeType.ELITE;
         }
 
@@ -640,7 +666,15 @@ export class AdventureRunService extends BaseService {
 
     private async advanceFromExploring(run: AdventureRun): Promise<AdventureRun> {
         const nodeType = await this.decideNextNode(run);
-        const nodeTypeStreak = run.lastNodeType === nodeType ? (run.nodeTypeStreak ?? 0) + 1 : 1;
+        // Streak is tracked by category, not exact type: two combat-tier
+        // nodes in a row (e.g. COMBAT then ELITE) count toward the same
+        // streak, since the "max 2 combat nodes in a row" rule
+        // (known-issue.md #1) applies across COMBAT/ELITE/STRONG_ELITE, not
+        // just repeats of the identical type.
+        const sameStreakCategory = run.lastNodeType !== undefined && (
+            (isCombatNodeType(run.lastNodeType) && isCombatNodeType(nodeType)) || run.lastNodeType === nodeType
+        );
+        const nodeTypeStreak = sameStreakCategory ? (run.nodeTypeStreak ?? 0) + 1 : 1;
         const patch: Record<string, unknown> = {
             currentNodeType: nodeType,
             lastNodeType: nodeType,
