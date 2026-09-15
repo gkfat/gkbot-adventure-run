@@ -30,11 +30,27 @@
                 >
                     {{ name }}
                 </div>
-                <div
-                    v-if="item.type === 'EQUIPMENT' && item.weight !== undefined"
-                    class="text-caption text-medium-emphasis"
-                >
-                    {{ WEIGHT_CLASS_LABEL[resolveWeaponWeightClass(item)] }}・重量 {{ item.weight }}
+                <div v-if="item.type === 'EQUIPMENT' && item.weight !== undefined">
+                    <div class="text-caption text-medium-emphasis">
+                        {{ WEIGHT_CLASS_LABEL[resolveWeaponWeightClass(item)] }}・重量 {{ item.weight }}
+                    </div>
+                    <div class="item-detail__weight-bar">
+                        <div
+                            v-for="(cell, index) in buildWeightBarCells(item.weight)"
+                            :key="index"
+                            class="item-detail__weight-cell"
+                            :class="{
+                                'item-detail__weight-cell--active': cell.active,
+                                'item-detail__weight-cell--group-end': index === 2 || index === 5,
+                            }"
+                            :style="{ '--cell-color': WEIGHT_CLASS_COLOR[cell.weightClass] }"
+                        >
+                            <span
+                                v-if="cell.active"
+                                class="item-detail__weight-arrow"
+                            >▲</span>
+                        </div>
+                    </div>
                 </div>
                 <div
                     v-if="item.weaponType"
@@ -79,7 +95,8 @@
 
 <script setup lang="ts">
 import {
-    RARITY_COLOR, SLOT_LABEL, WEIGHT_CLASS_LABEL, WEAPON_TYPE_LABEL, resolvePixelIcon, resolveWeaponWeightClass, type ItemLike,
+    RARITY_COLOR, SLOT_LABEL, WEIGHT_CLASS_LABEL, WEIGHT_CLASS_COLOR, WEAPON_TYPE_LABEL,
+    resolvePixelIcon, resolveWeaponWeightClass, buildWeightBarCells, type ItemLike,
 } from '../../../utils/equipmentDisplay';
 
 defineProps<{
@@ -142,6 +159,40 @@ defineProps<{
         border-radius: 2px;
         white-space: nowrap;
     }
+}
+
+.item-detail__weight-bar {
+    display: flex;
+    gap: 2px;
+    margin-top: 6px;
+    width: 140px;
+}
+
+.item-detail__weight-cell {
+    position: relative;
+    flex: 1 1 0;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--cell-color);
+    opacity: 0.25;
+
+    &--group-end {
+        margin-right: 4px;
+    }
+
+    &--active {
+        opacity: 1;
+    }
+}
+
+.item-detail__weight-arrow {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 8px;
+    line-height: 1;
+    color: var(--cell-color);
 }
 
 .item-detail {

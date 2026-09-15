@@ -1,11 +1,37 @@
 <template>
     <GameCommonDialogFrame
         v-model="open"
-        max-width="320"
+        :max-width="equippedInSlot ? 560 : 320"
         content-class="item-detail-dialog"
     >
         <template v-if="item && detailInfo">
+            <div
+                v-if="equippedInSlot && equippedDetailInfo"
+                class="item-detail-dialog__compare d-flex ga-3 mb-3"
+            >
+                <div class="item-detail-dialog__compare-column">
+                    <div class="text-caption text-medium-emphasis mb-1">目前裝備</div>
+                    <GameCommonItemDetailPanel
+                        :item="equippedInSlot"
+                        :name="equippedDetailInfo.name"
+                        :effects="equippedDetailInfo.effects"
+                        :flavor="equippedDetailInfo.flavor"
+                    />
+                </div>
+
+                <div class="item-detail-dialog__compare-column">
+                    <div class="text-caption text-medium-emphasis mb-1">目標裝備</div>
+                    <GameCommonItemDetailPanel
+                        :item="item"
+                        :name="detailInfo.name"
+                        :effects="detailInfo.effects"
+                        :flavor="detailInfo.flavor"
+                    />
+                </div>
+            </div>
+
             <GameCommonItemDetailPanel
+                v-else
                 :item="item"
                 :name="detailInfo.name"
                 :effects="detailInfo.effects"
@@ -79,12 +105,22 @@ const {
     character, equipItem, unequipItem,
 } = useCharacter();
 const {
-    sellItem, sellLoading, sellError,
+    sellItem, sellLoading, sellError, itemById,
 } = useInventory();
 
 const open = ref(false);
 const item = ref<ItemLike & { itemId: string; sellPriceGold: number } | null>(null);
 const detailInfo = computed(() => (item.value ? describeItem(item.value) : null));
+
+// 若正在檢視的道具有裝備欄位，且該欄位已裝備「其他」道具，於 header 顯示該道具供比較；
+// 若正在檢視的就是目前裝備中的道具本身，則不重複顯示。
+const equippedInSlot = computed(() => {
+    if (!item.value?.equipSlot) return undefined;
+    const equippedItemId = character.value?.equipment?.[item.value.equipSlot];
+    if (!equippedItemId || equippedItemId === item.value.itemId) return undefined;
+    return itemById(equippedItemId);
+});
+const equippedDetailInfo = computed(() => (equippedInSlot.value ? describeItem(equippedInSlot.value) : null));
 
 const equipActionLoading = ref(false);
 const equipActionError = ref<string | null>(null);
@@ -153,5 +189,30 @@ defineExpose({
         align-items: center;
         color: rgb(var(--v-theme-green));
     }
+
+    &__compare {
+        // 窄螢幕（手機寬度）放不下兩欄完整的道具詳情，並排會擠壓成文字換行、
+        // 圖示與文字重疊，改為上下堆疊、各自維持可讀寬度。斷點沿用專案既有的
+        // Vuetify mobileBreakpoint（sm: 600，見 app/plugins/vuetify.ts）。
+        @media (max-width: 600px) {
+            flex-direction: column;
+        }
+    }
+
+    &__compare-column {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+}
+</style>
+
+<style lang="scss">
+// 比較模式（雙欄堆疊）內容變高，手機直式螢幕可能超出視窗高度；GameCommonDialogFrame
+// 本身不提供捲動（見 dialogFrame.vue），這裡讓 dialog 內容自己可以垂直捲動，
+// 避免下方的裝備/出售/關閉按鈕被截斷、完全點不到。跨元件邊界故不能用 scoped
+// class（見 dialogFrame.vue 同樣模式的 .game-dialog-frame--contained-fullscreen）。
+.game-dialog-frame.item-detail-dialog {
+    max-height: 80vh;
+    overflow-y: auto;
 }
 </style>

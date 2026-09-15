@@ -60,6 +60,26 @@ export const WEIGHT_CLASS_LABEL: Record<WeaponWeightClass, string> = {
     [WeaponWeightClass.HEAVY]: '重型',
 };
 
+export const WEIGHT_CLASS_COLOR: Record<WeaponWeightClass, string> = {
+    [WeaponWeightClass.LIGHT]: 'rgb(var(--v-theme-green))',
+    [WeaponWeightClass.MEDIUM]: 'rgb(var(--v-theme-secondary))',
+    [WeaponWeightClass.HEAVY]: 'rgb(var(--v-theme-warning))',
+};
+
+// Detail dialog's weight bar always shows 9 cells (weight 1-9, 3 per weight
+// class per WEIGHT_CLASS_THRESHOLDS) regardless of the item's actual weight
+// range, so a weight above 9 (e.g. a high-rarity roll) still marks the last
+// cell rather than overflowing the bar.
+const WEIGHT_BAR_CELL_COUNT = 9;
+
+export function buildWeightBarCells(weight: number | undefined): { weightClass: WeaponWeightClass; active: boolean }[] {
+    const activeIndex = Math.min(Math.max(weight ?? 0, 1), WEIGHT_BAR_CELL_COUNT) - 1;
+    return Array.from({ length: WEIGHT_BAR_CELL_COUNT }, (_, index) => ({
+        weightClass: deriveWeaponWeightClass(index + 1),
+        active: index === activeIndex,
+    }));
+}
+
 export const WEAPON_TYPE_LABEL: Record<WeaponType, string> = {
     [WeaponType.FIST]: '拳套',
     [WeaponType.BLADE]: '刀劍',
