@@ -192,12 +192,13 @@
 
                             <div
                                 v-if="isEquipped(item)"
-                                class="pixel-slot__badge"
+                                class="pixel-slot__equipped-overlay"
                                 aria-label="裝備中"
                             >
                                 <v-icon
                                     icon="mdi-check-bold"
-                                    size="10"
+                                    size="20"
+                                    color="green"
                                 />
                             </div>
                         </button>
@@ -338,6 +339,12 @@ const sortedItems = computed(() => {
     const filtered = items.value.filter(item => item.type === tab.value);
 
     return [...filtered].sort((a, b) => {
+        const slotDiff = (
+            (a.equipSlot ? EQUIP_SLOTS_ALL.indexOf(a.equipSlot) : -1)
+            - (b.equipSlot ? EQUIP_SLOTS_ALL.indexOf(b.equipSlot) : -1)
+        );
+        if (slotDiff) return slotDiff;
+
         const rarityDiff = RARITY_ORDER_DESC.indexOf(a.rarity) - RARITY_ORDER_DESC.indexOf(b.rarity);
         if (rarityDiff) return rarityDiff;
 
@@ -551,6 +558,7 @@ onMounted(() => {
         position: absolute;
         top: -6px;
         left: -6px;
+        z-index: 1;
         padding: 0 2px;
         font-size: 7px;
         line-height: 1.4;
@@ -559,19 +567,15 @@ onMounted(() => {
         white-space: nowrap;
     }
 
-    &__badge {
+    &__equipped-overlay {
         position: absolute;
-        top: -6px;
-        right: -6px;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
+        inset: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgb(var(--v-theme-green));
-        color: rgb(var(--v-theme-background));
-        border: 2px solid rgb(var(--v-theme-background));
+        background: rgba(20, 23, 28, 0.6);
+        border-radius: 1px;
+        pointer-events: none;
     }
 }
 
