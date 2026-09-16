@@ -54,28 +54,21 @@
                         :slots="EQUIP_SLOTS_LEFT"
                         :equipment="character.equipment"
                         :item-by-id="itemById"
+                        side="left"
                         @select="openItemDetail"
                     />
 
                     <div class="character-stage__sprite-col d-flex flex-column align-center ga-1">
-                        <div class="character-stage__sprite-header d-flex flex-column align-center">
-                            <div class="d-flex align-center ga-2">
-                                <span class="font-pixel text-caption character-stage__lv-tag">
-                                    LV {{ character.level }}
-                                </span>
-                                <v-chip
-                                    label
-                                    size="x-small"
-                                    color="primary"
-                                    variant="outlined"
-                                    class="font-pixel character-stage__class-chip"
-                                >
-                                    {{ character.className }}
-                                </v-chip>
-                            </div>
-                            <div class="font-pixel text-caption character-stage__power-tag">
-                                戰力 {{ combatPower }}
-                            </div>
+                        <div class="character-stage__identity d-flex flex-column align-center">
+                            <v-chip
+                                label
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                                class="font-pixel character-stage__class-chip mb-2"
+                            >
+                                {{ character.className }}
+                            </v-chip>
                             <div class="d-flex align-center ga-1">
                                 <span class="text-body-2 text-medium-emphasis">
                                     {{ character.nickname }}
@@ -99,12 +92,22 @@
                                 class="character-stage__sprite"
                             >
                         </div>
+
+                        <div class="character-stage__sprite-header">
+                            <p class="font-pixel character-stage__lv-tag my-2">
+                                LV {{ character.level }}
+                            </p>
+                            <p class="font-pixel character-stage__power-tag">
+                                戰力 {{ combatPower }}
+                            </p>
+                        </div>
                     </div>
 
                     <GameCharacterStageEquipSlots
                         :slots="EQUIP_SLOTS_RIGHT"
                         :equipment="character.equipment"
                         :item-by-id="itemById"
+                        side="right"
                         @select="openItemDetail"
                     />
                 </div>
@@ -249,8 +252,9 @@ watch(character, (value) => {
         flex: 1 1 auto;
     }
 
-    &__sprite-header {
+    &__identity {
         gap: 2px;
+        margin-bottom: 4px;
     }
 
     &__rename-btn {
@@ -280,7 +284,6 @@ watch(character, (value) => {
     &__sprite {
         position: relative;
         z-index: 1;
-        margin-left: 36px;
         image-rendering: pixelated;
         filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
     }
@@ -289,12 +292,6 @@ watch(character, (value) => {
         width: 100%;
         margin: 0 auto;
         padding: 16px 10px;
-        border-radius: 2px;
-        border: 1px solid rgba(196, 203, 219, 0.3);
-        background-image: url('/images/backgrounds/sewer-camp.gif');
-        background-size: cover;
-        background-position: center;
-        image-rendering: pixelated;
     }
 }
 </style>

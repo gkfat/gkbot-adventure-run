@@ -1,10 +1,14 @@
 <template>
-    <div class="character-stage__equip-col d-flex flex-column ga-3">
+    <div
+        class="character-stage__equip-col d-flex flex-column ga-3"
+        :class="`character-stage__equip-col--${side}`"
+    >
         <button
-            v-for="slot in slots"
+            v-for="(slot, index) in slots"
             :key="slot"
             type="button"
             class="equip-slot d-flex align-center justify-center pixel-press"
+            :class="{ 'equip-slot--edge': index === 0 || index === 2 }"
             :style="slotStyle(slot)"
             :aria-label="slotLabel(slot)"
             @click="openDetail(slot)"
@@ -44,6 +48,7 @@ const props = defineProps<{
     equipment: Partial<Record<EquipmentSlot, string>>;
     // eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
     itemById: (itemId: string | undefined) => ItemLike | undefined;
+    side: 'left' | 'right';
 }>();
 
 const emit = defineEmits<{
@@ -84,16 +89,28 @@ const openDetail = (slot: EquipmentSlot) => {
 </script>
 
 <style scoped lang="scss">
+.character-stage__equip-col {
+    &--left .equip-slot--edge {
+        left: 14px;
+    }
+
+    &--right .equip-slot--edge {
+        left: -14px;
+    }
+}
+
 .equip-slot {
     position: relative;
     width: 48px;
     height: 48px;
     padding: 0;
     border: 2px solid rgba(196, 203, 219, 0.25);
-    border-radius: 6px;
+    border-radius: 2px;
     background: #14171c;
     color: rgb(var(--v-theme-primary));
     cursor: pointer;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 2px 0 0 rgba(0, 0, 0, 0.5);
+    transition: left 0.12s ease-out, transform 0.08s ease-out, background-color 0.08s ease-out;
 
     &__value {
         position: absolute;
