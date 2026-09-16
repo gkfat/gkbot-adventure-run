@@ -1,10 +1,10 @@
 <template>
-    <div class="chapter-progress">
+    <div class="chapter-progress d-flex flex-column align-center">
         <div class="font-title chapter-progress__title">
             {{ stageName }}
         </div>
-        <div class="chapter-progress__meta">
-            <div class="chapter-progress__nodes">
+        <div class="chapter-progress__meta d-flex align-center ga-2">
+            <div class="chapter-progress__nodes d-flex flex-wrap justify-center">
                 <span
                     v-for="n in levelTotal"
                     :key="n"
@@ -30,9 +30,6 @@ defineProps<{
 
 <style scoped lang="scss">
 .chapter-progress {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     gap: 6px;
     width: fit-content;
     max-width: 280px;
@@ -45,16 +42,7 @@ defineProps<{
         text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.85), 0 0 10px rgba(255, 209, 102, 0.35);
     }
 
-    &__meta {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
     &__nodes {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
         gap: 5px;
     }
 

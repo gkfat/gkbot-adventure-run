@@ -2,7 +2,7 @@
     <GameCommonDialogFrame
         :model-value="modelValue"
         max-width="420"
-        content-class="adventure-log-dialog"
+        content-class="adventure-log-dialog d-flex flex-column"
         @update:model-value="$emit('update:modelValue', $event)"
     >
         <div class="d-flex align-center justify-space-between mb-3">
@@ -26,7 +26,7 @@
 
         <div
             v-else
-            class="adventure-log-dialog__list"
+            class="adventure-log-dialog__list d-flex flex-column"
         >
             <div
                 v-for="entry in entries"
@@ -112,15 +112,11 @@ defineEmits<{ 'update:modelValue': [value: boolean] }>();
 <style scoped lang="scss">
 .adventure-log-dialog {
     max-height: 80vh;
-    display: flex;
-    flex-direction: column;
 
     &__list {
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
-        display: flex;
-        flex-direction: column;
         gap: 10px;
     }
 

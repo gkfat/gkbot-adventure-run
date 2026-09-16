@@ -1,10 +1,10 @@
 <template>
-    <div class="character-stage__equip-col">
+    <div class="character-stage__equip-col d-flex flex-column ga-3">
         <button
             v-for="slot in slots"
             :key="slot"
             type="button"
-            class="equip-slot pixel-press"
+            class="equip-slot d-flex align-center justify-center pixel-press"
             :style="slotStyle(slot)"
             :aria-label="slotLabel(slot)"
             @click="openDetail(slot)"
@@ -84,17 +84,8 @@ const openDetail = (slot: EquipmentSlot) => {
 </script>
 
 <style scoped lang="scss">
-.character-stage__equip-col {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
 .equip-slot {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     width: 48px;
     height: 48px;
     padding: 0;

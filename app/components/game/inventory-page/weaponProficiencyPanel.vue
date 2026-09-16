@@ -1,7 +1,7 @@
 <template>
     <div class="character-stage__box weapon-proficiency mb-3">
         <div class="text-caption text-medium-emphasis mb-2">武器熟練度</div>
-        <div class="weapon-proficiency__grid">
+        <div class="weapon-proficiency__grid d-flex flex-column">
             <div
                 v-for="row in rows"
                 :key="row.key"
@@ -56,7 +56,7 @@
 
                 <div
                     v-if="row.unlockedPassives.length > 0"
-                    class="weapon-proficiency__passives"
+                    class="weapon-proficiency__passives d-flex flex-column"
                 >
                     <div
                         v-for="passive in row.unlockedPassives"
@@ -162,8 +162,6 @@ const rows = computed(() => DIMENSIONS.map((key) => {
 
 .weapon-proficiency {
     &__grid {
-        display: grid;
-        grid-template-columns: 1fr;
         gap: 10px;
     }
 
@@ -199,8 +197,6 @@ const rows = computed(() => DIMENSIONS.map((key) => {
 
     &__passives {
         margin-top: 4px;
-        display: flex;
-        flex-direction: column;
         gap: 2px;
     }
 }

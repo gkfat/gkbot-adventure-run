@@ -408,10 +408,6 @@ const invest = async (node: TalentNode) => {
         text-align: center;
     }
 
-    &__tier-nodes {
-        gap: 8px;
-    }
-
     &__stage {
         padding: 8px 6px;
         gap: 2px;

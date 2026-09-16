@@ -3,7 +3,7 @@
         :model-value="!!modifier"
         persistent
         :scrim="false"
-        content-class="modifier-acquired-dialog"
+        content-class="modifier-acquired-dialog d-flex flex-column align-center text-center"
     >
         <template v-if="modifier">
             <img
@@ -83,19 +83,5 @@ const playerDialogueText = computed(() => dialogueBubbles.get('player')?.text ??
         opacity: 1;
         transform: scale(1);
     }
-}
-</style>
-
-<style lang="scss">
-// content-class 是傳給 GameCommonDialogFrame 的字串 prop，套用該 class 的外層
-// <div> 是在 dialogFrame.vue 的 template 裡渲染，只會帶 dialogFrame.vue 自己的
-// scoped 屬性，這裡（modifierAcquiredDialog.vue）的 scoped style 選不到它
-// （見使用者回報 #3：dialog 內容沒有置中）。置中規則因此需要放在非 scoped
-// block，比照 dialogFrame.vue 自己對 --contained-fullscreen 的做法。
-.modifier-acquired-dialog {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
 }
 </style>

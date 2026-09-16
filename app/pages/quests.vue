@@ -204,10 +204,6 @@ $claim-color: #e0c063;
     width: 100%;
     overflow: hidden;
 
-    &__tabs {
-        gap: 8px;
-    }
-
     &__tab {
         flex: 1 1 0;
         padding: 8px;

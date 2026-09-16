@@ -13,7 +13,7 @@
             選擇一個祝福
         </div>
 
-        <div class="blessing-select-dialog__cards">
+        <div class="blessing-select-dialog__cards d-flex ga-2 align-stretch">
             <button
                 v-for="candidate in candidates"
                 :key="candidate.modifierId"
@@ -74,12 +74,6 @@ const emit = defineEmits<{ 'update:selectedId': [modifierId: string] }>();
 
 <style scoped lang="scss">
 .blessing-select-dialog {
-    &__cards {
-        display: flex;
-        gap: 8px;
-        align-items: stretch;
-    }
-
     // 三張並排的祝福卡：厚實深色外框 + 內縮 outline，仿照 archetypeGallery.vue
     // 選角卡片的「華麗外框」語言；選取時 outline 轉綠並微微上浮、加光暈。
     &__card {

@@ -114,7 +114,7 @@
                     >
                         <button
                             type="button"
-                            class="achievements-dialog__cell d-flex flex-column align-center justify-center"
+                            class="achievements-dialog__cell d-flex flex-column align-center justify-center ga-1 py-2 px-1"
                             :class="{ 'achievements-dialog__cell--active': achievement.achievementId === selectedId }"
                             @click="selectedId = achievement.achievementId"
                         >
@@ -213,8 +213,6 @@ const handleClaim = async (achievementId: string) => {
         position: relative;
         width: 100%;
         aspect-ratio: 1;
-        gap: 4px;
-        padding: 8px 4px;
         background: #14171c;
         border: 1px solid rgba(196, 203, 219, 0.15);
         border-radius: 3px;

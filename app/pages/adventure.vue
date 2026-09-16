@@ -245,50 +245,68 @@
                     </div>
 
                     <v-divider class="my-2" />
-                    <div class="d-flex flex-wrap ga-4">
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                    <v-row dense>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">EXP</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
                                 {{ currentRun.expEarned }}
                             </div>
-                        </div>
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                        </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">金幣</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
                                 +{{ currentRun.goldEarned }}
                             </div>
-                        </div>
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                        </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">寶石</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
                                 +{{ currentRun.gemsEarned }}
                             </div>
-                        </div>
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                        </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">道具</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
                                 x{{ currentRun.runInventory.length }}
                             </div>
-                        </div>
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                        </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">祝福</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
                                 x{{ currentRun.blessings.length }}
                             </div>
-                        </div>
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                        </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">詛咒</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
                                 x{{ currentRun.curses.length }}
                             </div>
-                        </div>
-                    </div>
+                        </v-col>
+                    </v-row>
                 </div>
             </div>
 
             <div
                 v-if="character"
-                class="adventure-page__stage d-flex flex-column align-center"
+                class="adventure-page__stage d-flex flex-column align-center ga-2"
             >
                 <div class="adventure-page__stage-fx-anchor">
                     <div class="adventure-page__stage-sprite-wrap">
@@ -386,44 +404,62 @@
                          凍結的戰前快照，而不是 currentRun 的即時值（見上方 frozenRunTotals
                          的說明，避免這一列在玩家還沒看完戰鬥結算前就先跳成戰後數字）。 -->
                     <v-divider class="my-2" />
-                    <div class="d-flex flex-wrap ga-4">
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                    <v-row dense>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">EXP</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
                                 {{ displayedRunTotals.expEarned }}
                             </div>
-                        </div>
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                        </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">金幣</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
                                 +{{ displayedRunTotals.goldEarned }}
                             </div>
-                        </div>
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                        </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">寶石</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
                                 +{{ displayedRunTotals.gemsEarned }}
                             </div>
-                        </div>
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                        </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">道具</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
                                 x{{ displayedRunTotals.itemCount }}
                             </div>
-                        </div>
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                        </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">祝福</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
                                 x{{ displayedRunTotals.blessingCount }}
                             </div>
-                        </div>
-                        <div class="adventure-page__loot-stat d-flex flex-column">
+                        </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
                             <div class="text-caption text-medium-emphasis">詛咒</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
                                 x{{ displayedRunTotals.curseCount }}
                             </div>
-                        </div>
-                    </div>
+                        </v-col>
+                    </v-row>
                 </div>
 
                 <!-- COMBAT：觸發戰鬥；戰鬥結果在 COMBAT/RESOLUTION 都顯示，直到玩家繼續前進。
@@ -540,7 +576,7 @@
                     <div
                         v-for="potion in restPotions"
                         :key="potion.itemId"
-                        class="adventure-page__potion-row d-flex align-center justify-space-between"
+                        class="adventure-page__potion-row d-flex align-center justify-space-between ga-2"
                     >
                         <div class="d-flex align-center ga-2">
                             <GameCommonPixelIcon
@@ -595,7 +631,7 @@
                 固定於頁面頂端的獨立 HP 區塊；戰鬥中額外疊加行動條/spark/傷害飄字。 -->
             <div
                 v-if="character"
-                class="adventure-page__stage d-flex flex-column align-center"
+                class="adventure-page__stage d-flex flex-column align-center ga-2"
             >
                 <div class="adventure-page__stage-fx-anchor">
                     <img
@@ -1572,7 +1608,6 @@ onMounted(() => {
     // 不論 scroll 內容多寡都固定在同一個畫面位置（見進場走路動畫的版面比照）。
     &__stage {
         flex: 0 0 auto;
-        gap: 8px;
         padding: 4px 0 12px;
     }
 
@@ -1755,7 +1790,6 @@ onMounted(() => {
     }
 
     &__potion-row {
-        gap: 8px;
         padding: 6px 0;
 
         &:not(:last-child) {

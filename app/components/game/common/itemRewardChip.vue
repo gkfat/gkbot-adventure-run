@@ -1,7 +1,7 @@
 <template>
-    <div class="item-reward-chip">
+    <div class="item-reward-chip d-flex align-center ga-2">
         <div
-            class="item-reward-chip__icon"
+            class="item-reward-chip__icon d-flex align-center justify-center"
             :style="{ borderColor: RARITY_COLOR[item.rarity] }"
         >
             <span
@@ -39,16 +39,10 @@ defineProps<{ item: ItemLike }>();
 
 <style scoped lang="scss">
 .item-reward-chip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     text-align: left;
 
     &__icon {
         position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         flex: 0 0 auto;
         width: 44px;
         height: 44px;

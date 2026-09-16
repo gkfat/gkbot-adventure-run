@@ -12,11 +12,16 @@
                 <span class="text-caption text-medium-emphasis font-pixel">{{ SLOT_LABEL[item.equipSlot] }}</span>
             </div>
 
-            <div
+            <v-row
                 v-if="equippedInSlot && equippedDetailInfo"
-                class="item-detail-dialog__compare d-flex ga-3 mb-3"
+                class="item-detail-dialog__compare mb-3"
+                dense
             >
-                <div class="item-detail-dialog__compare-column item-detail-dialog__compare-column--current">
+                <v-col
+                    cols="12"
+                    sm="6"
+                    class="item-detail-dialog__compare-column item-detail-dialog__compare-column--current"
+                >
                     <div class="text-caption text-medium-emphasis mb-1">目前裝備</div>
 
                     <GameCommonItemDetailPanel
@@ -28,9 +33,13 @@
                         :show-slot-label="false"
                         compact
                     />
-                </div>
+                </v-col>
 
-                <div class="item-detail-dialog__compare-column">
+                <v-col
+                    cols="12"
+                    sm="6"
+                    class="item-detail-dialog__compare-column"
+                >
                     <div class="text-caption text-medium-emphasis mb-1">目標裝備</div>
                     <GameCommonItemDetailPanel
                         :item="item"
@@ -39,8 +48,8 @@
                         :flavor="detailInfo.flavor"
                         :show-slot-label="false"
                     />
-                </div>
-            </div>
+                </v-col>
+            </v-row>
 
             <GameCommonItemDetailPanel
                 v-else
@@ -201,20 +210,6 @@ defineExpose({
         display: inline-flex;
         align-items: center;
         color: rgb(var(--v-theme-green));
-    }
-
-    &__compare {
-        // 窄螢幕（手機寬度）放不下兩欄完整的道具詳情，並排會擠壓成文字換行、
-        // 圖示與文字重疊，改為上下堆疊、各自維持可讀寬度。斷點沿用專案既有的
-        // Vuetify mobileBreakpoint（sm: 600，見 app/plugins/vuetify.ts）。
-        @media (max-width: 600px) {
-            flex-direction: column;
-        }
-    }
-
-    &__compare-column {
-        flex: 1 1 0;
-        min-width: 0;
     }
 
     &__compare-column--current {

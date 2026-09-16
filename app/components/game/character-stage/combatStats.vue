@@ -5,10 +5,10 @@
                 v-for="stat in statEntries"
                 :key="stat.label"
                 cols="4"
-                class="character-stage__combat-stat"
+                class="character-stage__combat-stat d-flex flex-column align-center"
             >
                 <span class="text-caption text-medium-emphasis character-stage__stat-label">{{ stat.label }}</span>
-                <span class="character-stage__stat-value-block">
+                <span class="character-stage__stat-value-block d-flex align-baseline justify-center ga-1">
                     <span
                         class="font-pixel character-stage__stat-value"
                         :style="{ color: stat.buffed ? (stat.favorable ? 'rgb(var(--v-theme-green))' : 'rgb(var(--v-theme-error))') : 'rgb(var(--v-theme-primary))' }"
@@ -195,9 +195,6 @@ const statEntries = computed(() => {
 }
 
 .character-stage__combat-stat {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     gap: 2px;
     text-align: center;
 }
@@ -208,11 +205,6 @@ const statEntries = computed(() => {
 }
 
 .character-stage__stat-value-block {
-    display: flex;
-    flex-direction: row;
-    align-items: baseline;
-    justify-content: center;
-    gap: 4px;
     min-width: 0;
     line-height: 1.3;
 }

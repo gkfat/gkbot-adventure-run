@@ -31,7 +31,7 @@
             <div class="d-flex flex-wrap justify-center ga-4 mb-3">
                 <div
                     v-if="result.hpHealed"
-                    class="event-result-dialog__stat"
+                    class="event-result-dialog__stat d-flex flex-column align-center"
                 >
                     <div class="text-caption text-medium-emphasis">HP</div>
                     <div
@@ -43,7 +43,7 @@
                 </div>
                 <div
                     v-if="result.goldGained"
-                    class="event-result-dialog__stat"
+                    class="event-result-dialog__stat d-flex flex-column align-center"
                 >
                     <div class="text-caption text-medium-emphasis">金幣</div>
                     <div
@@ -55,7 +55,7 @@
                 </div>
                 <div
                     v-if="result.gemsGained"
-                    class="event-result-dialog__stat"
+                    class="event-result-dialog__stat d-flex flex-column align-center"
                 >
                     <div class="text-caption text-medium-emphasis">寶石</div>
                     <div
@@ -67,7 +67,7 @@
                 </div>
                 <div
                     v-if="result.blessingGranted"
-                    class="event-result-dialog__stat"
+                    class="event-result-dialog__stat d-flex flex-column align-center"
                 >
                     <div class="text-caption text-medium-emphasis">祝福</div>
                     <div
@@ -79,7 +79,7 @@
                 </div>
                 <div
                     v-if="result.curseApplied"
-                    class="event-result-dialog__stat"
+                    class="event-result-dialog__stat d-flex flex-column align-center"
                 >
                     <div class="text-caption text-medium-emphasis">詛咒</div>
                     <div
@@ -119,9 +119,6 @@ const playerDialogueText = computed(() => dialogueBubbles.get('player')?.text ??
 <style scoped lang="scss">
 .event-result-dialog {
     &__stat {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
         gap: 2px;
     }
 

@@ -5,7 +5,7 @@
              （見 useCombat.ts waveDisplay）。玩家不再是這裡的一張小卡，改由
              adventure.vue 的持久化「大角色 stage」承接（見該檔案），這裡只負責
              banner + 敵方卡片 + 結算文字。 -->
-        <div class="combat-result-panel__arena d-flex flex-column">
+        <div class="combat-result-panel__arena d-flex flex-column ga-2">
             <div
                 v-if="displayedBanner"
                 class="combat-result-panel__wave-banner d-flex align-center justify-center"
@@ -14,7 +14,7 @@
                 <div
                     v-if="displayedBanner.showText"
                     :key="displayedBanner.textKey"
-                    class="combat-result-panel__wave-banner-text d-flex flex-column align-center"
+                    class="combat-result-panel__wave-banner-text d-flex flex-column align-center ga-1"
                     :class="{ 'combat-result-panel__wave-banner-text--exit': displayedBanner.textExiting }"
                 >
                     <span class="font-pixel combat-result-panel__wave-banner-title">{{ displayedBanner.label }}</span>
@@ -136,7 +136,6 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
 .combat-result-panel {
     &__arena {
         position: relative;
-        gap: 8px;
     }
 
     // 換 wave 的 banner：橫越戰場的全寬條，底色先淡入撐開、全程維持到最後才
@@ -161,7 +160,6 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     }
 
     &__wave-banner-text {
-        gap: 4px;
         opacity: 0;
         animation: combat-result-panel-banner-text-in 0.2s ease-out forwards;
 

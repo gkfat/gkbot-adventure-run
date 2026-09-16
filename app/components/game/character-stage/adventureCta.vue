@@ -17,7 +17,7 @@
             class="mx-auto mb-3"
         />
 
-        <div class="character-stage__cta-row">
+        <div class="character-stage__cta-row d-flex flex-column align-center ga-2">
             <button
                 type="button"
                 class="cta-btn"
@@ -76,13 +76,6 @@ const handleStart = () => {
 <style scoped lang="scss">
 .character-stage__footer {
     flex-shrink: 0;
-}
-
-.character-stage__cta-row {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
 }
 
 .character-stage__abandon-btn {

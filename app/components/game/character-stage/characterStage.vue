@@ -49,7 +49,7 @@
         >
             <div class="w-100 text-center character-stage__content">
                 <!-- 裝備欄位：角色圖像左右各 3 格 -->
-                <div class="character-stage__equip-row mt-2">
+                <div class="character-stage__equip-row d-flex align-center justify-space-between mt-2">
                     <GameCharacterStageEquipSlots
                         :slots="EQUIP_SLOTS_LEFT"
                         :equipment="character.equipment"
@@ -57,8 +57,8 @@
                         @select="openItemDetail"
                     />
 
-                    <div class="character-stage__sprite-col">
-                        <div class="character-stage__sprite-header">
+                    <div class="character-stage__sprite-col d-flex flex-column align-center ga-1">
+                        <div class="character-stage__sprite-header d-flex flex-column align-center">
                             <div class="d-flex align-center ga-2">
                                 <span class="font-pixel text-caption character-stage__lv-tag">
                                     LV {{ character.level }}
@@ -249,17 +249,7 @@ watch(character, (value) => {
         flex: 1 1 auto;
     }
 
-    &__sprite-col {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-    }
-
     &__sprite-header {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
         gap: 2px;
     }
 
@@ -296,9 +286,6 @@ watch(character, (value) => {
     }
 
     &__equip-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
         width: 100%;
         margin: 0 auto;
         padding: 16px 10px;

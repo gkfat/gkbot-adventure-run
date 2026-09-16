@@ -51,7 +51,7 @@
             v-if="item.type === 'EQUIPMENT' && item.weight !== undefined"
             class="mb-3"
         >
-            <div class="item-detail__weight-bar">
+            <div class="item-detail__weight-bar d-flex">
                 <div
                     v-for="(cell, index) in buildWeightBarCells(item.weight)"
                     :key="index"
@@ -63,7 +63,7 @@
                     :style="{ '--cell-color': WEIGHT_CLASS_COLOR[cell.weightClass] }"
                 />
             </div>
-            <div class="item-detail__weight-groups text-caption text-medium-emphasis">
+            <div class="item-detail__weight-groups d-flex text-caption text-medium-emphasis">
                 <span
                     v-for="weightClass in WEIGHT_CLASS_ORDER"
                     :key="weightClass"
@@ -77,12 +77,12 @@
 
         <div
             v-if="effects.length > 0"
-            class="item-detail__effects d-flex flex-column mb-3"
+            class="item-detail__effects d-flex flex-column ga-1 mb-3"
         >
             <div
                 v-for="effect in effects"
                 :key="effect.label"
-                class="item-detail__effect-row d-flex align-baseline justify-space-between text-body-2"
+                class="item-detail__effect-row d-flex align-baseline justify-space-between ga-3 text-body-2"
             >
                 <span>{{ effect.label }}</span>
                 <span
@@ -188,12 +188,10 @@ withDefaults(defineProps<{
 }
 
 .item-detail__weight-bar {
-    display: flex;
     gap: 1px;
 }
 
 .item-detail__weight-groups {
-    display: flex;
     margin-top: 2px;
 
     span {
@@ -238,14 +236,6 @@ withDefaults(defineProps<{
         &--with-slot-label {
             padding-right: 48px;
         }
-    }
-
-    &__effects {
-        gap: 4px;
-    }
-
-    &__effect-row {
-        gap: 12px;
     }
 
     &__effect-value {

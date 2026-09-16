@@ -11,7 +11,7 @@
 
         <button
             type="button"
-            class="game-header__config pixel-press"
+            class="game-header__config d-flex align-center justify-center pixel-press"
             aria-label="開啟設定選單"
             @click="$emit('open-drawer')"
         >
@@ -41,9 +41,6 @@ defineEmits<{ 'open-drawer': [] }>();
     }
 
     &__config {
-        display: flex;
-        align-items: center;
-        justify-content: center;
         width: 34px;
         height: 34px;
         background: none;

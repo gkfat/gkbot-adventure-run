@@ -31,7 +31,7 @@
         <!-- 角色說明欄 -->
         <div
             v-if="selected"
-            class="archetype-detail d-flex flex-column"
+            class="archetype-detail d-flex flex-column ga-2"
         >
             <div class="archetype-detail__panel">
                 <div class="text-body-1 font-weight-medium">
@@ -66,7 +66,7 @@
                     </button>
                 </div>
 
-                <div class="archetype-gallery__stats d-flex flex-column">
+                <div class="archetype-gallery__stats d-flex flex-column ga-1">
                     <div
                         v-for="stat in statBars(selected.attributes)"
                         :key="stat.label"
@@ -257,10 +257,6 @@ const handleConfirm = () => {
         gap: 6px;
     }
 
-    &__stats {
-        gap: 4px;
-    }
-
     &__stat-row {
         display: grid;
         grid-template-columns: 32px 1fr;
@@ -332,7 +328,6 @@ const handleConfirm = () => {
 
 .archetype-detail {
     width: 100%;
-    gap: 8px;
     padding: 12px 14px;
     background: #14171c;
     border: 1px solid rgba(196, 203, 219, 0.15);

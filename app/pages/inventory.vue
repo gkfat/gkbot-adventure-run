@@ -124,7 +124,7 @@
                         >
                             <button
                                 type="button"
-                                class="pixel-slot pixel-slot--equip pixel-press"
+                                class="pixel-slot pixel-slot--equip d-flex align-center justify-center pixel-press"
                                 :style="slotStyle(slot)"
                                 :aria-label="slotLabel(slot)"
                                 @click="openSlotDetail(slot)"
@@ -167,7 +167,7 @@
                     >
                         <button
                             type="button"
-                            class="pixel-slot pixel-slot--item pixel-press"
+                            class="pixel-slot pixel-slot--item d-flex align-center justify-center pixel-press"
                             :class="{ 'pixel-slot--equipped': isEquipped(item) }"
                             :style="{ borderColor: RARITY_COLOR[item.rarity] }"
                             @click="openDetail(item)"
@@ -417,10 +417,6 @@ onMounted(() => {
         border-radius: 3px;
     }
 
-    &__tabs {
-        gap: 8px;
-    }
-
     &__tab {
         flex: 1 1 0;
         padding: 8px;
@@ -454,9 +450,6 @@ onMounted(() => {
 // brackets, used for both the equipped-gear overview and the item grid.
 .pixel-slot {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     border: 2px solid rgba(196, 203, 219, 0.25);
     border-radius: 3px;
     background: #14171c;

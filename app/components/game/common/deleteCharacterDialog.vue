@@ -49,7 +49,7 @@
             </div>
 
             <div class="text-caption text-medium-emphasis mb-1">屬性</div>
-            <div class="delete-character__attrs mb-3">
+            <div class="delete-character__attrs d-flex flex-wrap mb-3">
                 <span
                     v-for="attr in attrList"
                     :key="attr.label"
@@ -84,12 +84,12 @@
             <div class="text-caption text-medium-emphasis mb-1">裝備</div>
             <div
                 v-if="equippedItems.length > 0"
-                class="delete-character__equip-row mb-3"
+                class="delete-character__equip-row d-flex flex-wrap mb-3"
             >
                 <div
                     v-for="item in equippedItems"
                     :key="item.itemId"
-                    class="pixel-slot pixel-slot--equip"
+                    class="pixel-slot pixel-slot--equip d-flex align-center justify-center"
                     :style="{ borderColor: RARITY_COLOR[item.rarity] }"
                 >
                     <span
@@ -255,23 +255,16 @@ defineExpose({
     }
 
     &__attrs {
-        display: flex;
-        flex-wrap: wrap;
         gap: 4px 14px;
     }
 
     &__equip-row {
-        display: flex;
-        flex-wrap: wrap;
         gap: 6px;
     }
 }
 
 .pixel-slot {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     border: 2px solid rgba(196, 203, 219, 0.25);
     border-radius: 3px;
     background: #14171c;

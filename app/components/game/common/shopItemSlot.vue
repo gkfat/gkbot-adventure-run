@@ -17,7 +17,7 @@
             :name="resolvePixelIcon(shopSlot.item)"
             :size="32"
         />
-        <span class="shop-item-slot__name text-caption">
+        <span class="shop-item-slot__name text-caption d-flex align-center justify-center">
             {{ shopSlot.item.name }}
         </span>
         <!-- 固定保留一行高度，即使沒有主屬性也不留空，讓同一列的卡片維持等高 -->
@@ -141,9 +141,6 @@ const handleClick = () => {
 
 .shop-item-slot {
     &__name {
-        display: flex;
-        align-items: center;
-        justify-content: center;
         min-height: 24px;
         max-width: 100%;
         padding: 0 4px;
