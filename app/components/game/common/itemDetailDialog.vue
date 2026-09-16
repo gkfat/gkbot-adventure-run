@@ -6,16 +6,27 @@
     >
         <template v-if="item && detailInfo">
             <div
+                v-if="item.equipSlot"
+                class="d-flex justify-end mb-1"
+            >
+                <span class="text-caption text-medium-emphasis font-pixel">{{ SLOT_LABEL[item.equipSlot] }}</span>
+            </div>
+
+            <div
                 v-if="equippedInSlot && equippedDetailInfo"
                 class="item-detail-dialog__compare d-flex ga-3 mb-3"
             >
-                <div class="item-detail-dialog__compare-column">
+                <div class="item-detail-dialog__compare-column item-detail-dialog__compare-column--current">
                     <div class="text-caption text-medium-emphasis mb-1">目前裝備</div>
+
                     <GameCommonItemDetailPanel
                         :item="equippedInSlot"
                         :name="equippedDetailInfo.name"
                         :effects="equippedDetailInfo.effects"
                         :flavor="equippedDetailInfo.flavor"
+                        :show-flavor="false"
+                        :show-slot-label="false"
+                        compact
                     />
                 </div>
 
@@ -26,6 +37,7 @@
                         :name="detailInfo.name"
                         :effects="detailInfo.effects"
                         :flavor="detailInfo.flavor"
+                        :show-slot-label="false"
                     />
                 </div>
             </div>
@@ -36,6 +48,7 @@
                 :name="detailInfo.name"
                 :effects="detailInfo.effects"
                 :flavor="detailInfo.flavor"
+                :show-slot-label="false"
             />
 
             <div
@@ -97,7 +110,7 @@
 
 <script setup lang="ts">
 import {
-    describeItem, pickTargetSlot, type ItemLike,
+    describeItem, pickTargetSlot, SLOT_LABEL, type ItemLike,
 } from '../../../utils/equipmentDisplay';
 import type { EquipmentSlot } from '../../../../shared/types/common';
 
@@ -202,6 +215,12 @@ defineExpose({
     &__compare-column {
         flex: 1 1 0;
         min-width: 0;
+    }
+
+    &__compare-column--current {
+        border: 2px solid rgba(196, 203, 219, 0.25);
+        border-radius: 4px;
+        padding: 14px;
     }
 }
 </style>

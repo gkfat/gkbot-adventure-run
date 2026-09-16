@@ -66,6 +66,13 @@ export const WEIGHT_CLASS_COLOR: Record<WeaponWeightClass, string> = {
     [WeaponWeightClass.HEAVY]: 'rgb(var(--v-theme-warning))',
 };
 
+// Light-to-heavy order for rendering the weight spectrum's group labels.
+export const WEIGHT_CLASS_ORDER: WeaponWeightClass[] = [
+    WeaponWeightClass.LIGHT,
+    WeaponWeightClass.MEDIUM,
+    WeaponWeightClass.HEAVY,
+];
+
 // Detail dialog's weight bar always shows 9 cells (weight 1-9, 3 per weight
 // class per WEIGHT_CLASS_THRESHOLDS) regardless of the item's actual weight
 // range, so a weight above 9 (e.g. a high-rarity roll) still marks the last

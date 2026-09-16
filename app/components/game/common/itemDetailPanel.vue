@@ -1,7 +1,7 @@
 <template>
     <div class="item-detail">
         <div
-            v-if="item.type === 'EQUIPMENT' && item.equipSlot"
+            v-if="showSlotLabel && item.type === 'EQUIPMENT' && item.equipSlot"
             class="item-detail__slot-label text-caption text-medium-emphasis font-pixel"
         >
             {{ SLOT_LABEL[item.equipSlot] }}
@@ -10,6 +10,7 @@
         <div class="d-flex align-center ga-3 mb-3">
             <div
                 class="pixel-slot pixel-slot--item pixel-slot--detail d-flex align-center justify-center"
+                :class="{ 'pixel-slot--compact': compact }"
                 :style="{ borderColor: RARITY_COLOR[item.rarity] }"
             >
                 <span
@@ -20,47 +21,57 @@
                 </span>
                 <GameCommonPixelIcon
                     :name="resolvePixelIcon(item)"
-                    :size="64"
+                    :size="compact ? 40 : 64"
                 />
             </div>
             <div>
                 <div
                     class="font-pixel item-detail__title"
+                    :class="{ 'item-detail__title--with-slot-label': showSlotLabel }"
                     :style="{ color: RARITY_COLOR[item.rarity] }"
                 >
                     {{ name }}
                 </div>
-                <div v-if="item.type === 'EQUIPMENT' && item.weight !== undefined">
-                    <div class="text-caption text-medium-emphasis">
-                        {{ WEIGHT_CLASS_LABEL[resolveWeaponWeightClass(item)] }}・重量 {{ item.weight }}
-                    </div>
-                    <div class="item-detail__weight-bar">
-                        <div
-                            v-for="(cell, index) in buildWeightBarCells(item.weight)"
-                            :key="index"
-                            class="item-detail__weight-cell"
-                            :class="{
-                                'item-detail__weight-cell--active': cell.active,
-                                'item-detail__weight-cell--group-end': index === 2 || index === 5,
-                            }"
-                            :style="{ '--cell-color': WEIGHT_CLASS_COLOR[cell.weightClass] }"
-                        >
-                            <span
-                                v-if="cell.active"
-                                class="item-detail__weight-arrow"
-                            >▲</span>
-                        </div>
-                    </div>
+                <div
+                    v-if="item.type === 'EQUIPMENT' && item.weight !== undefined"
+                    class="text-caption text-medium-emphasis"
+                >
+                    重量 {{ item.weight }}
                 </div>
                 <div
                     v-if="item.weaponType"
                     class="text-caption text-medium-emphasis"
                 >
-                    武器類型：{{ WEAPON_TYPE_LABEL[item.weaponType] }}
+                    {{ WEAPON_TYPE_LABEL[item.weaponType] }}
                 </div>
-                <div class="text-caption text-medium-emphasis">
-                    稀有度 {{ item.rarity }}
-                </div>
+            </div>
+        </div>
+
+        <div
+            v-if="item.type === 'EQUIPMENT' && item.weight !== undefined"
+            class="mb-3"
+        >
+            <div class="item-detail__weight-bar">
+                <div
+                    v-for="(cell, index) in buildWeightBarCells(item.weight)"
+                    :key="index"
+                    class="item-detail__weight-cell"
+                    :class="{
+                        'item-detail__weight-cell--active': cell.active,
+                        'item-detail__weight-cell--group-end': index === 2 || index === 5,
+                    }"
+                    :style="{ '--cell-color': WEIGHT_CLASS_COLOR[cell.weightClass] }"
+                />
+            </div>
+            <div class="item-detail__weight-groups text-caption text-medium-emphasis">
+                <span
+                    v-for="weightClass in WEIGHT_CLASS_ORDER"
+                    :key="weightClass"
+                    class="item-detail__weight-group-label"
+                    :style="resolveWeaponWeightClass(item) === weightClass ? { color: WEIGHT_CLASS_COLOR[weightClass] } : undefined"
+                >
+                    {{ WEIGHT_CLASS_LABEL[weightClass] }}
+                </span>
             </div>
         </div>
 
@@ -87,7 +98,10 @@
             沒有額外效果
         </p>
 
-        <p class="text-body-2 text-medium-emphasis mb-3">
+        <p
+            v-if="showFlavor"
+            class="text-body-2 text-medium-emphasis mb-3"
+        >
             {{ flavor }}
         </p>
     </div>
@@ -95,16 +109,23 @@
 
 <script setup lang="ts">
 import {
-    RARITY_COLOR, SLOT_LABEL, WEIGHT_CLASS_LABEL, WEIGHT_CLASS_COLOR, WEAPON_TYPE_LABEL,
+    RARITY_COLOR, SLOT_LABEL, WEIGHT_CLASS_LABEL, WEIGHT_CLASS_COLOR, WEIGHT_CLASS_ORDER, WEAPON_TYPE_LABEL,
     resolvePixelIcon, resolveWeaponWeightClass, buildWeightBarCells, type ItemLike,
 } from '../../../utils/equipmentDisplay';
 
-defineProps<{
+withDefaults(defineProps<{
     item: ItemLike;
     name: string;
     effects: { label: string; value: string; positive: boolean }[];
     flavor: string;
-}>();
+    showFlavor?: boolean;
+    showSlotLabel?: boolean;
+    compact?: boolean;
+}>(), {
+    showFlavor: true,
+    showSlotLabel: true,
+    compact: false,
+});
 </script>
 
 <style scoped lang="scss">
@@ -148,6 +169,11 @@ defineProps<{
         flex: 0 0 auto;
     }
 
+    &--compact {
+        width: 56px;
+        height: 56px;
+    }
+
     &__rarity {
         position: absolute;
         top: -6px;
@@ -163,36 +189,33 @@ defineProps<{
 
 .item-detail__weight-bar {
     display: flex;
-    gap: 2px;
-    margin-top: 6px;
-    width: 140px;
+    gap: 1px;
+}
+
+.item-detail__weight-groups {
+    display: flex;
+    margin-top: 2px;
+
+    span {
+        flex: 1 1 0;
+        text-align: center;
+    }
 }
 
 .item-detail__weight-cell {
-    position: relative;
     flex: 1 1 0;
-    height: 8px;
-    border-radius: 2px;
+    height: 5px;
+    border-radius: 1px;
     background: var(--cell-color);
-    opacity: 0.25;
+    opacity: 0.3;
 
     &--group-end {
-        margin-right: 4px;
+        margin-right: 2px;
     }
 
     &--active {
         opacity: 1;
     }
-}
-
-.item-detail__weight-arrow {
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 8px;
-    line-height: 1;
-    color: var(--cell-color);
 }
 
 .item-detail {
@@ -204,13 +227,17 @@ defineProps<{
         right: 16px;
     }
 
-    // 品名可能混雜英數字（走 font-pixel，字元較寬），縮小字級並保留右側空間，
-    // 避免與 __slot-label 重疊
     &__title {
-        padding-right: 48px;
         font-size: 0.85rem;
         line-height: 1.4;
         word-break: break-word;
+
+        // 品名可能混雜英數字（走 font-pixel，字元較寬），保留右側空間避免與
+        // __slot-label 重疊；比較模式欄位較窄且欄位標示已移到外層標題列，
+        // 不需要保留這段空間
+        &--with-slot-label {
+            padding-right: 48px;
+        }
     }
 
     &__effects {

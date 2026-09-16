@@ -7,6 +7,12 @@
     font-family: 'Press Start 2P', 'Source Sans 3', 'Noto Sans TC', sans-serif !important;
 }
 
+// 藝術字體，用於凸顯章節／標題等 CJK 短文字，不作為內文字體
+.font-title {
+    font-family: 'Noto Serif TC', 'Noto Sans TC', serif !important;
+    font-weight: 900 !important;
+}
+
 // ---------------------------------------------------------------------------
 // 全站統一按鈕互動語言：idle 時像素感的「立體邊」，hover 時像按下一半，
 // 點擊（active）時才真正按到底。所有按鈕（含純 <button>）共用同一組數值。
