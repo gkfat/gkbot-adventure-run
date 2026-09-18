@@ -25,8 +25,29 @@ export const idleFrameUrl = (spriteUrl: string, step: number) => {
 /**
  * The adventure page shows the character from behind (facing away, into the
  * facility) rather than the front-facing camp-screen portrait. Back sprites
- * have no walk-cycle frames, but can share the same idle frame naming as the
- * front sprite (`{name}-back-idle-{1,2}.png`) — compose with `idleFrameUrl`.
- * All five archetypes ship those files.
+ * can share the same idle frame naming as the front sprite
+ * (`{name}-back-idle-{1,2}.png`) — compose with `idleFrameUrl`. All five
+ * archetypes ship those files.
  */
 export const backSpriteUrl = (spriteUrl: string) => spriteUrl.replace(/\.png$/, '-back.png');
+
+/**
+ * Walk-cycle frames only exist for back sprites (`{name}-back-walk-{1,2,3}.png`,
+ * front-facing sprites have none) — compose with `backSpriteUrl`, not the raw
+ * `spriteUrl`. The sequence below cycles left-step -> mid-stride -> right-step
+ * -> mid-stride so the loop reads as continuous walking motion without ever
+ * resting at the static base pose while `isWalking` is true.
+ */
+const WALK_LEVEL_SEQUENCE = [
+    1,
+    2,
+    3,
+    2,
+] as const;
+
+export const WALK_FRAME_COUNT = WALK_LEVEL_SEQUENCE.length;
+
+export const walkFrameUrl = (backSprite: string, step: number) => {
+    const level = WALK_LEVEL_SEQUENCE[step] ?? 1;
+    return backSprite.replace(/\.png$/, `-walk-${level}.png`);
+};

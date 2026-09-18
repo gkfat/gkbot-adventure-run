@@ -923,7 +923,7 @@ import type { Stats } from '../../shared/types/common';
 import { describeItem, resolvePixelIcon, RARITY_COLOR, type ItemLike } from '../utils/equipmentDisplay';
 import type { EventNodeData, BlessingNodeData, RestNodeData } from '../composables/useAdventureRun';
 import { pickIntroNarrative, pickTransitionNarrative, REST_NARRATIVE } from '../constants/adventureNarrative';
-import { backSpriteUrl, idleFrameUrl } from '../utils/spriteDisplay';
+import { backSpriteUrl, idleFrameUrl, walkFrameUrl } from '../utils/spriteDisplay';
 import { FACILITY_SEVERITY_TINT, getFacilityBackgroundUrl } from '../utils/facilityBackground';
 import { useCombat } from '../composables/useCombat';
 import { useDialogueBubble } from '../composables/useDialogueBubble';
@@ -964,9 +964,13 @@ const enteredAdventureCold = !checked.value;
 const showLogDialog = ref(false);
 const walkFrame = useWalkFrame();
 const idleStep = useIdleFrame();
-const characterSpriteSrc = computed(() => (
-    character.value ? idleFrameUrl(backSpriteUrl(character.value.spriteUrl), idleStep.value) : ''
-));
+const characterSpriteSrc = computed(() => {
+    if (!character.value) return '';
+    const backUrl = backSpriteUrl(character.value.spriteUrl);
+    return walkFrame.isWalking.value
+        ? walkFrameUrl(backUrl, walkFrame.step.value)
+        : idleFrameUrl(backUrl, idleStep.value);
+});
 
 // 戰鬥演出狀態集中在這裡（而非 GameAdventureCombatResultPanel 內部）：探索與戰鬥共用同一個
 // 「角色 stage」，玩家的 HP/行動條/spark/傷害飄字需要疊加在同一個持久化角色圖像

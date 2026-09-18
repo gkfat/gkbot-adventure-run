@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 實作角色修改暱稱
 - 實作角色負重機制，裝備重量系統、武器熟練度系統
 - 實作角色技能系統
+- 實作走路動畫
 
 ### Changed
 
