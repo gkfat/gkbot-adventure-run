@@ -50,13 +50,18 @@
             <div class="w-100 text-center character-stage__content">
                 <!-- 裝備欄位：角色圖像左右各 3 格 -->
                 <div class="character-stage__equip-row d-flex align-center justify-space-between mt-2">
-                    <GameCharacterStageEquipSlots
-                        :slots="EQUIP_SLOTS_LEFT"
-                        :equipment="character.equipment"
-                        :item-by-id="itemById"
-                        side="left"
-                        @select="openItemDetail"
-                    />
+                    <div class="d-flex flex-column ga-3">
+                        <GameCharacterStageEquipSlots
+                            :slots="EQUIP_SLOTS_LEFT"
+                            :equipment="character.equipment"
+                            :item-by-id="itemById"
+                            side="left"
+                            @select="openItemDetail"
+                        />
+
+                        <!-- 目前佩戴中的技能（character-skills） -->
+                        <GameCharacterStageEquippedSkills />
+                    </div>
 
                     <div class="character-stage__sprite-col d-flex flex-column align-center ga-1">
                         <div class="character-stage__identity d-flex flex-column align-center">

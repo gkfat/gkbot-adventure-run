@@ -38,6 +38,14 @@
                     }"
                 >
                     <div class="combat-result-panel__fx-anchor">
+                        <span
+                            v-if="enemy.statusBadge"
+                            class="combat-result-panel__status-badge"
+                            :class="enemy.statusBadge.colorClass"
+                            :aria-label="enemy.statusBadge.label"
+                        >
+                            {{ enemy.statusBadge.label }}
+                        </span>
                         <div
                             :key="enemy.cardFx?.key ?? -1"
                             class="combat-result-panel__unit-inner"
@@ -96,13 +104,20 @@
                                 v-if="enemy.damageText.kind === 'crit'"
                                 class="combat-result-panel__damage-text-crit-label"
                             >爆擊</span>
-                            <span>{{ enemy.damageText.kind === 'dodge' ? '閃避' : enemy.damageText.value }}</span>
+                            <span>{{ enemy.damageText.kind === 'dodge' ? '閃避' : enemy.damageText.kind === 'heal' ? `+${enemy.damageText.value}` : enemy.damageText.value }}</span>
                         </span>
                         <GameAdventureDialogueBubble
                             v-if="dialogueBubbles.get(enemy.enemyId)"
                             :key="dialogueBubbles.get(enemy.enemyId)!.key"
                             :text="dialogueBubbles.get(enemy.enemyId)!.text"
                         />
+                        <span
+                            v-if="enemy.skillCast"
+                            :key="enemy.skillCast.key"
+                            class="combat-result-panel__skill-cast-text font-pixel"
+                        >
+                            {{ enemy.skillCast.name }}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -256,6 +271,14 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
             height: 68px;
             filter: drop-shadow(0 0 4px rgba(255, 140, 0, 0.7));
         }
+
+        // character-skills：所有造成傷害的技能共用這個爆裂特效（見 useCombat.ts
+        // sparkFrameUrls），跟一般攻擊的 hit/crit 揮砍區分開來。
+        &--skill {
+            width: 68px;
+            height: 68px;
+            filter: drop-shadow(0 0 6px rgba(91, 227, 255, 0.7));
+        }
     }
 
     // 傷害數字／閃避文字飄字：疊在卡片正上方，由下往上飄並淡出，跟 &__spark
@@ -293,6 +316,52 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
             color: rgba(255, 255, 255, 0.75);
             animation-duration: 0.7s;
         }
+
+        &--heal {
+            color: rgb(var(--v-theme-green));
+        }
+    }
+
+    // character-skills：技能觸發當下顯示的技能名稱，跟傷害飄字一樣一次性、靠
+    // :key 重新掛載重播，但固定顯示在卡片正下方（傷害飄字往上飄，避免重疊）。
+    &__skill-cast-text {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-top: 2px;
+        transform: translateX(-50%);
+        font-size: 10px;
+        color: rgb(var(--v-theme-secondary));
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        pointer-events: none;
+        white-space: nowrap;
+        animation: combat-result-panel-skill-cast-float 1.4s ease-out forwards;
+    }
+
+    // 控場/持續型技能狀態指示（known-issue.md #1）：疊在卡片左上角的小色塊，
+    // 依效果種類換色，讓玩家一眼看出敵人目前正受什麼技能效果影響（見
+    // useCombat.ts statusBadgeFor／app/utils/skillDisplay.ts STATUS_BADGE_STYLE）。
+    &__status-badge {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        padding: 1px 4px;
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.3;
+        white-space: nowrap;
+        border-radius: 3px;
+        color: #0a0c10;
+        pointer-events: none;
+
+        &.status-badge--freeze { background: #7fdfff; }
+        &.status-badge--haste { background: #ffd166; }
+        &.status-badge--defense-up { background: #8ed081; }
+        &.status-badge--crit-up { background: #ff9f6b; }
+        &.status-badge--armor-break { background: #ff6b6b; }
+        &.status-badge--dot { background: #c98bf2; }
+        &.status-badge--shield { background: #6ba8ff; }
     }
 
     &__damage-text-crit-label {
@@ -522,6 +591,23 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
     100% {
         opacity: 0;
         transform: translate(-50%, -22px);
+    }
+}
+
+@keyframes combat-result-panel-skill-cast-float {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -4px);
+    }
+    15% {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+    80% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
     }
 }
 </style>

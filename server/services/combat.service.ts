@@ -15,6 +15,7 @@
 
 import { BaseService } from './base.service';
 import { CharacterService } from './character.service';
+import { CharacterSkillService } from './character-skill.service';
 import { ItemRepository } from '../repositories/item.repository';
 import {
     RngService, type RngCursor,
@@ -33,8 +34,14 @@ import {
 } from '../constants/combat';
 import { generateItemInstance } from './item.service';
 import {
-    getItemTemplate, ITEM_TEMPLATES,
+    getItemTemplate, ITEM_TEMPLATES, getCharacterSkillById, getCharacterSkillsByArchetypeId,
 } from '../constants/templates';
+import { SKILL_FRAGMENT_DROP_AMOUNT } from '../../shared/constants/skills';
+import type {
+    SkillEffect,
+    AdventureRun, CombatContext, CombatResolver, CombatResolution, CombatLogEntry, RunModifier,
+    EnemyFaction, FacilitySeverity, 
+} from '../../shared/types/adventure';
 import {
     findCurseTemplate, resolveBlessingModifier,
 } from '../../shared/constants/blessings';
@@ -43,10 +50,6 @@ import type { ItemInstance } from '../../shared/types/item';
 import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import {
     NodeType, disambiguateEnemyNames,
-} from '../../shared/types/adventure';
-import type {
-    AdventureRun, CombatContext, CombatResolver, CombatResolution, CombatLogEntry, RunModifier,
-    EnemyFaction, FacilitySeverity,
 } from '../../shared/types/adventure';
 import {
     EquipmentSlot, WeaponType, type Stats,
@@ -173,9 +176,37 @@ const MAX_ROUNDS = 500;
  * to the implementation (D5 ASSUMPTION).
  */
 type StatusEffect = {
-    kind: 'critChance' | 'actionIntervalSec' | 'damageTaken';
+    kind: 'critChance' | 'actionIntervalSec' | 'damageTaken' | 'def';
     magnitude: number;
     remainingAttacks: number;
+    // Character/enemy skills (character-skills): skill-granted status effects
+    // expire by simulation time instead of attack count — set alongside
+    // remainingAttacks: Number.MAX_SAFE_INTEGER so the existing attack-count
+    // pruning (tickOwnAttackEffects/tickIncomingHitEffects) never removes
+    // them early; isEffectActive() below is what actually gates them.
+    expiresAt?: number;
+};
+
+/**
+ * A skill (character or enemy) currently charging on a CombatUnit
+ * (character-skills「技能充能與觸發時機」) — an independent timer alongside
+ * the unit's own `nextAttackAt`, not a replacement for its normal attack.
+ */
+type ChargingSkill = {
+    skillId: string;
+    skillName: string;
+    effect: SkillEffect;
+    chargeSec: number;
+    readyAt: number;
+};
+
+/** A pending DOT tick (character-skills DOT effect) — ticks on the target's own next action. */
+type DotEffect = {
+    skillId: string;
+    skillName: string;
+    sourceId: string;
+    tickDamage: number;
+    remainingTicks: number;
 };
 
 type CombatUnit = {
@@ -208,6 +239,12 @@ type CombatUnit = {
     consecutiveHitCount: number;
     // One extra forced-crit charge, consumed by the next crit roll (RANGED B).
     forcedCritCharges: number;
+    // Character/enemy skills (character-skills)
+    chargingSkills: ChargingSkill[];
+    dotEffects: DotEffect[];
+    // Absorbs incoming damage before HP, until exhausted (SHIELD effect).
+    // Undefined/0 means no shield.
+    shieldHp?: number;
 };
 
 /** Player's currently-equipped weapon context, computed once per combat (D3/D4/D5/D7). */
@@ -221,9 +258,15 @@ type PlayerWeaponContext = {
     dualWieldLevel: number;
 };
 
-function unitStatValue(unit: CombatUnit, kind: 'critChance' | 'actionIntervalSec', base: number): number {
+/** A status effect is active if it hasn't been time-pruned (skill effects) and, when attack-count-scoped, hasn't run out of attacks. */
+function isEffectActive(effect: StatusEffect, now: number): boolean {
+    if (effect.expiresAt !== undefined && effect.expiresAt <= now) return false;
+    return effect.remainingAttacks > 0;
+}
+
+function unitStatValue(unit: CombatUnit, kind: 'critChance' | 'actionIntervalSec', base: number, now: number): number {
     const bonus = unit.statusEffects
-        .filter(effect => effect.kind === kind)
+        .filter(effect => effect.kind === kind && isEffectActive(effect, now))
         .reduce((sum, effect) => sum + effect.magnitude, 0);
     return base + bonus;
 }
@@ -235,11 +278,45 @@ function damageTakenMultiplier(unit: CombatUnit): number {
     return 1 + bonus;
 }
 
+/** Sum of currently-active `def` status effects (DEFENSE_UP/ARMOR_BREAK, character-skills). */
+function unitDefBonus(unit: CombatUnit, now: number): number {
+    return unit.statusEffects
+        .filter(effect => effect.kind === 'def' && isEffectActive(effect, now))
+        .reduce((sum, effect) => sum + effect.magnitude, 0);
+}
+
+/** Unit's DEF at simulation time `now`, including active DEFENSE_UP/ARMOR_BREAK skill effects. */
+function effectiveDef(unit: CombatUnit, now: number): number {
+    return Math.max(0, unit.def + unitDefBonus(unit, now));
+}
+
 function addStatusEffect(unit: CombatUnit, kind: StatusEffect['kind'], magnitude: number, durationAttacks: number): void {
     if (durationAttacks <= 0) return;
     unit.statusEffects.push({
         kind, magnitude, remainingAttacks: durationAttacks,
     });
+}
+
+/** Character/enemy skills (character-skills): a time-scoped status effect, expiring at `expiresAt` (simulation ms) rather than after N attacks. */
+function addTimedStatusEffect(unit: CombatUnit, kind: StatusEffect['kind'], magnitude: number, expiresAt: number): void {
+    unit.statusEffects.push({
+        kind, magnitude, remainingAttacks: Number.MAX_SAFE_INTEGER, expiresAt,
+    });
+}
+
+/**
+ * Apply damage to a unit, draining any SHIELD pool first (character-skills
+ * SHIELD effect). Returns the actual HP lost, for combatLog's `damage` field.
+ */
+function applyDamageWithShield(target: CombatUnit, rawDamage: number): number {
+    const shield = target.shieldHp ?? 0;
+    const absorbed = Math.min(shield, rawDamage);
+    if (absorbed > 0) {
+        target.shieldHp = shield - absorbed;
+    }
+    const hpDamage = rawDamage - absorbed;
+    target.hp = Math.max(0, target.hp - hpDamage);
+    return hpDamage;
 }
 
 /** Decrement + prune a unit's own-attack-scoped effects after it acts. */
@@ -263,6 +340,7 @@ function tickIncomingHitEffects(unit: CombatUnit): void {
 export class CombatService extends BaseService implements CombatResolver {
     protected serviceName = 'combat';
     private characterService: CharacterService;
+    private characterSkillService: CharacterSkillService;
     private rngService: RngService;
     private itemRepo: ItemRepository;
     private progressTracker: QuestAchievementProgressTracker;
@@ -270,6 +348,7 @@ export class CombatService extends BaseService implements CombatResolver {
     constructor() {
         super();
         this.characterService = new CharacterService();
+        this.characterSkillService = new CharacterSkillService();
         this.rngService = new RngService();
         this.itemRepo = new ItemRepository();
         this.progressTracker = new QuestAchievementProgressTracker();
@@ -319,6 +398,8 @@ export class CombatService extends BaseService implements CombatResolver {
             statusEffects: [],
             consecutiveHitCount: 0,
             forcedCritCharges: 0,
+            chargingSkills: [],
+            dotEffects: [],
         };
 
         const weaponContext = await this.getPlayerWeaponContext(character);
@@ -330,6 +411,10 @@ export class CombatService extends BaseService implements CombatResolver {
         // across every wave, written once at the end of resolve().
         const proficiencyExpGained: Partial<Record<WeaponType, number>> = {};
         let dualWieldExpGained = 0;
+        // Skill trigger tally (character-skills「戰鬥觸發累積技能 exp」) — accrued
+        // across every wave, written once at the end of resolve() alongside
+        // weaponProficiency.
+        const skillTriggerCounts: Record<string, number> = {};
         const addProficiencyExp = (isCrit: boolean) => {
             const amount = isCrit ? PROFICIENCY_EXP_PER_CRIT : PROFICIENCY_EXP_PER_HIT;
             for (const type of weaponContext.weaponTypes) {
@@ -359,6 +444,14 @@ export class CombatService extends BaseService implements CombatResolver {
             // combat-log-sequential-playback design.md — the frontend relies on
             // per-wave timestamps to build its playback schedule).
             player.nextAttackAt = player.actionIntervalSec * 1000;
+            // Skill charge timers are an independent second timeline off the
+            // same per-wave zero baseline as nextAttackAt (combatLog
+            // timestamps reset per wave too) — rebuilt fresh each wave rather
+            // than carried over, mirroring how enemy units (and their own
+            // chargingSkills, see buildEnemyUnit) are always rebuilt fresh
+            // per wave (character-skills「技能充能與觸發時機」).
+            player.chargingSkills = this.buildPlayerChargingSkills(character, 0);
+            player.dotEffects = [];
 
             const enemies = this.spawnWave(
                 cursor, context, mobArchetypes, bossArchetypes, severityTier, player.actionIntervalSec,
@@ -387,10 +480,63 @@ export class CombatService extends BaseService implements CombatResolver {
             while (player.hp > 0 && alive.length > 0 && rounds < MAX_ROUNDS) {
                 rounds += 1;
 
-                const actor = [player, ...alive].reduce(
-                    (min, unit) => (unit.nextAttackAt < min.nextAttackAt ? unit : min),
-                );
-                const eventTimestamp = actor.nextAttackAt;
+                // Merge the normal attack schedule with every unit's skill
+                // charge timers (character-skills「技能充能與觸發時機」) — pick
+                // whichever event (attack or skill-ready) is soonest.
+                let actor: CombatUnit = player;
+                let eventTimestamp = player.nextAttackAt;
+                let readyCharging: ChargingSkill | undefined;
+                for (const unit of [player, ...alive]) {
+                    if (unit.nextAttackAt < eventTimestamp) {
+                        actor = unit;
+                        eventTimestamp = unit.nextAttackAt;
+                        readyCharging = undefined;
+                    }
+                    for (const charging of unit.chargingSkills) {
+                        if (charging.readyAt < eventTimestamp) {
+                            actor = unit;
+                            eventTimestamp = charging.readyAt;
+                            readyCharging = charging;
+                        }
+                    }
+                }
+
+                if (readyCharging) {
+                    this.resolveSkillTrigger(
+                        cursor, actor, readyCharging, player, alive, defeated, combatLog, wave, eventTimestamp, skillTriggerCounts,
+                    );
+                    readyCharging.readyAt = eventTimestamp + readyCharging.chargeSec * 1000;
+                    continue;
+                }
+
+                // DOT ticks (character-skills DOT effect) resolve right before
+                // the affected unit's own next action.
+                if (actor.dotEffects.length > 0) {
+                    let lastDotSourceId = actor.id;
+                    for (const dot of [...actor.dotEffects]) {
+                        lastDotSourceId = dot.sourceId;
+                        const hpDamage = applyDamageWithShield(actor, dot.tickDamage);
+                        combatLog.push({
+                            timestamp: eventTimestamp, wave, actorId: dot.sourceId, targetId: actor.id, action: 'SKILL',
+                            skillId: dot.skillId, skillName: dot.skillName, damage: hpDamage, targetHpRemaining: actor.hp,
+                        });
+                        dot.remainingTicks -= 1;
+                    }
+                    actor.dotEffects = actor.dotEffects.filter(dot => dot.remainingTicks > 0);
+                    if (actor.hp <= 0) {
+                        combatLog.push({
+                            timestamp: eventTimestamp, wave, actorId: lastDotSourceId, targetId: actor.id, action: 'DEATH',
+                        });
+                        if (actor !== player) {
+                            const index = alive.indexOf(actor);
+                            if (index >= 0) {
+                                alive.splice(index, 1);
+                                defeated.push(actor);
+                            }
+                        }
+                        continue;
+                    }
+                }
 
                 if (actor === player) {
                     this.performPlayerAttack(cursor, player, alive, defeated, weaponContext, combatLog, wave, addProficiencyExp);
@@ -403,7 +549,7 @@ export class CombatService extends BaseService implements CombatResolver {
                     }
                 }
 
-                actor.nextAttackAt += unitStatValue(actor, 'actionIntervalSec', actor.actionIntervalSec) * 1000;
+                actor.nextAttackAt += unitStatValue(actor, 'actionIntervalSec', actor.actionIntervalSec, eventTimestamp) * 1000;
 
                 if (bossUnit && bossUnit.canReinforce && bossUnit.hp > 0
                     && rounds % BOSS_REINFORCE_CONFIG.CHECK_INTERVAL_ROUNDS === 0
@@ -420,7 +566,7 @@ export class CombatService extends BaseService implements CombatResolver {
                             const minionArchetype = mobArchetypes[minionArchetypeIndex] as EnemyArchetype;
                             const minionMultipliers = getStatMultipliers(context.enemyLevel, 'BOSS_MINION', severityTier);
                             const minion = this.buildEnemyUnit(
-                                minionArchetype, minionArchetypeIndex, minionMultipliers, context.enemyLevel, false, player.actionIntervalSec,
+                                minionArchetype, minionArchetypeIndex, minionMultipliers, context.enemyLevel, false, player.actionIntervalSec, eventTimestamp,
                             );
                             minion.nextAttackAt = eventTimestamp;
                             alive.push(minion);
@@ -472,18 +618,37 @@ export class CombatService extends BaseService implements CombatResolver {
             });
         }
 
+        // Character skills (character-skills「戰鬥觸發累積技能 exp」): a one-time
+        // write of this fight's tallied skill-trigger exp, same pattern as
+        // recordWeaponProficiency above.
+        await this.characterSkillService.recordSkillExpGained(run.characterId, character.unlockedSkills ?? {}, skillTriggerCounts);
+
         const victory = player.hp > 0;
         const rewards = victory
-            ? this.computeRewards(run, rewardCursor, context, defeated, character.attributes.LUCK, activeModifiers)
+            ? this.computeRewards(run, rewardCursor, context, defeated, character.attributes.LUCK, character.archetypeId, activeModifiers)
             : {
-                expGained: 0, goldDropped: 0, gemsDropped: 0, itemsDropped: [], blessingPointsGained: 0,
+                expGained: 0, goldDropped: 0, gemsDropped: 0, itemsDropped: [], blessingPointsGained: 0, skillFragmentDrop: undefined,
             };
+
+        // Character skills (character-skills「戰鬥掉落」): apply the
+        // combat-victory fragment drop (if any) rolled inside computeRewards.
+        // Destructured (not left on `rewards`) so it doesn't leak into the
+        // returned CombatResult below — this outcome isn't part of that
+        // public shape (see design.md decision 8).
+        const {
+            skillFragmentDrop, ...rewardsForResult 
+        } = rewards;
+        if (skillFragmentDrop) {
+            await this.characterSkillService.grantFragments(
+                run.characterId, character.skillFragments ?? {}, skillFragmentDrop.skillId, skillFragmentDrop.amount,
+            );
+        }
 
         return {
             victory,
             roundCount: combatLog.filter(entry => entry.action !== 'DEATH').length,
             playerHpRemaining: Math.max(0, player.hp),
-            ...rewards,
+            ...rewardsForResult,
             enemies: disambiguateEnemyNames(encountered).map(enemy => ({
                 enemyId: enemy.id, name: enemy.name, level: enemy.level as number, hpMax: enemy.hpMax, isBoss: enemy.isBoss, archetypeSlug: enemy.archetypeSlug,
             })),
@@ -553,6 +718,7 @@ export class CombatService extends BaseService implements CombatResolver {
         enemyLevel: number,
         isBoss: boolean,
         playerActionIntervalSec: number,
+        chargeStartAt = 0,
     ): CombatUnit {
         // Enemies must always act slower than the player currently fighting
         // them, independent of the player's own AGI/equipment build —
@@ -586,7 +752,185 @@ export class CombatService extends BaseService implements CombatResolver {
             statusEffects: [],
             consecutiveHitCount: 0,
             forcedCritCharges: 0,
+            chargingSkills: archetype.skill ? [
+                {
+                    skillId: archetype.skill.skillId,
+                    skillName: archetype.skill.name,
+                    effect: archetype.skill.effect,
+                    chargeSec: archetype.skill.chargeSec,
+                    readyAt: chargeStartAt + archetype.skill.chargeSec * 1000,
+                },
+            ] : [],
+            dotEffects: [],
         };
+    }
+
+    /**
+     * Build a player's equipped-skill charge timers at the start of a wave
+     * (character-skills「技能充能與觸發時機」) — one `ChargingSkill` per
+     * equipped-and-unlocked slot, all starting from `startAt` (the wave's own
+     * zero baseline, same as `nextAttackAt`).
+     */
+    private buildPlayerChargingSkills(character: Character, startAt: number): ChargingSkill[] {
+        const chargingSkills: ChargingSkill[] = [];
+        for (const skillId of character.equippedSkillIds ?? []) {
+            if (!skillId) continue;
+            const definition = getCharacterSkillById(skillId);
+            const progress = character.unlockedSkills[skillId];
+            if (!definition || !progress) continue;
+            const level = Math.min(definition.effectByLevel.length, Math.max(1, progress.level));
+            chargingSkills.push({
+                skillId,
+                skillName: definition.name,
+                effect: definition.effectByLevel[level - 1] as SkillEffect,
+                chargeSec: definition.chargeSec,
+                readyAt: startAt + definition.chargeSec * 1000,
+            });
+        }
+        return chargingSkills;
+    }
+
+    /**
+     * Resolve one skill (character or enemy) charge completing
+     * (character-skills「技能充能與觸發時機」/「技能傷害類效果結算」/「技能狀態類效果結算」).
+     * Mutates `alive`/`defeated`/`combatLog`/`skillTriggerCounts` in place.
+     */
+    private resolveSkillTrigger(
+        cursor: RngCursor,
+        unit: CombatUnit,
+        charging: ChargingSkill,
+        player: CombatUnit,
+        alive: CombatUnit[],
+        defeated: CombatUnit[],
+        combatLog: CombatLogEntry[],
+        wave: number,
+        timestamp: number,
+        skillTriggerCounts: Record<string, number>,
+    ): void {
+        const isPlayerActing = unit === player;
+        const targets = isPlayerActing ? alive : [player];
+        const primary = targets[0];
+        if (!primary || primary.hp <= 0) return;
+
+        const effect = charging.effect;
+
+        const logSkillEvent = (target: CombatUnit, damage?: number, statusDurationSec?: number): void => {
+            combatLog.push({
+                timestamp,
+                wave,
+                actorId: unit.id,
+                targetId: target.id,
+                action: 'SKILL',
+                skillId: charging.skillId,
+                skillName: charging.skillName,
+                // 控場/持續型效果（known-issue.md #1）：讓前端知道 targetId 目前
+                // 正受此技能效果影響，用以在畫面上呈現對應狀態指示。
+                statusEffectKind: effect.kind,
+                ...(statusDurationSec !== undefined ? { statusDurationSec } : {}),
+                ...(damage !== undefined ? {
+                    damage, targetHpRemaining: target.hp,
+                } : {}),
+            });
+        };
+
+        const rollAndApplyDamage = (target: CombatUnit, multiplier: number, ratio = 1, markDot = false): void => {
+            const dodgeRoll = cursor.next();
+            if (dodgeRoll < target.dodgeChance) {
+                combatLog.push({
+                    timestamp, wave, actorId: unit.id, targetId: target.id, action: 'DODGE', skillId: charging.skillId, skillName: charging.skillName,
+                });
+                return;
+            }
+            const critRoll = cursor.next();
+            const isCrit = critRoll < unit.critChance;
+            const rawDamage = computeDamage(unit.atk * multiplier, effectiveDef(target, timestamp), isCrit, unit.critMultiplier);
+            const finalDamage = ratio === 1 ? rawDamage : Math.max(0, Math.round(rawDamage * ratio));
+            const hpDamage = applyDamageWithShield(target, finalDamage);
+            combatLog.push({
+                timestamp, wave, actorId: unit.id, targetId: target.id, action: isCrit ? 'CRIT' : 'SKILL',
+                skillId: charging.skillId, skillName: charging.skillName, damage: hpDamage, targetHpRemaining: target.hp,
+                // DOT 本體傷害同時附帶持續傷害狀態（known-issue.md #1），沒有固定
+                // 到期時間（每次 tick 都會重新觸發顯示），由前端用預設時窗顯示。
+                ...(markDot ? { statusEffectKind: 'DOT' as const } : {}),
+            });
+            if (target.hp <= 0) {
+                combatLog.push({
+                    timestamp, wave, actorId: unit.id, targetId: target.id, action: 'DEATH',
+                });
+                if (target !== player) {
+                    const index = alive.indexOf(target);
+                    if (index >= 0) {
+                        alive.splice(index, 1);
+                        defeated.push(target);
+                    }
+                }
+            }
+        };
+
+        switch (effect.kind) {
+        case 'DAMAGE_SINGLE':
+            rollAndApplyDamage(primary, effect.multiplier ?? 1);
+            break;
+        case 'DAMAGE_AOE':
+            for (const target of [...targets]) {
+                if (target.hp > 0) rollAndApplyDamage(target, effect.multiplier ?? 1);
+            }
+            break;
+        case 'DAMAGE_SPLASH':
+            rollAndApplyDamage(primary, effect.multiplier ?? 1);
+            for (const secondary of targets.slice(1)) {
+                if (secondary.hp > 0) rollAndApplyDamage(secondary, effect.multiplier ?? 1, effect.splashRatio ?? 0.5);
+            }
+            break;
+        case 'DOT':
+            rollAndApplyDamage(primary, effect.multiplier ?? 1, 1, Boolean(effect.ticks && effect.tickDamage));
+            if (primary.hp > 0 && effect.ticks && effect.tickDamage) {
+                primary.dotEffects.push({
+                    skillId: charging.skillId, skillName: charging.skillName, sourceId: unit.id, tickDamage: effect.tickDamage, remainingTicks: effect.ticks,
+                });
+            }
+            break;
+        case 'FREEZE':
+            primary.nextAttackAt += (effect.durationSec ?? 0) * 1000;
+            logSkillEvent(primary, undefined, effect.durationSec);
+            break;
+        case 'HASTE_SELF':
+            addTimedStatusEffect(
+                unit, 'actionIntervalSec', -unit.actionIntervalSec * ((effect.percent ?? 0) / 100), timestamp + (effect.durationSec ?? 0) * 1000,
+            );
+            logSkillEvent(unit, undefined, effect.durationSec);
+            break;
+        case 'HEAL_SELF': {
+            const healAmount = Math.round(unit.hpMax * ((effect.percent ?? 0) / 100));
+            unit.hp = Math.min(unit.hpMax, unit.hp + healAmount);
+            logSkillEvent(unit, -healAmount);
+            break;
+        }
+        case 'DEFENSE_UP':
+            addTimedStatusEffect(unit, 'def', unit.def * ((effect.percent ?? 0) / 100), timestamp + (effect.durationSec ?? 0) * 1000);
+            logSkillEvent(unit, undefined, effect.durationSec);
+            break;
+        case 'CRIT_UP':
+            addTimedStatusEffect(unit, 'critChance', (effect.flatPercent ?? 0) / 100, timestamp + (effect.durationSec ?? 0) * 1000);
+            logSkillEvent(unit, undefined, effect.durationSec);
+            break;
+        case 'ARMOR_BREAK':
+            addTimedStatusEffect(primary, 'def', -primary.def * ((effect.percent ?? 0) / 100), timestamp + (effect.durationSec ?? 0) * 1000);
+            logSkillEvent(primary, undefined, effect.durationSec);
+            break;
+        case 'SHIELD': {
+            const shieldAmount = Math.round(unit.hpMax * ((effect.percent ?? 0) / 100));
+            unit.shieldHp = (unit.shieldHp ?? 0) + shieldAmount;
+            logSkillEvent(unit);
+            break;
+        }
+        default:
+            break;
+        }
+
+        if (isPlayerActing) {
+            skillTriggerCounts[charging.skillId] = (skillTriggerCounts[charging.skillId] ?? 0) + 1;
+        }
     }
 
     /**
@@ -684,8 +1028,8 @@ export class CombatService extends BaseService implements CombatResolver {
     }
 
     /** Full damage against one target: base formula + BLADE bonus + target's damageTaken statusEffects. */
-    private computePlayerDamageAgainst(ctx: PlayerWeaponContext, player: CombatUnit, target: CombatUnit, isCrit: boolean): number {
-        const base = computeDamage(player.atk, target.def, isCrit, player.critMultiplier);
+    private computePlayerDamageAgainst(ctx: PlayerWeaponContext, player: CombatUnit, target: CombatUnit, isCrit: boolean, now: number): number {
+        const base = computeDamage(player.atk, effectiveDef(target, now), isCrit, player.critMultiplier);
         const withBlade = this.applyBladeDamageBonus(ctx, target, isCrit, base);
         return Math.round(withBlade * damageTakenMultiplier(target));
     }
@@ -810,15 +1154,15 @@ export class CombatService extends BaseService implements CombatResolver {
                 return true;
             }
             const critRoll = cursor.next();
-            return critRoll < unitStatValue(player, 'critChance', player.critChance);
+            return critRoll < unitStatValue(player, 'critChance', player.critChance, timestamp);
         };
 
         const applyDamage = (target: CombatUnit, damage: number, isCrit: boolean, ratio = 1): void => {
             const finalDamage = ratio === 1 ? damage : Math.max(0, Math.round(damage * ratio));
-            target.hp = Math.max(0, target.hp - finalDamage);
+            const hpDamage = applyDamageWithShield(target, finalDamage);
             tickIncomingHitEffects(target);
             combatLog.push({
-                timestamp, wave, actorId: player.id, targetId: target.id, action: isCrit ? 'CRIT' : 'ATTACK', damage: finalDamage, targetHpRemaining: target.hp,
+                timestamp, wave, actorId: player.id, targetId: target.id, action: isCrit ? 'CRIT' : 'ATTACK', damage: hpDamage, targetHpRemaining: target.hp,
             });
             if (target.hp <= 0) {
                 combatLog.push({
@@ -847,7 +1191,7 @@ export class CombatService extends BaseService implements CombatResolver {
             for (const target of [...alive]) {
                 const isCrit = rollCrit();
                 anyCrit = anyCrit || isCrit;
-                let damage = this.computePlayerDamageAgainst(ctx, player, target, isCrit);
+                let damage = this.computePlayerDamageAgainst(ctx, player, target, isCrit, timestamp);
                 if (target === primary && mainTargetBonus > 0) {
                     damage = Math.round(damage * (1 + mainTargetBonus));
                 }
@@ -857,18 +1201,18 @@ export class CombatService extends BaseService implements CombatResolver {
             this.applyOnHitPassives(ctx, player, primary, anyCrit, cursor);
         } else if (isSplash) {
             const isCrit = rollCrit();
-            const mainDamage = this.computePlayerDamageAgainst(ctx, player, primary, isCrit);
+            const mainDamage = this.computePlayerDamageAgainst(ctx, player, primary, isCrit, timestamp);
             applyDamage(primary, mainDamage, isCrit);
             const secondaryRatio = this.getSplashSecondaryRatio(ctx);
             for (const secondary of alive.filter(unit => unit !== primary).slice(0, 2)) {
-                const secondaryDamage = this.computePlayerDamageAgainst(ctx, player, secondary, isCrit);
+                const secondaryDamage = this.computePlayerDamageAgainst(ctx, player, secondary, isCrit, timestamp);
                 applyDamage(secondary, secondaryDamage, isCrit, secondaryRatio);
             }
             addProficiencyExp(isCrit);
             this.applyOnHitPassives(ctx, player, primary, isCrit, cursor);
         } else {
             const isCrit = rollCrit();
-            const damage = this.computePlayerDamageAgainst(ctx, player, primary, isCrit);
+            const damage = this.computePlayerDamageAgainst(ctx, player, primary, isCrit, timestamp);
             applyDamage(primary, damage, isCrit);
             addProficiencyExp(isCrit);
             this.applyOnHitPassives(ctx, player, primary, isCrit, cursor);
@@ -882,7 +1226,7 @@ export class CombatService extends BaseService implements CombatResolver {
             const chance = strengthened ? DUAL_WIELD_PASSIVE_CONFIG.A_EXTRA_ATTACK_CHANCE_STRENGTHENED : DUAL_WIELD_PASSIVE_CONFIG.A_EXTRA_ATTACK_CHANCE;
             if (cursor.next() < chance) {
                 const extraIsCrit = player.forcedCritCharges > 0 ? rollCrit() : false;
-                const extraDamage = this.computePlayerDamageAgainst(ctx, player, primary, extraIsCrit);
+                const extraDamage = this.computePlayerDamageAgainst(ctx, player, primary, extraIsCrit, timestamp);
                 applyDamage(primary, extraDamage, extraIsCrit, DUAL_WIELD_PASSIVE_CONFIG.A_EXTRA_ATTACK_DAMAGE_RATIO);
             }
         }
@@ -903,22 +1247,22 @@ export class CombatService extends BaseService implements CombatResolver {
 
         const critRoll = cursor.next();
         const isCrit = critRoll < actor.critChance;
-        const damage = computeDamage(actor.atk, target.def, isCrit, actor.critMultiplier);
+        const damage = computeDamage(actor.atk, effectiveDef(target, actor.nextAttackAt), isCrit, actor.critMultiplier);
+        const hpDamage = applyDamageWithShield(target, damage);
 
-        target.hp = Math.max(0, target.hp - damage);
         combatLog.push({
             timestamp: actor.nextAttackAt,
             wave,
             actorId: actor.id,
             targetId: target.id,
             action: isCrit ? 'CRIT' : 'ATTACK',
-            damage,
+            damage: hpDamage,
             targetHpRemaining: target.hp,
         });
     }
 
     private computeRewards(
-        run: AdventureRun, cursor: RngCursor, context: CombatContext, defeated: CombatUnit[], luck: number, activeModifiers: RunModifier[],
+        run: AdventureRun, cursor: RngCursor, context: CombatContext, defeated: CombatUnit[], luck: number, archetypeId: string, activeModifiers: RunModifier[],
     ) {
         let expGained = 0;
         let goldBase = 0;
@@ -963,12 +1307,30 @@ export class CombatService extends BaseService implements CombatResolver {
 
         const blessingPointsGained = defeated.length > 0 ? blessingPointsForVictory(NODE_TYPE_TO_ENEMY_TIER[context.tier]) : 0;
 
+        // Character skills (character-skills「戰鬥掉落」): one LUCK-gated roll per
+        // combat victory (not per kill, unlike item drops above) — on a hit,
+        // pick uniformly among the character's own archetype's skills and
+        // grant a fixed fragment amount.
+        let skillFragmentDrop: { skillId: string; amount: number } | undefined;
+        const catalog = getCharacterSkillsByArchetypeId(archetypeId);
+        if (catalog.length > 0) {
+            const fragmentDropRoll = cursor.next();
+            if (fragmentDropRoll < luckDropChance) {
+                const pickRoll = cursor.next();
+                const chosen = catalog[Math.floor(pickRoll * catalog.length)]!;
+                skillFragmentDrop = {
+                    skillId: chosen.skillId, amount: SKILL_FRAGMENT_DROP_AMOUNT,
+                };
+            }
+        }
+
         return {
             expGained,
             goldDropped: applyLuckToGold(goldBase, luck),
             gemsDropped,
             itemsDropped,
             blessingPointsGained,
+            skillFragmentDrop,
         };
     }
 }

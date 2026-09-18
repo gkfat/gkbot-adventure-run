@@ -91,9 +91,67 @@ export type CombatLogEntry = {
   wave: number;                // 0-based wave index this entry belongs to
   actorId: string;            // 'player' or enemyId
   targetId: string;           // 'player' or enemyId
-  action: 'ATTACK' | 'CRIT' | 'DODGE' | 'DEATH';
+  action: 'ATTACK' | 'CRIT' | 'DODGE' | 'DEATH' | 'SKILL';
   damage?: number;
   targetHpRemaining?: number;
+  // SKILL action only (character-skills) — identifies which skill triggered.
+  skillId?: string;
+  skillName?: string;
+  // SKILL action only, control/lingering effect kinds (known-issue.md #1) —
+  // tells the frontend `targetId` is now under this effect for
+  // `statusDurationSec` seconds, so it can render a status indicator.
+  statusEffectKind?: SkillEffectKind;
+  statusDurationSec?: number;
+};
+
+/**
+ * Character/enemy skill effect classification (character-skills). All 11
+ * kinds share this one shape; only the fields relevant to a given `kind` are
+ * populated (see character-skills spec.md「技能效果分類」).
+ */
+export type SkillEffectKind =
+  | 'DAMAGE_SINGLE' | 'DAMAGE_AOE' | 'DAMAGE_SPLASH'
+  | 'FREEZE' | 'HASTE_SELF' | 'HEAL_SELF'
+  | 'DEFENSE_UP' | 'CRIT_UP' | 'ARMOR_BREAK'
+  | 'DOT' | 'SHIELD';
+
+export type SkillEffect = {
+  kind: SkillEffectKind;
+  multiplier?: number;      // 傷害類：ATK 倍率
+  splashRatio?: number;     // DAMAGE_SPLASH 專用：副目標傷害佔比
+  percent?: number;         // HEAL_SELF/DEFENSE_UP/ARMOR_BREAK/HASTE_SELF/SHIELD 的百分比幅度
+  flatPercent?: number;     // CRIT_UP 專用：直接加算的百分點
+  durationSec?: number;     // FREEZE/HASTE_SELF/DEFENSE_UP/ARMOR_BREAK 的持續秒數
+  tickDamage?: number;      // DOT 專用：每次 tick 的固定傷害
+  ticks?: number;           // DOT 專用：tick 次數
+};
+
+/**
+ * Static per-archetype character skill definition (character-skills), keyed
+ * by `skillId` under CHARACTER_SKILLS[archetypeId] (shared/constants/characterSkills.ts).
+ * `effectByLevel[0]` is the Lv.1 effect, up to 10 entries (Lv.1~10) — leveling
+ * only strengthens `effect` values, `chargeSec` never changes.
+ */
+export type CharacterSkill = {
+  skillId: string;
+  archetypeId: string;
+  name: string;
+  description: string;
+  icon: string;
+  chargeSec: number;
+  unlockFragmentCost: number;
+  effectByLevel: readonly SkillEffect[];
+};
+
+/**
+ * Static enemy skill definition (character-skills) — fixed strength, no
+ * per-level growth (enemies already scale via getStatMultipliers).
+ */
+export type EnemySkill = {
+  skillId: string;
+  name: string;
+  chargeSec: number;
+  effect: SkillEffect;
 };
 
 /**

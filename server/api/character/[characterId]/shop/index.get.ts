@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
         }
 
         const shopService = new ShopService();
-        const shop = await shopService.getOrGenerateShop(characterId);
+        const shop = await shopService.getOrGenerateShop(characterId, character.archetypeId);
 
         logRequest({
             severity: 'INFO',

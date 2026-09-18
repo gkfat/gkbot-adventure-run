@@ -1,16 +1,13 @@
 import {
-    defineEventHandler, getRouterParam, readBody,
+    defineEventHandler, getRouterParam,
 } from 'h3';
 import { requireAuth } from '../../../../utils/auth';
-import { ShopService } from '../../../../services/shop.service';
-import {
-    purchaseItemRequestSchema, purchaseItemResponseSchema,
-} from '../../../../../shared/schemas/api/shop.schema';
+import { CharacterSkillService } from '../../../../services/character-skill.service';
+import { getCharacterSkillsResponseSchema } from '../../../../../shared/schemas/api/character-skill.schema';
 import { toH3Error } from '../../../../utils/errorHandler';
 import {
     AppError, ValidationError,
 } from '../../../../../shared/types/errors';
-import type { EquipmentSlot } from '../../../../../shared/types/common';
 import { logRequest } from '../../../../utils/logger';
 
 export default defineEventHandler(async (event) => {
@@ -25,24 +22,12 @@ export default defineEventHandler(async (event) => {
             throw new ValidationError('characterId is required');
         }
 
-        const body = await readBody(event);
-        const parseResult = purchaseItemRequestSchema.safeParse(body);
-        if (!parseResult.success) {
-            throw new ValidationError('Invalid request', parseResult.error.flatten());
-        }
-
-        const shopService = new ShopService();
-        const result = await shopService.purchaseItem(
-            authUser.uid,
-            characterId,
-            parseResult.data.slotId,
-            parseResult.data.destination,
-            parseResult.data.replaceSlot as EquipmentSlot | undefined,
-        );
+        const characterSkillService = new CharacterSkillService();
+        const view = await characterSkillService.getSkillsView(authUser.uid, characterId);
 
         logRequest({
             severity: 'INFO',
-            message: 'Shop item purchased',
+            message: 'Character skills retrieved',
             method: event.method,
             path: event.path,
             status: 200,
@@ -53,19 +38,14 @@ export default defineEventHandler(async (event) => {
 
         const response = {
             success: true,
-            data: {
-                item: result.item,
-                skillFragment: result.skillFragment,
-                goldSpent: result.goldSpent,
-                gemsSpent: result.gemsSpent,
-            },
+            data: view,
         };
 
-        return purchaseItemResponseSchema.parse(response);
+        return getCharacterSkillsResponseSchema.parse(response);
     } catch (error: unknown) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to purchase shop item',
+            message: 'Failed to get character skills',
             method: event.method,
             path: event.path,
             status: error instanceof AppError ? error.statusCode : 500,

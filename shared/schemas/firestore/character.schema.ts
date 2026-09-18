@@ -36,6 +36,26 @@ export const equipmentSchema = z.partialRecord(
 ).optional();
 
 /**
+ * A single unlocked skill's level/exp (character-skills) — same shape as
+ * proficiencyProgressSchema but its own type for readability.
+ */
+export const skillProgressSchema = z.object({
+    exp: z.number().int().min(0),
+    level: z.number().int().min(1).max(10),
+}).strict();
+
+/**
+ * Fixed-length 3-slot equip loadout (character-skills) — unused slots are
+ * `null`; the actually-usable slot count is derived from character level at
+ * read time (getUnlockedSkillSlotCount), not stored.
+ */
+export const equippedSkillIdsSchema = z.tuple([
+    z.string().nullable(),
+    z.string().nullable(),
+    z.string().nullable(),
+]);
+
+/**
  * Character document schema (strict mode)
  */
 export const characterSchema = z.object({
@@ -96,6 +116,16 @@ export const characterSchema = z.object({
     // kill-count tracking), incremented whenever a combat actually defeats a
     // unit of that archetype (independent of overall victory/defeat).
     defeatedArchetypeCounts: z.record(z.string(), z.number().int().min(0)).default({}),
+
+    // Character/enemy skills (character-skills): fragment counts (unlocked or
+    // not), unlocked skill level/exp, and the fixed-length 3-slot equip loadout.
+    skillFragments: z.record(z.string(), z.number().int().min(0)).default({}),
+    unlockedSkills: z.record(z.string(), skillProgressSchema).default({}),
+    equippedSkillIds: equippedSkillIdsSchema.default([
+        null,
+        null,
+        null,
+    ]),
 
     // Timestamps
     createdAt: z.number(),

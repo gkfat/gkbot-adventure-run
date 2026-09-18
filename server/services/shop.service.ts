@@ -24,7 +24,9 @@ import { CharacterRepository } from '../repositories/character.repository';
 import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import { getAdminFirestore } from '../utils/firebaseAdmin';
 import { generateItemInstance } from './item.service';
-import { getAllItemTemplates } from '../constants/templates';
+import {
+    getAllItemTemplates, getCharacterSkillsByArchetypeId, getCharacterSkillById,
+} from '../constants/templates';
 import type {
     DailyShop, ShopItem, CurrencyType,
 } from '../../shared/types/shop';
@@ -47,11 +49,30 @@ import {
 } from '../../shared/types/errors';
 
 export type PurchaseResult = {
-    item: ItemInstance;
+    // Present for `type: 'ITEM'` slots; absent for `SKILL_FRAGMENT` slots
+    // (character-skills「商店技能碎片商品」).
+    item?: ItemInstance;
+    skillFragment?: {
+        skillId: string; amount: number; name: string; icon: string;
+    };
     goldSpent?: number;
     gemsSpent?: number;
     unequipped?: ItemInstance;
 };
+
+/**
+ * Skill-fragment shop slots (character-skills「商店技能碎片商品」): one GOLD-priced
+ * and one GEMS-priced slot per daily shop, each granting a fixed fragment
+ * amount of a randomly-picked skill from the character's own archetype.
+ * ASSUMPTION: values are initial balance numbers, freely tunable.
+ */
+const SKILL_FRAGMENT_SHOP_SLOTS: { currency: CurrencyType; price: number; fragmentAmount: number }[] = [
+    {
+        currency: 'GOLD', price: 60, fragmentAmount: 4,
+    }, {
+        currency: 'GEMS', price: 3, fragmentAmount: 4,
+    },
+];
 
 /** Gold granted by a single daily supply claim. */
 const DAILY_SUPPLY_REWARD_GOLD = 100;
@@ -82,7 +103,7 @@ export class ShopService extends BaseService {
      * deleting every other, stale shop document for this character) if it
      * doesn't exist yet.
      */
-    async getOrGenerateShop(characterId: string): Promise<DailyShop> {
+    async getOrGenerateShop(characterId: string, archetypeId: string): Promise<DailyShop> {
         const today = getTodayUtcDate();
         const existing = await this.shopRepo.getShop(characterId, today);
         if (existing) {
@@ -92,7 +113,7 @@ export class ShopService extends BaseService {
         const shop: DailyShop = {
             characterId,
             date: today,
-            items: generateShopItems(characterId),
+            items: generateShopItems(characterId, archetypeId),
             generatedAt: Date.now(),
         };
         const created = await this.shopRepo.createShop(shop);
@@ -197,6 +218,42 @@ export class ShopService extends BaseService {
                 throw new BusinessLogicError('Insufficient resources');
             }
 
+            // Skill fragment slots (character-skills「商店技能碎片商品」) deliver
+            // straight into `skillFragments` — no ItemInstance, no permanent
+            // inventory/capacity check, `destination` is ignored.
+            if (slot.type === 'SKILL_FRAGMENT') {
+                const skillId = slot.skillId as string;
+                const fragmentAmount = slot.fragmentAmount as number;
+                const skillFragments = {
+                    ...character.skillFragments, [skillId]: (character.skillFragments?.[skillId] ?? 0) + fragmentAmount,
+                };
+                tx.update(characterRef, {
+                    updatedAt: Date.now(),
+                    skillFragments,
+                    ...(currency === 'GOLD' ? { gold: balance - price } : { gems: balance - price }),
+                });
+
+                const updatedShopItems = [...shop.items];
+                updatedShopItems[slotIndex] = {
+                    ...slot, sold: true, purchasedAt: Date.now(),
+                };
+                tx.set(shopRef, {
+                    ...shop, items: updatedShopItems,
+                });
+
+                const skillDefinition = getCharacterSkillById(skillId);
+                return {
+                    skillFragment: {
+                        skillId,
+                        amount: fragmentAmount,
+                        name: skillDefinition?.name ?? skillId,
+                        icon: skillDefinition?.icon ?? 'mysteryCapsule',
+                    },
+                    goldSpent: currency === 'GOLD' ? price : undefined,
+                    gemsSpent: currency === 'GEMS' ? price : undefined,
+                } satisfies PurchaseResult;
+            }
+
             const inventoryDoc = await tx.get(inventoryRef);
             const inventory: Inventory = inventoryDoc.exists
                 ? (inventoryDoc.data() as Inventory)
@@ -207,7 +264,9 @@ export class ShopService extends BaseService {
                 throw new BusinessLogicError('Inventory is full');
             }
 
-            const item = slot.item;
+            // Reaching here means type is 'ITEM' (or the undefined-legacy
+            // equivalent) — `item` is always populated for those slots.
+            const item = slot.item as ItemInstance;
             const itemRef = this.db.collection('items').doc(item.itemId);
             tx.set(itemRef, item);
             tx.set(inventoryRef, {
@@ -391,7 +450,7 @@ function rollPrice(min: number, max: number): number {
  * is set on the embedded ItemInstance immediately since shop slots are already
  * scoped to one character; purchase delivers this exact item, never re-rolling it.
  */
-function generateShopItems(characterId: string): ShopItem[] {
+function generateShopItems(characterId: string, archetypeId: string): ShopItem[] {
     const allTemplates = getAllItemTemplates();
     const equipmentTemplates = allTemplates.filter(t => t.type === ItemType.EQUIPMENT);
     const potionTemplates = allTemplates.filter(t => t.type === ItemType.POTION);
@@ -451,11 +510,29 @@ function generateShopItems(characterId: string): ShopItem[] {
         () => rollSlot(potionTemplates, index++, 'GEMS', gemsContext),
     );
 
+    const skillCatalog = getCharacterSkillsByArchetypeId(archetypeId);
+    const skillFragmentSlots: ShopItem[] = skillCatalog.length > 0
+        ? SKILL_FRAGMENT_SHOP_SLOTS.map((config) => {
+            const skill = skillCatalog[Math.floor(Math.random() * skillCatalog.length)]!;
+            const slot: ShopItem = {
+                slotId: `slot-${index++}`,
+                type: 'SKILL_FRAGMENT',
+                skillId: skill.skillId,
+                fragmentAmount: config.fragmentAmount,
+                currency: config.currency,
+                price: config.price,
+                sold: false,
+            };
+            return slot;
+        })
+        : [];
+
     return [
         ...goldEquipmentSlots,
         ...goldPotionSlots,
         ...gemsEquipmentSlots,
         ...gemsPotionSlots,
+        ...skillFragmentSlots,
     ];
 }
 

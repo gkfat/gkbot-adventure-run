@@ -120,10 +120,28 @@ function withWeaponProficiencyDefaults(character: Character): Character {
     };
 }
 
+/**
+ * Backfill `skillFragments`/`unlockedSkills`/`equippedSkillIds` for character
+ * documents written before `character-skills` shipped — same "不做資料回填"
+ * tolerance pattern as withTalentDefaults/withBestiaryDefaults.
+ */
+function withSkillDefaults(character: Character): Character {
+    return {
+        ...character,
+        skillFragments: character.skillFragments ?? {},
+        unlockedSkills: character.unlockedSkills ?? {},
+        equippedSkillIds: character.equippedSkillIds ?? [
+            null,
+            null,
+            null,
+        ],
+    };
+}
+
 function withCharacterDefaults(character: Character): Character {
-    return withWeaponProficiencyDefaults(
+    return withSkillDefaults(withWeaponProficiencyDefaults(
         withRenameDefaults(withBestiaryDefaults(withTalentDefaults(withLevelDefaults(withNextChapterDefault(character))))),
-    );
+    ));
 }
 
 export class CharacterRepository extends BaseRepository<Character> {
@@ -189,6 +207,14 @@ export class CharacterRepository extends BaseRepository<Character> {
 
             encounteredArchetypeSlugs: [],
             defeatedArchetypeCounts: {},
+
+            skillFragments: {},
+            unlockedSkills: {},
+            equippedSkillIds: [
+                null,
+                null,
+                null,
+            ],
 
             nextChapterIndex: 0,
             currentLevelIndex: 0,
@@ -379,6 +405,20 @@ export class CharacterRepository extends BaseRepository<Character> {
     async updateWeaponProficiency(
         characterId: string,
         patch: { weaponProficiency: Character['weaponProficiency']; dualWieldProficiency: Character['dualWieldProficiency'] },
+    ): Promise<Character> {
+        return this.update(characterId, patch);
+    }
+
+    /**
+     * Overwrite a character's skill fragments/unlocked-skill progress/equip
+     * loadout (character-skills). Callers (CharacterSkillService) always pass
+     * an already-merged full value for whichever fields changed — a single
+     * `update`, not a transaction, matching updateTalents' rationale (no
+     * concurrent-write-sensitive fields like gold/exp involved).
+     */
+    async updateSkills(
+        characterId: string,
+        patch: Partial<Pick<Character, 'skillFragments' | 'unlockedSkills' | 'equippedSkillIds'>>,
     ): Promise<Character> {
         return this.update(characterId, patch);
     }

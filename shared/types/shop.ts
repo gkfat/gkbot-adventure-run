@@ -11,11 +11,22 @@ import type { ItemInstance } from './item';
 export type CurrencyType = 'GOLD' | 'GEMS';
 
 /**
+ * Which kind of good a shop slot sells. Undefined (pre-`character-skills`
+ * documents) means `'ITEM'` — see shared/schemas/firestore/shop.schema.ts.
+ */
+export type ShopSlotType = 'ITEM' | 'SKILL_FRAGMENT';
+
+/**
  * Shop item (item for sale) — each item is priced in exactly one currency.
+ * A `type: 'SKILL_FRAGMENT'` slot sells `fragmentAmount` fragments of
+ * `skillId` instead of an `ItemInstance` (character-skills「商店技能碎片商品」).
  */
 export type ShopItem = {
   slotId: string;           // Unique slot ID
-  item: ItemInstance;       // The item being sold
+  type?: ShopSlotType;      // undefined = 'ITEM' (pre-existing documents)
+  item?: ItemInstance;      // present when type is 'ITEM' (or undefined)
+  skillId?: string;         // present when type is 'SKILL_FRAGMENT'
+  fragmentAmount?: number;  // present when type is 'SKILL_FRAGMENT'
   currency: CurrencyType;   // Which resource this item is priced in
   price: number;            // Price in that currency
   sold: boolean;            // Whether already purchased

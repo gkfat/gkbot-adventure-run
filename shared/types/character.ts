@@ -48,6 +48,15 @@ export type TalentTree = {
 };
 
 /**
+ * A single unlocked skill's level/exp (character-skills) — same shape
+ * convention as ProficiencyProgress, but capped at SKILL_MAX_LEVEL (10).
+ */
+export type SkillProgress = {
+  exp: number;
+  level: number; // 1-10
+};
+
+/**
  * Character document stored in Firestore
  */
 export type Character = {
@@ -112,6 +121,15 @@ export type Character = {
   // Enemy bestiary — cumulative kill count per archetype slug (slug -> count),
   // incremented whenever a combat actually defeats a unit of that archetype.
   defeatedArchetypeCounts: Record<string, number>;
+
+  // Character/enemy skills (character-skills):碎片持有量（未解鎖或已解鎖後的
+  // 多餘碎片皆計入），Key 為 skillId，從未取得過的技能不出現在此 record 中。
+  skillFragments: Record<string, number>;
+  // 已解鎖技能的等級/exp，Key 為 skillId，未解鎖的技能不出現在此 record 中。
+  unlockedSkills: Record<string, SkillProgress>;
+  // 固定長度 3 的佩戴欄位；未佩戴的欄位為 null。實際可用欄位數由角色 level
+  // 換算（見 shared/constants/skills.ts 的 getUnlockedSkillSlotCount）。
+  equippedSkillIds: [string | null, string | null, string | null];
 
   // Timestamps
   createdAt: Timestamp;

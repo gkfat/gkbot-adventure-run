@@ -634,6 +634,49 @@
                 class="adventure-page__stage d-flex flex-column align-center ga-2"
             >
                 <div class="adventure-page__stage-fx-anchor">
+                    <!-- 目前佩戴中的技能（character-skills）：用 position: absolute
+                             定位在角色圖像左側，脫離 flex 排列，不會把角色圖像往右推
+                             （見使用者回報：技能格子原本佔用 flex 版面，害角色偏移）。
+                             格子本身以由下而上的遮罩逐漸填滿表示充能進度，充滿後觸發
+                             時另外顯示技能名稱飄字（見下面）與共用的技能特效。 -->
+                    <div
+                        v-if="inCombatStage && playerSkillGauges.length > 0"
+                        class="adventure-page__skill-col d-flex flex-column ga-2"
+                    >
+                        <div
+                            v-for="skill in playerSkillGauges"
+                            :key="skill.skillId"
+                            class="adventure-page__skill-slot d-flex align-center justify-center"
+                            :class="{ 'adventure-page__skill-slot--charging': skill.charging }"
+                            :aria-label="`${skill.name}：${skill.charging ? '使用中' : skill.gauge.percent === null ? '' : Math.round(skill.gauge.percent) + '%'}`"
+                        >
+                            <GameCommonPixelIcon
+                                :name="(skill.icon as PixelIconName)"
+                                :size="28"
+                            />
+                            <div
+                                v-if="skill.gauge.percent !== null"
+                                class="adventure-page__skill-slot-mask"
+                                :style="{ height: `${skill.gauge.percent}%` }"
+                            />
+                            <span
+                                v-if="skill.charging && playerSkillCastFx"
+                                :key="playerSkillCastFx.key"
+                                class="adventure-page__skill-cast-text font-pixel"
+                            >
+                                {{ playerSkillCastFx.name }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <span
+                        v-if="inCombatStage && playerStatusBadge"
+                        class="adventure-page__stage-status-badge"
+                        :class="playerStatusBadge.colorClass"
+                        :aria-label="playerStatusBadge.label"
+                    >
+                        {{ playerStatusBadge.label }}
+                    </span>
                     <img
                         v-if="acquiredModifierDialog"
                         :key="acquiredModifierDialog.modifierId"
@@ -677,7 +720,7 @@
                             v-if="playerDamageText.kind === 'crit'"
                             class="adventure-page__stage-damage-text-crit-label"
                         >爆擊</span>
-                        <span>{{ playerDamageText.kind === 'dodge' ? '閃避' : playerDamageText.value }}</span>
+                        <span>{{ playerDamageText.kind === 'dodge' ? '閃避' : playerDamageText.kind === 'heal' ? `+${playerDamageText.value}` : playerDamageText.value }}</span>
                     </span>
                     <span
                         v-if="healFx"
@@ -884,6 +927,7 @@ import { backSpriteUrl, idleFrameUrl } from '../utils/spriteDisplay';
 import { FACILITY_SEVERITY_TINT, getFacilityBackgroundUrl } from '../utils/facilityBackground';
 import { useCombat } from '../composables/useCombat';
 import { useDialogueBubble } from '../composables/useDialogueBubble';
+import type { PixelIconName } from '../utils/pixelIcons';
 import type { DialogueTrigger } from '../constants/dialogueLines';
 
 definePageMeta({
@@ -899,6 +943,9 @@ useHead({
 const {
     character, loading: characterLoading, fetchCharacter,
 } = useCharacter();
+const {
+    skills: characterSkills, equippedSkillIds, loaded: skillsLoaded, fetchSkills,
+} = useCharacterSkills();
 const {
     currentRun, loading: runLoading, error: runError, checked, fetchCurrent, advance, useHealingItem,
     startCombat, lastCombatResult, resolveEvent, selectBlessing, lastEventResult,
@@ -958,6 +1005,18 @@ const displayedRunTotals = computed(() => {
         curseCount: currentRun.value?.curses.length ?? 0,
     };
 });
+// character-skills：目前佩戴中的技能（含圖示/名稱），供角色 stage 左側的技能
+// 充能欄位使用；只取已解鎖且實際佩戴的欄位，忽略空欄位。
+const equippedSkillsForCombat = computed(() => (
+    equippedSkillIds.value
+        .filter((id): id is string => id !== null)
+        .map(id => characterSkills.value.find(skill => skill.skillId === id))
+        .filter((skill): skill is NonNullable<typeof skill> => Boolean(skill))
+        .map(skill => ({
+            skillId: skill.skillId, name: skill.name, icon: skill.icon, chargeSec: skill.chargeSec ?? 0,
+        }))
+));
+
 const {
     displayedBanner,
     enemyCards,
@@ -967,6 +1026,9 @@ const {
     playerCardFx,
     playerSpark,
     playerDamageText,
+    playerSkillCastFx,
+    playerSkillGauges,
+    playerStatusBadge,
     playbackDone: combatAnimPlaybackDone,
 } = useCombat(
     () => lastCombatResult.value,
@@ -977,6 +1039,7 @@ const {
     // 對話資料表沒有對應項目時 resolveDialogueLines 會 fallback 到通用池。
     () => character.value?.archetypeId ?? 'legacy',
     () => currentRun.value?.factionType,
+    () => equippedSkillsForCombat.value,
 );
 const inCombatStage = computed(() => !!lastCombatResult.value);
 
@@ -1562,6 +1625,7 @@ watch(character, async (value) => {
 onMounted(() => {
     if (!character.value) fetchCharacter();
     if (!inventoryLoaded.value) fetchInventory();
+    if (!skillsLoaded.value) fetchSkills();
 });
 </script>
 
@@ -1611,6 +1675,74 @@ onMounted(() => {
         padding: 4px 0 12px;
     }
 
+    // 目前佩戴中的技能（character-skills）：position: absolute 定位在角色圖像
+    // （fx-anchor，見上方 position: relative）左側、垂直置中，完全脫離 flex
+    // 排列，不會佔用版面空間把角色圖像往右推（見使用者回報：技能格子原本是
+    // flex 版面的一員，多出來的寬度害角色偏移）。
+    &__skill-col {
+        position: absolute;
+        top: 50%;
+        right: 100%;
+        margin-right: 8px;
+        transform: translateY(-50%);
+        z-index: 1;
+    }
+
+    // 充能進度以「由下而上的遮罩逐漸填滿」表示：底色暗，遮罩用主題色由下往上
+    // 長高，長滿代表已充能完畢、下一次觸發即在眼前。
+    &__skill-slot {
+        position: relative;
+        width: 40px;
+        height: 40px;
+        border: 2px solid rgba(196, 203, 219, 0.25);
+        border-radius: 2px;
+        background: #14171c;
+        color: rgb(var(--v-theme-primary));
+        // 不裁切：技能名稱飄字（見 __skill-cast-text）定位在格子正上方，需要
+        // 露出格子邊界外；充能遮罩本身高度永遠 clamp 在 0~100%，不會真的溢出。
+        overflow: visible;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 2px 0 0 rgba(0, 0, 0, 0.5);
+
+        img {
+            position: relative;
+            z-index: 1;
+        }
+
+        // character-skills：充能滿、進入 windup 暫停演繹期間亮起（見
+        // isSkillWindupActive），呼應「技能格亮起」的需求。
+        &--charging {
+            border-color: rgb(var(--v-theme-primary));
+            box-shadow: 0 0 8px 2px rgba(var(--v-theme-primary), 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+            animation: adventure-page-skill-slot-charging-pulse 0.5s ease-in-out infinite alternate;
+        }
+    }
+
+    &__skill-slot-mask {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        z-index: 0;
+        background: rgba(var(--v-theme-primary), 0.4);
+        transition: height 0.1s linear;
+    }
+
+    // 技能名稱飄字：固定顯示在觸發中的技能格正上方，不疊在角色圖像上（見使用者
+    // 回報：疊在角色身上看不清楚），跟傷害飄字（往上飄）區分開來。
+    &__skill-cast-text {
+        position: absolute;
+        z-index: 3;
+        top: -6px;
+        left: 50%;
+        transform: translate(-50%, -100%);
+        font-size: 10px;
+        color: rgb(var(--v-theme-secondary));
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+        pointer-events: none;
+        white-space: nowrap;
+        animation: adventure-page-skill-cast-float 1.4s ease-out forwards;
+    }
+
     // fx-anchor：spark／傷害飄字獨立掛在這一層（跟 sprite-wrap 是兄弟節點，不是
     // 子節點），避免 sprite-wrap 因為自己的 :key（cardFx 出手/閃避動畫）重新掛載時
     // 把還在播放中的 spark／飄字一併拆掉重建，導致同一個效果在原本的動畫還沒播完
@@ -1619,6 +1751,31 @@ onMounted(() => {
         position: relative;
         height: 120px;
         aspect-ratio: 1;
+    }
+
+    // 控場/持續型技能狀態指示（known-issue.md #1）：玩家自身受到敵方對應
+    // 技能影響時，比照 combatResultPanel.vue 的敵人卡片同款色塊樣式。
+    &__stage-status-badge {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 2;
+        padding: 1px 4px;
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.3;
+        white-space: nowrap;
+        border-radius: 3px;
+        color: #0a0c10;
+        pointer-events: none;
+
+        &.status-badge--freeze { background: #7fdfff; }
+        &.status-badge--haste { background: #ffd166; }
+        &.status-badge--defense-up { background: #8ed081; }
+        &.status-badge--crit-up { background: #ff9f6b; }
+        &.status-badge--armor-break { background: #ff6b6b; }
+        &.status-badge--dot { background: #c98bf2; }
+        &.status-badge--shield { background: #6ba8ff; }
     }
 
     &__stage-sprite-wrap {
@@ -1686,6 +1843,14 @@ onMounted(() => {
             width: 130px;
             height: 130px;
             filter: drop-shadow(0 0 6px rgba(255, 140, 0, 0.7));
+        }
+
+        // character-skills：所有造成傷害的技能共用這個爆裂特效，跟一般攻擊的
+        // hit/crit 揮砍區分開來（見 useCombat.ts sparkFrameUrls）。
+        &--skill {
+            width: 130px;
+            height: 130px;
+            filter: drop-shadow(0 0 8px rgba(91, 227, 255, 0.75));
         }
     }
 
@@ -1974,6 +2139,32 @@ onMounted(() => {
     100% {
         opacity: 0;
         transform: translate(-50%, -28px);
+    }
+}
+
+@keyframes adventure-page-skill-cast-float {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, calc(-100% + 4px));
+    }
+    15% {
+        opacity: 1;
+        transform: translate(-50%, -100%);
+    }
+    80% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes adventure-page-skill-slot-charging-pulse {
+    0% {
+        box-shadow: 0 0 4px 1px rgba(var(--v-theme-primary), 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+    100% {
+        box-shadow: 0 0 12px 4px rgba(var(--v-theme-primary), 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
     }
 }
 </style>

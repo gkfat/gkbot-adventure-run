@@ -120,6 +120,7 @@ describe('resolveActiveModifiers (blessing-leveling)', () => {
 const {
     getCharacterWithStatsMock, createCursorMock, recordEncounteredArchetypesMock, recordDefeatedArchetypesMock,
     recordWeaponProficiencyMock, itemRepoGetByIdsMock, incrementProgressMock,
+    recordSkillExpGainedMock, grantFragmentsMock,
 } = vi.hoisted(() => ({
     getCharacterWithStatsMock: vi.fn(),
     createCursorMock: vi.fn(),
@@ -128,6 +129,8 @@ const {
     recordWeaponProficiencyMock: vi.fn(),
     itemRepoGetByIdsMock: vi.fn(),
     incrementProgressMock: vi.fn(),
+    recordSkillExpGainedMock: vi.fn(),
+    grantFragmentsMock: vi.fn(),
 }));
 
 vi.mock('./character.service', () => ({
@@ -137,6 +140,15 @@ vi.mock('./character.service', () => ({
             recordEncounteredArchetypes: recordEncounteredArchetypesMock,
             recordDefeatedArchetypes: recordDefeatedArchetypesMock,
             recordWeaponProficiency: recordWeaponProficiencyMock,
+        };
+    }),
+}));
+
+vi.mock('./character-skill.service', () => ({
+    CharacterSkillService: vi.fn().mockImplementation(function CharacterSkillServiceMock() {
+        return {
+            recordSkillExpGained: recordSkillExpGainedMock,
+            grantFragments: grantFragmentsMock,
         };
     }),
 }));
@@ -1059,5 +1071,135 @@ describe('CombatService.resolve — weapon proficiency (weapon-proficiency-syste
         expect(incrementProgressMock).not.toHaveBeenCalledWith(expect.objectContaining({
             type: 'WEAPON_LEVEL_REACHED', amount: 4,
         }));
+    });
+});
+
+describe('CombatService.resolve — character/enemy skills (character-skills)', () => {
+    function skillCharacter(overrides: Record<string, unknown> = {}) {
+        return {
+            nickname: 'Tester',
+            archetypeId: 'fighter',
+            attributes: { LUCK: 0 },
+            encounteredArchetypeSlugs: [],
+            defeatedArchetypeCounts: {},
+            equipment: {},
+            weaponProficiency: {},
+            dualWieldProficiency: {
+                exp: 0, level: 1,
+            },
+            equippedSkillIds: [
+                null,
+                null,
+                null,
+            ],
+            unlockedSkills: {},
+            skillFragments: {},
+            stats: {
+                ATK: 50, DEF: 500, HP_MAX: 100000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+            },
+            ...overrides,
+        };
+    }
+
+    it('triggers an equipped player skill on its own charge timer, independent of the attack schedule', async () => {
+        // enemyLevel high enough that the pinned archetype (ENEMY_ARCHETYPES[0],
+        // baseHp 90/baseDef 4) survives well past fighter_crushing_blow's 16s
+        // charge, so at least one SKILL trigger is guaranteed before victory.
+        getCharacterWithStatsMock.mockResolvedValue(skillCharacter({
+            equippedSkillIds: [
+                'fighter_crushing_blow',
+                null,
+                null,
+            ],
+            unlockedSkills: {
+                fighter_crushing_blow: {
+                    exp: 0, level: 1,
+                },
+            },
+        }));
+        itemRepoGetByIdsMock.mockResolvedValue([]);
+
+        const service = new CombatService();
+        const run = baseRun({
+            playerHp: 1000000, playerHpMax: 1000000,
+        });
+        const context: CombatContext = {
+            enemyLevel: 300, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+        };
+
+        const result = await service.resolve(run, context);
+
+        const skillEvents = result.combatLog.filter(entry => entry.action === 'SKILL' && entry.skillId === 'fighter_crushing_blow');
+        expect(skillEvents.length).toBeGreaterThan(0);
+        expect(recordSkillExpGainedMock).toHaveBeenCalled();
+        const [
+            , , triggerCounts,
+        ] = recordSkillExpGainedMock.mock.calls[0] as [string, unknown, Record<string, number>];
+        expect(triggerCounts.fighter_crushing_blow).toBeGreaterThan(0);
+    });
+
+    it('does not build any charge timers for a character with no equipped skills', async () => {
+        getCharacterWithStatsMock.mockResolvedValue(skillCharacter());
+        itemRepoGetByIdsMock.mockResolvedValue([]);
+
+        const service = new CombatService();
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [],
+        };
+        const result = await service.resolve(baseRun(), context);
+
+        expect(result.combatLog.some(entry => entry.action === 'SKILL')).toBe(false);
+    });
+
+    it('triggers an enemy\'s assigned AOE skill on its own charge timer', async () => {
+        // GKBOT_BOSS_ARCHETYPES[3] = assembly-overseer (skill chargeSec 18,
+        // DAMAGE_AOE). Player deals modest damage so the boss survives past 18s.
+        getCharacterWithStatsMock.mockResolvedValue(skillCharacter({
+            archetypeId: 'gambler',
+            stats: {
+                ATK: 5, DEF: 500, HP_MAX: 100000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+            },
+        }));
+        itemRepoGetByIdsMock.mockResolvedValue([]);
+
+        const service = new CombatService();
+        const run = baseRun({
+            playerHp: 100000, playerHpMax: 100000,
+        });
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [3],
+        };
+
+        const result = await service.resolve(run, context);
+
+        const skillEvents = result.combatLog.filter(entry => entry.action === 'SKILL' && entry.skillId === 'enemy_assembly_overseer_overload');
+        expect(skillEvents.length).toBeGreaterThan(0);
+        expect(skillEvents[0]?.actorId).not.toBe('player');
+    });
+
+    it('an enemy\'s DOT skill deals an initial hit then ticks on the target\'s later actions', async () => {
+        // GKBOT_BOSS_ARCHETYPES[4] = illusion-mage-unit (skill chargeSec 14, DOT).
+        getCharacterWithStatsMock.mockResolvedValue(skillCharacter({
+            archetypeId: 'scholar',
+            stats: {
+                ATK: 5, DEF: 500, HP_MAX: 100000, actionIntervalSec: 1, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+            },
+        }));
+        itemRepoGetByIdsMock.mockResolvedValue([]);
+
+        const service = new CombatService();
+        const run = baseRun({
+            playerHp: 100000, playerHpMax: 100000,
+        });
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [4],
+        };
+
+        const result = await service.resolve(run, context);
+
+        const dotEvents = result.combatLog.filter(entry => entry.action === 'SKILL' && entry.skillId === 'enemy_illusion_mage_phantom');
+        // 1 initial hit + up to 3 ticks — at least the initial hit must land.
+        expect(dotEvents.length).toBeGreaterThan(0);
+        expect(dotEvents.every(entry => entry.targetId === 'player')).toBe(true);
     });
 });

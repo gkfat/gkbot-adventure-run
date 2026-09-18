@@ -172,6 +172,7 @@ export const useCharacter = () => {
             useGacha().reset();
             useQuests().reset();
             useAchievements().reset();
+            useCharacterSkills().reset();
         }
 
         selectedCharacterId.value = characterId;
@@ -394,6 +395,7 @@ export const useCharacter = () => {
                 useGacha().reset();
                 useQuests().reset();
                 useAchievements().reset();
+                useCharacterSkills().reset();
             }
 
             return true;

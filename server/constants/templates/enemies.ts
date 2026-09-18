@@ -1,3 +1,5 @@
+import type { EnemySkill } from '../../../shared/types/adventure';
+
 /**
  * Enemy archetypes — static content data for combat encounters.
  *
@@ -33,6 +35,11 @@ export type EnemyArchetype = {
     // archetypes set these, giving them a distinct feel from "笨重型" ones.
     critChanceOverride?: number;
     dodgeChanceOverride?: number;
+    // Character/enemy skills (character-skills): optional fixed-strength
+    // skill this archetype uses in combat (charges independently of its
+    // normal attack, see combat-engine「技能充能與觸發時機」). Most archetypes
+    // have none — only a couple of flavor picks carry one for now.
+    skill?: EnemySkill;
 };
 
 // GkBot 陣營小兵 (enemy-factions-and-severity, design.md 決策 6) — the first
@@ -84,10 +91,20 @@ export const GKBOT_BOSS_ARCHETYPES: EnemyArchetype[] = [
         slug: 'core-repair-officer', name: '核心維修官', description: '核心區域的維修統籌單位。', baseAtk: 14, baseDef: 10, baseHp: 289, actionIntervalSec: 2.5, bossMinionCount: 1, canReinforce: true,
     },
     {
-        slug: 'assembly-overseer', name: '產線總管', description: '生產線的最高權限單位，未來技能：過載攻擊。', baseAtk: 22, baseDef: 6, baseHp: 255, actionIntervalSec: 2.2, bossMinionCount: 1,
+        slug: 'assembly-overseer', name: '產線總管', description: '生產線的最高權限單位，過載時電流會擴散向周圍所有目標。', baseAtk: 22, baseDef: 6, baseHp: 255, actionIntervalSec: 2.2, bossMinionCount: 1,
+        skill: {
+            skillId: 'enemy_assembly_overseer_overload', name: '過載攻擊', chargeSec: 18, effect: {
+                kind: 'DAMAGE_AOE', multiplier: 1.3, 
+            },
+        },
     },
     {
-        slug: 'illusion-mage-unit', name: '幻象法師型', description: '殘存的娛樂用投影單位，未來技能：幻影分身。', baseAtk: 15, baseDef: 5, baseHp: 204, actionIntervalSec: 2.3, dodgeChanceOverride: 0.32,
+        slug: 'illusion-mage-unit', name: '幻象法師型', description: '殘存的娛樂用投影單位，投出的幻影分身會反覆騷擾目標。', baseAtk: 15, baseDef: 5, baseHp: 204, actionIntervalSec: 2.3, dodgeChanceOverride: 0.32,
+        skill: {
+            skillId: 'enemy_illusion_mage_phantom', name: '幻影分身', chargeSec: 14, effect: {
+                kind: 'DOT', multiplier: 0.8, tickDamage: 6, ticks: 3,
+            },
+        },
     },
     {
         slug: 'dealer-boss', name: '荷官頭目', description: '賭場核心荷官機具，出手比一般同型更快更狠。', baseAtk: 16, baseDef: 9, baseHp: 272, actionIntervalSec: 2.4, bossMinionCount: 1, critChanceOverride: 0.18,

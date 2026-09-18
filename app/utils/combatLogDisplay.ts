@@ -18,6 +18,12 @@ export const describeCombatLogEntry = (entry: CombatLogEntry, enemies: CombatSum
     case 'DODGE': return `${target} 閃避了 ${actor} 的攻擊`;
     case 'CRIT': return `${actor} 對 ${target} 造成 ${entry.damage} 點暴擊傷害`;
     case 'DEATH': return `${target} 被擊敗`;
+    case 'SKILL': {
+        const skillName = entry.skillName ?? '技能';
+        if (entry.damage === undefined) return `${actor} 使用了「${skillName}」`;
+        if (entry.damage < 0) return `${actor} 使用「${skillName}」恢復了 ${-entry.damage} 點生命`;
+        return `${actor} 使用「${skillName}」對 ${target} 造成 ${entry.damage} 點傷害`;
+    }
     default: return `${actor} 對 ${target} 造成 ${entry.damage} 點傷害`;
     }
 };

@@ -2,15 +2,14 @@ import {
     defineEventHandler, getRouterParam, readBody,
 } from 'h3';
 import { requireAuth } from '../../../../utils/auth';
-import { ShopService } from '../../../../services/shop.service';
+import { CharacterSkillService } from '../../../../services/character-skill.service';
 import {
-    purchaseItemRequestSchema, purchaseItemResponseSchema,
-} from '../../../../../shared/schemas/api/shop.schema';
+    equipSkillRequestSchema, equipSkillResponseSchema,
+} from '../../../../../shared/schemas/api/character-skill.schema';
 import { toH3Error } from '../../../../utils/errorHandler';
 import {
     AppError, ValidationError,
 } from '../../../../../shared/types/errors';
-import type { EquipmentSlot } from '../../../../../shared/types/common';
 import { logRequest } from '../../../../utils/logger';
 
 export default defineEventHandler(async (event) => {
@@ -26,23 +25,19 @@ export default defineEventHandler(async (event) => {
         }
 
         const body = await readBody(event);
-        const parseResult = purchaseItemRequestSchema.safeParse(body);
+        const parseResult = equipSkillRequestSchema.safeParse(body);
         if (!parseResult.success) {
-            throw new ValidationError('Invalid request', parseResult.error.flatten());
+            throw new ValidationError('Invalid skill equip request', parseResult.error.flatten());
         }
 
-        const shopService = new ShopService();
-        const result = await shopService.purchaseItem(
-            authUser.uid,
-            characterId,
-            parseResult.data.slotId,
-            parseResult.data.destination,
-            parseResult.data.replaceSlot as EquipmentSlot | undefined,
+        const characterSkillService = new CharacterSkillService();
+        const character = await characterSkillService.equipSkill(
+            authUser.uid, characterId, parseResult.data.skillId, parseResult.data.slotIndex,
         );
 
         logRequest({
             severity: 'INFO',
-            message: 'Shop item purchased',
+            message: 'Skill equip loadout updated',
             method: event.method,
             path: event.path,
             status: 200,
@@ -53,19 +48,14 @@ export default defineEventHandler(async (event) => {
 
         const response = {
             success: true,
-            data: {
-                item: result.item,
-                skillFragment: result.skillFragment,
-                goldSpent: result.goldSpent,
-                gemsSpent: result.gemsSpent,
-            },
+            data: { equippedSkillIds: character.equippedSkillIds },
         };
 
-        return purchaseItemResponseSchema.parse(response);
+        return equipSkillResponseSchema.parse(response);
     } catch (error: unknown) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to purchase shop item',
+            message: 'Failed to update skill equip loadout',
             method: event.method,
             path: event.path,
             status: error instanceof AppError ? error.statusCode : 500,

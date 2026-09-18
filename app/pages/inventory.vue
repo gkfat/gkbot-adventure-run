@@ -94,6 +94,20 @@
                 :dual-wield-proficiency="character.dualWieldProficiency"
             />
 
+            <!-- 技能 tab -->
+            <template v-else-if="tab === 'SKILL'">
+                <GameInventoryPageSkillSlotPanel
+                    :skills="skills"
+                    :equipped-skill-ids="equippedSkillIds"
+                    :unlocked-slot-count="unlockedSlotCount"
+                    @select="openSkillDetail"
+                />
+                <GameInventoryPageSkillGrid
+                    :skills="skills"
+                    @select="openSkillDetail"
+                />
+            </template>
+
             <!-- 裝備／道具 tab：裝備 tab 多顯示目前裝備總覽，兩者共用下方物品格 -->
             <template v-else>
                 <div
@@ -215,11 +229,19 @@
 
         <!-- 物品詳情 dialog -->
         <GameCommonItemDetailDialog ref="itemDetailDialogRef" />
+
+        <!-- 技能詳情 dialog -->
+        <GameInventoryPageSkillDialog
+            ref="skillDialogRef"
+            :equipped-skill-ids="equippedSkillIds"
+            :unlocked-slot-count="unlockedSlotCount"
+        />
     </div>
 </template>
 
 <script setup lang="ts">
 import type { EquipmentSlot } from '../../shared/types/common';
+import type { SkillEntry } from '../composables/useCharacterSkills';
 import {
     EQUIP_SLOTS_ALL, SLOT_PIXEL_ICON, SLOT_LABEL, RARITY_COLOR, RARITY_ORDER_DESC,
     resolvePixelIcon, primaryStatValue, primaryStatMagnitude,
@@ -243,6 +265,9 @@ const {
 const {
     items, loading: inventoryLoading, loaded: inventoryLoaded, error: inventoryError, itemById, fetchInventory,
 } = useInventory();
+const {
+    skills, unlockedSlotCount, equippedSkillIds, loaded: skillsLoaded, fetchSkills,
+} = useCharacterSkills();
 
 type AttributeKey = 'STR' | 'AGI' | 'CON' | 'LUCK';
 
@@ -325,11 +350,12 @@ const overloadPenaltyTexts = computed(() => {
     return texts;
 });
 
-type TabKey = 'EQUIPMENT' | 'PROFICIENCY' | 'POTION';
+type TabKey = 'EQUIPMENT' | 'PROFICIENCY' | 'SKILL' | 'POTION';
 
 const TAB_OPTIONS: { key: TabKey; label: string }[] = [
     { key: 'EQUIPMENT', label: '裝備' },
     { key: 'PROFICIENCY', label: '熟練度' },
+    { key: 'SKILL', label: '技能' },
     { key: 'POTION', label: '道具' },
 ];
 
@@ -394,14 +420,23 @@ const openSlotDetail = (slot: EquipmentSlot) => {
     }
 };
 
+// eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
+type SkillDialog = { open: (skill: SkillEntry) => void };
+const skillDialogRef = ref<SkillDialog | null>(null);
+const openSkillDetail = (skill: SkillEntry) => {
+    skillDialogRef.value?.open(skill);
+};
+
 const loadAll = () => {
     fetchCharacter();
     fetchInventory();
+    fetchSkills();
 };
 
 onMounted(() => {
     if (!character.value) fetchCharacter();
     if (!inventoryLoaded.value) fetchInventory();
+    if (!skillsLoaded.value) fetchSkills();
 });
 </script>
 

@@ -1,6 +1,7 @@
 import type {
     EquipmentSlot, Rarity, WeaponType,
 } from '../../shared/types/common';
+import type { ShopSlotType } from '../../shared/types/shop';
 
 interface ShopItemStats {
     ATK?: number;
@@ -40,7 +41,13 @@ export type ShopType = 'GOLD' | 'GEMS';
 
 export interface ShopSlot {
     slotId: string;
-    item: ShopItemInstance;
+    // undefined = 'ITEM' (character-skills 上線前既有的商品)
+    type?: ShopSlotType;
+    // 只有 type 為 'ITEM'（或未定義）時才有值
+    item?: ShopItemInstance;
+    // 只有 type 為 'SKILL_FRAGMENT' 時才有值（character-skills）
+    skillId?: string;
+    fragmentAmount?: number;
     currency: ShopType;
     price: number;
     sold: boolean;
@@ -52,13 +59,16 @@ interface GetShopResponse {
     data: { date: string; items: ShopSlot[] };
 }
 
+export interface PurchaseResultData {
+    item?: { itemId: string; templateId: string; rarity: string };
+    skillFragment?: { skillId: string; amount: number; name: string; icon: string };
+    goldSpent?: number;
+    gemsSpent?: number;
+}
+
 interface PurchaseResponse {
     success: boolean;
-    data: {
-        item: { itemId: string; templateId: string; rarity: string };
-        goldSpent?: number;
-        gemsSpent?: number;
-    };
+    data: PurchaseResultData;
 }
 
 export type PurchaseDestination = 'INVENTORY' | 'EQUIP';
@@ -128,14 +138,14 @@ export const useShop = () => {
         slotId: string,
         destination: PurchaseDestination,
         replaceSlot?: EquipmentSlot,
-    ): Promise<boolean> => {
-        if (!selectedCharacterId.value) return false;
+    ): Promise<PurchaseResultData | null> => {
+        if (!selectedCharacterId.value) return null;
 
         purchaseLoading.value = true;
         purchaseError.value = null;
 
         try {
-            await api.post<PurchaseResponse>(
+            const response = await api.post<PurchaseResponse>(
                 `/api/character/${selectedCharacterId.value}/shop/purchase`,
                 {
                     slotId, destination, replaceSlot,
@@ -145,11 +155,11 @@ export const useShop = () => {
             const target = items.value.find(slot => slot.slotId === slotId);
             if (target) target.sold = true;
 
-            return true;
+            return response.data;
         } catch (err: any) {
             console.error('[useShop] Failed to purchase item:', err);
             purchaseError.value = err.message || '購買失敗';
-            return false;
+            return null;
         } finally {
             purchaseLoading.value = false;
         }

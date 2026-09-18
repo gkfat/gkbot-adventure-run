@@ -202,3 +202,154 @@ describe('useCombat — 行動條充能與攻擊動畫揭露同步', () => {
         expect(percentJustBeforeReveal!).toBeGreaterThanOrEqual(99);
     });
 });
+
+describe('useCombat — 技能充能條與觸發演出（character-skills）', () => {
+    beforeEach(setupClocks);
+    afterEach(() => vi.useRealTimers());
+
+    it('技能充能百分比隨時間單調遞增，觸發後立即歸零重新開始下一輪', () => {
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 8000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'SKILL', damage: 20, targetHpRemaining: 80, skillId: 'skill_a', skillName: '測試技能',
+            },
+        ];
+        const result = buildResult(combatLog);
+        const combat = useCombat(
+            () => result, () => 100, () => 100, undefined, undefined,
+            () => [
+                {
+                    skillId: 'skill_a', name: '測試技能', icon: 'sword', chargeSec: 8,
+                },
+            ],
+        );
+
+        const samples: number[] = [];
+        for (let i = 0; i < 400; i += 1) {
+            advanceFrame(16);
+            const gauge = combat.playerSkillGauges.value.find(skill => skill.skillId === 'skill_a')!.gauge;
+            if (gauge.percent !== null && gauge.percent < 100) samples.push(gauge.percent);
+        }
+
+        expect(samples.length).toBeGreaterThan(1);
+        for (let i = 1; i < samples.length; i += 1) {
+            expect(samples[i]).toBeGreaterThanOrEqual(samples[i - 1]!);
+        }
+    });
+
+    it('技能觸發當下顯示技能名稱與共用的技能特效，跟一般攻擊區分開來', async () => {
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 3000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'SKILL', damage: 20, targetHpRemaining: 80, skillId: 'skill_a', skillName: '測試技能',
+            },
+        ];
+        const result = buildResult(combatLog);
+        const combat = useCombat(
+            () => result, () => 100, () => 100, undefined, undefined,
+            () => [
+                {
+                    skillId: 'skill_a', name: '測試技能', icon: 'sword', chargeSec: 8,
+                },
+            ],
+        );
+
+        let castName: string | undefined;
+        let enemySparkKind: string | undefined;
+        // 技能名稱在 windupStartAt 就會顯示（充能滿、暫停開始的那一刻），但共用
+        // 的技能特效要等 SKILL_WINDUP_MS（800ms）暫停演繹完才會揭曉（見
+        // useCombat.ts schedule 的 windupStartAt/displayAt），兩者时間點不同，
+        // 這裡持續推進到兩者都出現才停止，而不是一看到 castName 就提早結束。
+        for (let i = 0; i < 500 && enemySparkKind === undefined; i += 1) {
+            advanceFrame(16);
+            // watch() 的 side effect（fireEntry）走 Vue 預設的 pre-flush（microtask
+            // 排程），測試環境沒有元件渲染循環幫忙推進，需要主動讓出一次微任務
+            // 佇列排定的 callback 才會真的執行（其餘既有測試只斷言 computed 衍生
+            // 值，不涉及這個 watcher 的 side effect，因此不需要這一步）。
+            await Promise.resolve();
+            castName ??= combat.playerSkillCastFx.value?.name;
+            enemySparkKind = combat.enemyCards.value.find(enemy => enemy.enemyId === 'enemy1')?.spark?.kind;
+        }
+
+        expect(castName).toBe('測試技能');
+        expect(enemySparkKind).toBe('skill');
+    });
+
+    it('技能整場戰鬥都沒有觸發過（chargeSec 較長）時，充能條仍然要用 chargeSec 顯示持續進度，不能整場都是 null', () => {
+        // 戰鬥很快就結束（player 一擊必殺），技能 chargeSec 長達 60 秒，遠比
+        // 這場戰鬥的時長長，全程都不會真的觸發——修復前：skillCycles 只有
+        // 「實際觸發事件」才會收尾一個充能週期，沒觸發過的技能整場都回傳
+        // percent: null（充能條完全不會動），見使用者回報。
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 1000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'ATTACK', damage: 100, targetHpRemaining: 0,
+            }, {
+                timestamp: 1000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'DEATH',
+            },
+        ];
+        const result = buildResult(combatLog);
+        const combat = useCombat(
+            () => result, () => 100, () => 100, undefined, undefined,
+            () => [
+                {
+                    skillId: 'skill_slow', name: '慢速技能', icon: 'sword', chargeSec: 60,
+                },
+            ],
+        );
+
+        let sawNonNullProgress = false;
+        for (let i = 0; i < 400; i += 1) {
+            advanceFrame(16);
+            const gauge = combat.playerSkillGauges.value.find(skill => skill.skillId === 'skill_slow')!.gauge;
+            if (gauge.percent !== null && gauge.percent > 0) sawNonNullProgress = true;
+        }
+
+        expect(sawNonNullProgress).toBe(true);
+    });
+
+    it('技能觸發時，緊接在後的其他行動（不分敵我）都會被 windup 暫停往後推遲', async () => {
+        // 原始 combatLog 時間軸上，enemy1 的反擊只比技能觸發晚 100ms——沒有
+        // windup 暫停的話兩者幾乎會前後腳揭曉；有暫停的話，enemy1 的反擊揭曉
+        // 時間點必須至少比技能效果揭曉時間點晚 SKILL_WINDUP_MS（800ms）。
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 3000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'SKILL', damage: 20, targetHpRemaining: 80, skillId: 'skill_a', skillName: '測試技能',
+            }, {
+                timestamp: 3100, wave: 0, actorId: 'enemy1', targetId: 'player', action: 'ATTACK', damage: 5, targetHpRemaining: 95,
+            },
+        ];
+        const result = buildResult(combatLog);
+        const combat = useCombat(
+            () => result, () => 100, () => 100, undefined, undefined,
+            () => [
+                {
+                    skillId: 'skill_a', name: '測試技能', icon: 'sword', chargeSec: 8,
+                },
+            ],
+        );
+
+        let skillRevealedAt = -1;
+        let nextActionRevealedAt = -1;
+        for (let i = 0; i < 500 && nextActionRevealedAt === -1; i += 1) {
+            advanceFrame(16);
+            await Promise.resolve();
+            const now = (i + 1) * 16;
+            if (skillRevealedAt === -1 && combat.enemyCards.value.some(enemy => enemy.hpCurrent === 80)) skillRevealedAt = now;
+            if (combat.playerStatus.value.hpCurrent === 95) nextActionRevealedAt = now;
+        }
+
+        expect(skillRevealedAt).toBeGreaterThan(0);
+        expect(nextActionRevealedAt).toBeGreaterThan(0);
+        expect(nextActionRevealedAt - skillRevealedAt).toBeGreaterThanOrEqual(750);
+    });
+
+    it('未佩戴任何技能時不建立充能週期', () => {
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 1000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'ATTACK', damage: 10, targetHpRemaining: 90,
+            },
+        ];
+        const result = buildResult(combatLog);
+        const combat = useCombat(() => result, () => 100, () => 100);
+
+        expect(combat.playerSkillGauges.value).toEqual([]);
+    });
+});

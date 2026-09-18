@@ -115,9 +115,30 @@ export const startCombatResponseSchema = z.object({
                 'CRIT',
                 'DODGE',
                 'DEATH',
+                'SKILL',
             ]),
             damage: z.number().optional(),
             targetHpRemaining: z.number().optional(),
+            // SKILL action only (character-skills)
+            skillId: z.string().optional(),
+            skillName: z.string().optional(),
+            // SKILL action only, control/lingering effect kinds
+            // (known-issue.md #1) — targetId 目前正受此效果影響
+            // statusDurationSec 秒，供前端顯示狀態指示。
+            statusEffectKind: z.enum([
+                'DAMAGE_SINGLE',
+                'DAMAGE_AOE',
+                'DAMAGE_SPLASH',
+                'FREEZE',
+                'HASTE_SELF',
+                'HEAL_SELF',
+                'DEFENSE_UP',
+                'CRIT_UP',
+                'ARMOR_BREAK',
+                'DOT',
+                'SHIELD',
+            ]).optional(),
+            statusDurationSec: z.number().optional(),
         })),
         summary: combatSummarySchema,
         // Present only when this call ended the run (defeat) — see

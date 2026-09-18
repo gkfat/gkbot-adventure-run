@@ -217,10 +217,58 @@
                     </v-col>
                 </v-row>
             </div>
+
+            <!-- 技能碎片商品（character-skills）：簡易卡片，不透過裝備購買 dialog -->
+            <div
+                v-if="skillFragmentSlots.length > 0"
+                class="shop-page__tier"
+            >
+                <div class="shop-page__tier-label font-pixel text-caption">
+                    技能碎片
+                </div>
+                <v-row dense>
+                    <v-col
+                        v-for="slot in skillFragmentSlots"
+                        :key="slot.slotId"
+                        cols="6"
+                    >
+                        <div
+                            class="shop-page__fragment-card d-flex flex-column"
+                            :class="{ 'shop-page__fragment-card--sold': slot.sold }"
+                        >
+                            <div class="d-flex align-center ga-1 mb-1">
+                                <GameCommonCurrencyIcon
+                                    :type="slot.currency"
+                                    :size="14"
+                                />
+                                <span class="font-pixel text-caption">{{ slot.price }}</span>
+                            </div>
+                            <div class="text-caption text-medium-emphasis mb-2">
+                                技能碎片 x{{ slot.fragmentAmount }}
+                            </div>
+                            <SystemBtn
+                                block
+                                variant="outlined"
+                                color="primary"
+                                size="small"
+                                class="text-none"
+                                :disabled="slot.sold"
+                                :loading="fragmentPurchaseLoadingSlotId === slot.slotId"
+                                @click="handlePurchaseFragmentSlot(slot)"
+                            >
+                                {{ slot.sold ? '已售出' : '購買' }}
+                            </SystemBtn>
+                        </div>
+                    </v-col>
+                </v-row>
+            </div>
         </div>
 
         <!-- 購買 dialog -->
         <GameCommonShopPurchaseDialog ref="purchaseDialogRef" />
+
+        <!-- 技能碎片購買結果 dialog -->
+        <GameCommonSkillFragmentPurchaseDialog ref="skillFragmentPurchaseDialogRef" />
     </div>
 </template>
 
@@ -242,7 +290,7 @@ useHead({
 const GOLD_COST = GACHA_CONFIG.GOLD_COST;
 const GEMS_COST = GACHA_CONFIG.GEMS_COST;
 const {
-    items, loading, loaded, error, fetchShop,
+    items, loading, loaded, error, fetchShop, purchase,
     dailySupply, claimDailySupplyLoading, fetchDailySupply, claimDailySupply,
 } = useShop();
 const { fetchCharacter } = useCharacter();
@@ -268,7 +316,7 @@ const sortByCurrencyThenPrice = (slots: ShopSlot[]) => [...slots].sort((a, b) =>
     return b.price - a.price;
 });
 
-const equipmentSlots = computed(() => items.value.filter(slot => slot.item.type === ItemType.EQUIPMENT));
+const equipmentSlots = computed(() => items.value.filter(slot => slot.item?.type === ItemType.EQUIPMENT));
 const gemsEquipment = computed(
     () => sortByCurrencyThenPrice(equipmentSlots.value.filter(slot => slot.currency === 'GEMS')),
 );
@@ -280,9 +328,34 @@ const tiers = computed(() => [
     {
         key: 'POTION',
         label: '道具',
-        items: sortByCurrencyThenPrice(items.value.filter(slot => slot.item.type === ItemType.POTION)),
+        items: sortByCurrencyThenPrice(items.value.filter(slot => slot.item?.type === ItemType.POTION)),
     },
 ]);
+
+// 技能碎片商品（character-skills）：不是 ItemInstance，另外用一組簡易卡片呈現，
+// 不重用 GameCommonShopItemSlot／購買 dialog（那兩者假設 rarity/stats 等裝備欄位）。
+const skillFragmentSlots = computed(
+    () => sortByCurrencyThenPrice(items.value.filter(slot => slot.type === 'SKILL_FRAGMENT')),
+);
+
+const { fetchSkills, loaded: skillsLoaded } = useCharacterSkills();
+const fragmentPurchaseLoadingSlotId = ref<string | null>(null);
+
+// eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
+type SkillFragmentPurchaseDialog = { open: (result: { skillId: string; amount: number; name: string; icon: string }) => void };
+const skillFragmentPurchaseDialogRef = ref<SkillFragmentPurchaseDialog | null>(null);
+
+const handlePurchaseFragmentSlot = async (slot: ShopSlot) => {
+    if (slot.sold || fragmentPurchaseLoadingSlotId.value) return;
+    fragmentPurchaseLoadingSlotId.value = slot.slotId;
+    const result = await purchase(slot.slotId, 'INVENTORY');
+    fragmentPurchaseLoadingSlotId.value = null;
+    if (result?.skillFragment) {
+        await fetchCharacter();
+        if (skillsLoaded.value) fetchSkills();
+        skillFragmentPurchaseDialogRef.value?.open(result.skillFragment);
+    }
+};
 
 // eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
 type PurchaseDialog = { open: (slot: ShopSlot) => void };
@@ -442,6 +515,17 @@ onMounted(() => {
         font-size: 11px;
         color: rgb(var(--v-theme-secondary));
         opacity: 0.85;
+    }
+
+    &__fragment-card {
+        padding: 8px;
+        border: 2px solid rgba(196, 203, 219, 0.25);
+        border-radius: 3px;
+        background: #14171c;
+
+        &--sold {
+            opacity: 0.5;
+        }
     }
 
     &__cabinet {

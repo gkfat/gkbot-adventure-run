@@ -30,11 +30,19 @@ export const purchaseItemRequestSchema = z.object({
 export const purchaseItemResponseSchema = z.object({
     success: z.boolean(),
     data: z.object({
+        // Present for `type: 'ITEM'` slots; absent for `SKILL_FRAGMENT` slots.
         item: z.object({
             itemId: z.string(),
             templateId: z.string(),
             rarity: z.string(),
-        }),
+        }).optional(),
+        // Present only for `type: 'SKILL_FRAGMENT'` slots (character-skills).
+        skillFragment: z.object({
+            skillId: z.string(),
+            amount: z.number().int().min(1),
+            name: z.string(),
+            icon: z.string(),
+        }).optional(),
         goldSpent: z.number().optional(),
         gemsSpent: z.number().optional(),
     }),

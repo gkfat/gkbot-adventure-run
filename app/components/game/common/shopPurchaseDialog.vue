@@ -86,8 +86,8 @@ const canAfford = computed(() => balance.value >= price.value);
 const handlePurchase = async () => {
     if (!slot.value) return;
 
-    const success = await purchase(slot.value.slotId, 'INVENTORY');
-    if (success) {
+    const result = await purchase(slot.value.slotId, 'INVENTORY');
+    if (result) {
         await fetchCharacter();
         invalidateInventory();
         open.value = false;

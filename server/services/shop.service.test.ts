@@ -30,9 +30,26 @@ const {
         id,
         get: () => Promise.resolve(docs.get(`${collectionName}:${id}`) ?? { exists: false }),
         delete: () => deleteMock(`${collectionName}:${id}`),
+        create: (data: unknown) => {
+            const key = `${collectionName}:${id}`;
+            if (docs.has(key)) {
+                const err = new Error('ALREADY_EXISTS') as Error & { code: number };
+                err.code = 6;
+                throw err;
+            }
+            docs.set(key, {
+                exists: true, data: () => data,
+            });
+            return Promise.resolve();
+        },
     });
 
-    const collectionMock = vi.fn((collectionName: string) => ({ doc: (id: string) => makeRef(collectionName, id) }));
+    const collectionMock = vi.fn((collectionName: string) => ({
+        doc: (id: string) => makeRef(collectionName, id),
+        // deleteOldShops only needs an empty result here — its stale-docs
+        // branch (which needs this.db.batch()) is unexercised by these tests.
+        where: () => ({ get: () => Promise.resolve({ docs: [] }) }),
+    }));
 
     const txGetMock = vi.fn((ref: { collectionName: string; id: string }) => (
         Promise.resolve(docs.get(`${ref.collectionName}:${ref.id}`) ?? { exists: false })
@@ -96,8 +113,22 @@ function baseCharacter(overrides: Partial<Character> = {}): Character {
         currentLevelIndex: 0,
         chapterTotalLevels: 5,
         nickname: '玩家A1B2C3',
+        skillFragments: {},
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        ...overrides,
+    };
+}
+
+function skillFragmentSlot(overrides: Partial<ShopItem> = {}): ShopItem {
+    return {
+        slotId: 'slot-frag',
+        type: 'SKILL_FRAGMENT',
+        skillId: 'fighter_crushing_blow',
+        fragmentAmount: 4,
+        currency: 'GOLD',
+        price: 60,
+        sold: false,
         ...overrides,
     };
 }
@@ -289,6 +320,94 @@ describe('ShopService.purchaseItem', () => {
         ).rejects.toThrow();
         expect(txUpdateMock).not.toHaveBeenCalled();
         expect(txSetMock).not.toHaveBeenCalled();
+    });
+
+    it('delivers fragments directly to skillFragments for a SKILL_FRAGMENT slot, bypassing inventory capacity (character-skills)', async () => {
+        setDoc('characters', 'char-1', baseCharacter({
+            archetypeId: 'fighter', skillFragments: { fighter_crushing_blow: 3 },
+        }));
+        setDoc('inventories', 'char-1', {
+            characterId: 'char-1',
+            items: Array.from({ length: 500 }, (_, i) => `existing-${i}`),
+            updatedAt: Date.now(),
+        });
+        setDoc('dailyShops', `char-1_${todayUtcDate()}`, baseShop({ items: [skillFragmentSlot()] }));
+
+        const service = new ShopService();
+        const result = await service.purchaseItem(
+            'account-1', 'char-1', 'slot-frag', PurchaseDestination.INVENTORY,
+        );
+
+        expect(result.skillFragment).toEqual({
+            skillId: 'fighter_crushing_blow', amount: 4, name: '重擊崩擊', icon: 'warhammer',
+        });
+        expect(result.item).toBeUndefined();
+        expect(result.goldSpent).toBe(60);
+
+        expect(txUpdateMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collectionName: 'characters', id: 'char-1',
+            }),
+            expect.objectContaining({
+                gold: 940, skillFragments: { fighter_crushing_blow: 7 },
+            }),
+        );
+        expect(txSetMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collectionName: 'dailyShops', id: `char-1_${todayUtcDate()}`,
+            }),
+            expect.objectContaining({
+                items: [
+                    expect.objectContaining({
+                        slotId: 'slot-frag', sold: true,
+                    }),
+                ],
+            }),
+        );
+        // No item/inventory writes for a fragment purchase.
+        expect(txSetMock).not.toHaveBeenCalledWith(
+            expect.objectContaining({ collectionName: 'items' }), expect.anything(),
+        );
+        expect(txSetMock).not.toHaveBeenCalledWith(
+            expect.objectContaining({ collectionName: 'inventories' }), expect.anything(),
+        );
+    });
+
+    it('rejects purchasing a SKILL_FRAGMENT slot with insufficient currency, without granting fragments', async () => {
+        setDoc('characters', 'char-1', baseCharacter({
+            archetypeId: 'fighter', gold: 10, skillFragments: {},
+        }));
+        setDoc('dailyShops', `char-1_${todayUtcDate()}`, baseShop({ items: [skillFragmentSlot()] }));
+
+        const service = new ShopService();
+        await expect(
+            service.purchaseItem('account-1', 'char-1', 'slot-frag', PurchaseDestination.INVENTORY),
+        ).rejects.toThrow();
+        expect(txUpdateMock).not.toHaveBeenCalled();
+        expect(txSetMock).not.toHaveBeenCalled();
+    });
+});
+
+describe('ShopService.getOrGenerateShop — skill fragment slots (character-skills)', () => {
+    it('includes GOLD and GEMS skill-fragment slots for a character with a known archetype', async () => {
+        const service = new ShopService();
+        const shop = await service.getOrGenerateShop('char-1', 'fighter');
+
+        const fragmentSlots = shop.items.filter(item => item.type === 'SKILL_FRAGMENT');
+        expect(fragmentSlots).toHaveLength(2);
+        expect(fragmentSlots.map(slot => slot.currency).sort()).toEqual(['GEMS', 'GOLD']);
+        for (const slot of fragmentSlots) {
+            expect(slot.skillId).toBeTruthy();
+            expect(slot.fragmentAmount).toBeGreaterThan(0);
+            expect(slot.item).toBeUndefined();
+        }
+    });
+
+    it('generates no skill-fragment slots for an unknown archetype (legacy characters)', async () => {
+        const service = new ShopService();
+        const shop = await service.getOrGenerateShop('char-legacy', 'legacy');
+
+        expect(shop.items.some(item => item.type === 'SKILL_FRAGMENT')).toBe(false);
     });
 });
 

@@ -76,6 +76,12 @@ import {
 } from '../../shared/schemas/api/gacha.schema';
 
 import { getBestiaryResponseSchema } from '../../shared/schemas/api/bestiary.schema';
+import {
+    getCharacterSkillsResponseSchema,
+    unlockSkillRequestSchema, unlockSkillResponseSchema,
+    strengthenSkillRequestSchema, strengthenSkillResponseSchema,
+    equipSkillRequestSchema, equipSkillResponseSchema,
+} from '../../shared/schemas/api/character-skill.schema';
 
 import {
     getDailyQuestsResponseSchema,
@@ -678,6 +684,119 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             200: {
                 description: 'Bestiary retrieved',
                 content: { 'application/json': { schema: getBestiaryResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}/skills',
+        description: 'Get the character\'s skill catalog (its archetype\'s CHARACTER_SKILLS), each entry flagged unlocked/not; description/effect/level/exp/isEquipped are only included once a skill is unlocked',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Skills retrieved',
+                content: { 'application/json': { schema: getCharacterSkillsResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/skills/unlock',
+        description: 'Unlock a skill by spending its unlockFragmentCost skill fragments',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: unlockSkillRequestSchema } } },
+        },
+        responses: {
+            200: {
+                description: 'Skill unlocked',
+                content: { 'application/json': { schema: unlockSkillResponseSchema } },
+            },
+            400: {
+                description: 'Unknown skill for this archetype, already unlocked, or not enough fragments',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/skills/strengthen',
+        description: 'Consume fragmentsToSpend fragments of an already-unlocked skill, converting them to exp and applying the level-up check',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: strengthenSkillRequestSchema } } },
+        },
+        responses: {
+            200: {
+                description: 'Skill strengthened',
+                content: { 'application/json': { schema: strengthenSkillResponseSchema } },
+            },
+            400: {
+                description: 'Unknown skill for this archetype, not yet unlocked, or not enough fragments',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/skills/equip',
+        description: 'Place (skillId) or clear (null) an unlocked skill into slotIndex of the character\'s equip loadout',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: equipSkillRequestSchema } } },
+        },
+        responses: {
+            200: {
+                description: 'Skill equip loadout updated',
+                content: { 'application/json': { schema: equipSkillResponseSchema } },
+            },
+            400: {
+                description: 'Slot not unlocked yet, skill not unlocked, or skill already equipped in another slot',
+                content: { 'application/json': { schema: errorResponseSchema } },
             },
             401: {
                 description: 'Unauthorized',

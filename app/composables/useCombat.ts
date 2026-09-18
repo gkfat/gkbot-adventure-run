@@ -1,11 +1,12 @@
 import type { CombatApiResult } from './useAdventureRun';
 import type {
-    CombatLogEntry, EnemyFaction, 
+    CombatLogEntry, EnemyFaction,
 } from '../../shared/types/adventure';
 import { useDialogueBubble } from './useDialogueBubble';
 import type {
-    DialogueSubject, DialogueTrigger, 
+    DialogueSubject, DialogueTrigger,
 } from '../constants/dialogueLines';
+import { STATUS_BADGE_STYLE } from '../utils/skillDisplay';
 
 // 每個 wave 開戰前都先播一段橫越戰場的 banner，一段文字的進出節奏都是
 // 「過 BANNER_TEXT_ENTER_DELAY_MS 後文字進入 → 停留 BANNER_TEXT_HOLD_MS →
@@ -45,13 +46,42 @@ const STUN_MS = 800;
 // 同一批一起顯示；換 wave 一定另起一批，即使雙方 timestamp 剛好都是 0。
 type LogGroup = { wave: number; timestamp: number; entries: CombatLogEntry[] };
 
-type ScheduledGroup = { group: LogGroup; displayAt: number; waveStartAt: number };
+// windupStartAt：這批技能真正「充能完成／被使用」的時間點（技能格亮起、技能
+// 名稱顯示的時間點）；hasSkillTrigger 為 true 時，displayAt = windupStartAt +
+// SKILL_WINDUP_MS（見 SKILL_WINDUP_MS 常數），該筆事件的實際效果延後到
+// windup 演繹完才揭曉，且這個延遲會透過既有的 monotonic 保底機制自動推遲
+// 所有後續事件（敵我雙方），達成「使用技能時全場暫停」的效果。非技能事件
+// windupStartAt === displayAt（沒有額外的 windup 停頓）。
+type ScheduledGroup = {
+    group: LogGroup; displayAt: number; waveStartAt: number; windupStartAt: number; hasSkillTrigger: boolean;
+};
 
 type CardFx = { kind: 'attack' | 'dodge'; key: number };
-type SparkFx = { kind: 'hit' | 'crit'; key: number };
-export type DamageTextFx = { kind: 'damage' | 'crit' | 'dodge'; value?: number; key: number };
+// 'skill'：character-skills 所有造成傷害的技能共用同一種特效（不分技能種類/
+// 是否爆擊），跟一般攻擊的 hit/crit 揮砍特效區分開來，見 skillFrameUrls。
+type SparkFx = { kind: 'hit' | 'crit' | 'skill'; key: number };
+export type DamageTextFx = { kind: 'damage' | 'crit' | 'dodge' | 'heal'; value?: number; key: number };
+// 技能名稱飄字（character-skills）：技能觸發當下在施放者頭上顯示技能名稱，
+// 跟 cardFx／damageTextFx 一樣是一次性特效、靠 :key 重新掛載重播。
+export type SkillCastFx = { key: number; name: string };
+// 控場/持續型技能對目標造成的戰鬥狀態指示（known-issue.md #1），供敵人卡片/
+// 玩家 stage 疊加一個小色塊+文字標籤，讓玩家一眼看出目前正受什麼效果影響。
+export type StatusBadge = { kind: string; label: string; colorClass: string };
 const CARD_FX_MS = 320;
 const SPARK_FX_MS = 450;
+// character-skills：技能造成傷害的爆裂特效演繹時長拉長到 800ms（比一般
+// hit/crit 的 450ms 更久），跟下面 SKILL_WINDUP_MS（技能觸發前的暫停時長）
+// 對齊，讓「充能滿→暫停亮起→演繹」這整套演出節奏一致。
+const SKILL_SPARK_FX_MS = 800;
+const SKILL_CAST_FX_MS = 1400;
+// character-skills：技能充能滿、要觸發使用的瞬間，讓敵我雙方的行動都暫停
+// 這麼久（技能格亮起、畫面顯示技能名稱），停頓結束後才揭曉技能的實際效果
+// （傷害/治療/狀態）演出。實作方式見 schedule／gaugeSchedule 的 windupStartAt。
+const SKILL_WINDUP_MS = 800;
+// 控場/持續型技能狀態指示（known-issue.md #1）：DOT／SHIELD 沒有固定到期
+// 時間（DOT 靠每次 tick 重新觸發顯示、SHIELD 持續到被護盾吸收完或戰鬥結束才
+// 消失），沒有 statusDurationSec 時用這個當顯示時窗的預設長度。
+const STATUS_BADGE_FALLBACK_MS = 2500;
 // 傷害飄字時長拆成一般命中/爆擊兩個常數（adventure-run-presentation D11）：
 // AoE/濺射/被動觸發會讓同一波動作短時間內出現更多筆傷害事件，原本共用的
 // 700ms 太容易一眼漏看。DODGE 沿用原始 700ms，不套用這兩個新常數。
@@ -114,17 +144,22 @@ export type EnemyCardView = {
     cardFx?: CardFx;
     spark?: SparkFx;
     damageText?: DamageTextFx;
+    skillCast?: SkillCastFx;
+    statusBadge?: StatusBadge;
     rowState: 'entering' | 'exiting' | 'idle';
 };
 
 // 受擊特效改用揮砍(從右上到左下的刀痕)影格序列演繹路徑，而非單張靜態圖：一般
 // 命中 4 格、爆擊(紅色、粒子更多更強烈) 5 格，圖檔見 GameAdventureSparkFx。
+// 'skill'：character-skills 所有造成傷害的技能共用的能量爆裂特效，5 格
+// （見 scripts/pixel-art/combat-fx/build.py），跟一般攻擊的揮砍痕跡區分開來。
 export const SPARK_FRAME_MS = 90;
 const HIT_SPARK_FRAME_COUNT = 4;
 const CRIT_SPARK_FRAME_COUNT = 5;
+const SKILL_SPARK_FRAME_COUNT = 5;
 export const sparkFrameUrls = (kind: SparkFx['kind']) => {
-    const count = kind === 'crit' ? CRIT_SPARK_FRAME_COUNT : HIT_SPARK_FRAME_COUNT;
-    const prefix = kind === 'crit' ? 'crit-slash' : 'hit-slash';
+    const count = kind === 'crit' ? CRIT_SPARK_FRAME_COUNT : kind === 'skill' ? SKILL_SPARK_FRAME_COUNT : HIT_SPARK_FRAME_COUNT;
+    const prefix = kind === 'crit' ? 'crit-slash' : kind === 'skill' ? 'skill-burst' : 'hit-slash';
     return Array.from({ length: count }, (_, i) => `/images/combat-fx/${prefix}-${i + 1}.png`);
 };
 
@@ -141,7 +176,12 @@ export function useCombat(
     // 略過觸發（不影響既有 playback/gauge 測試，見 useCombat.test.ts）。
     getPlayerArchetypeId?: () => string,
     getFactionType?: () => EnemyFaction | undefined,
+    // character-skills：目前佩戴中的技能（供充能條演出用），選填——單元測試
+    // 沒有提供時視為沒有佩戴任何技能，不影響既有 playback/gauge 測試。
+    getEquippedSkills?: () => { skillId: string; name: string; icon: string; chargeSec: number }[],
 ) {
+    const equippedSkills = computed(() => getEquippedSkills?.() ?? []);
+    const skillChargeSecById = computed(() => new Map(equippedSkills.value.map(skill => [skill.skillId, skill.chargeSec])));
     const { triggerDialogue } = useDialogueBubble();
     const archetypeSlugByEnemyId = computed<Map<string, string | undefined>>(() => {
         const map = new Map<string, string | undefined>();
@@ -219,8 +259,19 @@ export function useCombat(
             if (stunEnd !== undefined) displayAt = Math.max(displayAt, stunEnd);
             if (index > 0) displayAt = Math.max(displayAt, result[index - 1]!.displayAt);
 
+            // character-skills：技能觸發（含技能造成的 CRIT，見 combat.service.ts
+            // resolveSkillTrigger）在這裡的「本來時間點」上再插入 SKILL_WINDUP_MS
+            // 的暫停，讓技能格亮起、技能名稱先顯示，暫停結束才揭曉實際效果。這個
+            // 延遲只加在這一批自己的 displayAt 上，後面所有事件（不分敵我）都靠
+            // 既有的 monotonic 保底（見上面 Math.max）自動一併順延，等同「全場暫停」。
+            const windupStartAt = displayAt;
+            const hasSkillTrigger = group.entries.some(entry => Boolean(entry.skillId));
+            if (hasSkillTrigger) {
+                displayAt += SKILL_WINDUP_MS;
+            }
+
             result.push({
-                group, displayAt, waveStartAt,
+                group, displayAt, waveStartAt, windupStartAt, hasSkillTrigger,
             });
             for (const entry of group.entries) {
                 stunnedUntil.set(entry.targetId, displayAt + STUN_MS);
@@ -229,6 +280,43 @@ export function useCombat(
 
         return result;
     });
+
+    // 控場/持續型技能狀態指示（known-issue.md #1）：從 schedule 掃出每一筆帶
+    // statusEffectKind 的 SKILL 事件，換算成「targetId 在 [from, to) 這段時間
+    // 內正受此效果影響」的區間；from 用該筆事件所屬批次的 displayAt（技能實際
+    // 效果揭曉的時間點，跟傷害/受擊特效同步），to 則是 from 加上
+    // statusDurationSec（伺服器有算出固定持續時間時）或 STATUS_BADGE_FALLBACK_MS
+    // （DOT/SHIELD 這類沒有固定到期時間的效果）。只收錄 STATUS_BADGE_STYLE 有
+    // 定義樣式的 kind，瞬發的傷害/治療效果不產生狀態指示。
+    const statusEvents = computed(() => {
+        const events: { unitId: string; kind: string; label: string; colorClass: string; from: number; to: number }[] = [];
+        for (const {
+            group, displayAt, 
+        } of schedule.value) {
+            for (const entry of group.entries) {
+                if (!entry.statusEffectKind) continue;
+                const style = STATUS_BADGE_STYLE[entry.statusEffectKind];
+                if (!style) continue;
+                const durationMs = entry.statusDurationSec !== undefined ? entry.statusDurationSec * 1000 : STATUS_BADGE_FALLBACK_MS;
+                events.push({
+                    unitId: entry.targetId, kind: entry.statusEffectKind, label: style.label, colorClass: style.colorClass, from: displayAt, to: displayAt + durationMs,
+                });
+            }
+        }
+        return events;
+    });
+    const statusBadgeFor = (unitId: string): StatusBadge | undefined => {
+        let best: (typeof statusEvents.value)[number] | undefined;
+        for (const event of statusEvents.value) {
+            if (event.unitId !== unitId) continue;
+            if (nowMs.value < event.from || nowMs.value >= event.to) continue;
+            if (!best || event.from > best.from) best = event;
+        }
+        if (!best) return undefined;
+        return {
+            kind: best.kind, label: best.label, colorClass: best.colorClass,
+        };
+    };
 
     // 最後一個 wave 播完後，一律再播一段「戰鬥結束」banner 才揭曉勝敗結果——
     // 涵蓋只有一個 wave 的戰鬥（原本的換 wave 邏輯只在第二個 wave以後才會產生
@@ -272,6 +360,20 @@ export function useCombat(
     ));
     const visibleEntries = computed(() => groups.value.slice(0, visibleGroupCount.value).flatMap(group => group.entries));
 
+    // character-skills：技能觸發的「windup」開始時間點（windupStartAt）比它
+    // 真正揭露效果的時間點（displayAt）早 SKILL_WINDUP_MS——用跟
+    // visibleGroupCount 同樣的反算手法（同一顆 nowMs 時鐘），算出目前已經走到
+    // 第幾批的 windup 起點，用來觸發「技能格亮起＋顯示技能名稱」，時間點上比
+    // 一般的效果揭露（visibleGroupCount）更早。
+    const windupRevealCount = computed(() => {
+        let count = 0;
+        for (const { windupStartAt } of schedule.value) {
+            if (windupStartAt > nowMs.value) break;
+            count += 1;
+        }
+        return count;
+    });
+
     // 出手/受擊演出：每次有新的一批 log 被播出，就替涉及的單位各觸發一次一次性
     // 特效，跟充能條的百分比計算完全分開（充能條講的是「下一次出手還要多久」，
     // 這裡講的是「這一刻正在發生什麼」）。用遞增的 key 讓 DOM 重新掛載來重播
@@ -285,9 +387,11 @@ export function useCombat(
     const cardFx = reactive(new Map<string, CardFx>());
     const sparkFx = reactive(new Map<string, SparkFx>());
     const damageTextFx = reactive(new Map<string, DamageTextFx>());
+    const skillCastFx = reactive(new Map<string, SkillCastFx>());
     const cardFxTimers = new Map<string, ReturnType<typeof setTimeout>>();
     const sparkFxTimers = new Map<string, ReturnType<typeof setTimeout>>();
     const damageTextFxTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const skillCastFxTimers = new Map<string, ReturnType<typeof setTimeout>>();
     let fxKeySeq = 0;
 
     const triggerCardFx = (unitId: string, kind: CardFx['kind']) => {
@@ -304,7 +408,8 @@ export function useCombat(
         });
         const existing = sparkFxTimers.get(unitId);
         if (existing) clearTimeout(existing);
-        sparkFxTimers.set(unitId, setTimeout(() => sparkFx.delete(unitId), SPARK_FX_MS));
+        const duration = kind === 'skill' ? SKILL_SPARK_FX_MS : SPARK_FX_MS;
+        sparkFxTimers.set(unitId, setTimeout(() => sparkFx.delete(unitId), duration));
     };
     const triggerDamageTextFx = (unitId: string, kind: DamageTextFx['kind'], value?: number) => {
         damageTextFx.set(unitId, {
@@ -315,17 +420,41 @@ export function useCombat(
         const duration = kind === 'crit' ? DAMAGE_TEXT_FX_MS_CRIT : kind === 'dodge' ? DAMAGE_TEXT_FX_MS_DODGE : DAMAGE_TEXT_FX_MS_NORMAL;
         damageTextFxTimers.set(unitId, setTimeout(() => damageTextFx.delete(unitId), duration));
     };
+    const triggerSkillCastFx = (unitId: string, name: string) => {
+        skillCastFx.set(unitId, {
+            name, key: fxKeySeq++,
+        });
+        const existing = skillCastFxTimers.get(unitId);
+        if (existing) clearTimeout(existing);
+        skillCastFxTimers.set(unitId, setTimeout(() => skillCastFx.delete(unitId), SKILL_CAST_FX_MS));
+    };
     const clearFxTimers = () => {
         cardFxTimers.forEach(timer => clearTimeout(timer));
         sparkFxTimers.forEach(timer => clearTimeout(timer));
         damageTextFxTimers.forEach(timer => clearTimeout(timer));
+        skillCastFxTimers.forEach(timer => clearTimeout(timer));
         cardFxTimers.clear();
         sparkFxTimers.clear();
         damageTextFxTimers.clear();
+        skillCastFxTimers.clear();
         cardFx.clear();
         sparkFx.clear();
         damageTextFx.clear();
+        skillCastFx.clear();
     };
+
+    // character-skills：技能充能滿、進入 windup 暫停的那一刻（比實際效果揭露
+    // 早 SKILL_WINDUP_MS，見 windupRevealCount）就先觸發技能名稱飄字——「技能格
+    // 亮起＋顯示名稱」跟「傷害/治療等實際效果」是兩個分開的時間點，後者交給
+    // watch(visibleGroupCount, ...) 在暫停結束後才處理。
+    watch(windupRevealCount, (count) => {
+        if (count === 0) return;
+        const entry = schedule.value[count - 1];
+        if (!entry || !entry.hasSkillTrigger) return;
+        const skillEntry = entry.group.entries.find(e => Boolean(e.skillId));
+        if (!skillEntry) return;
+        triggerSkillCastFx(skillEntry.actorId, skillEntry.skillName ?? skillEntry.skillId!);
+    });
 
     watch(visibleGroupCount, (count) => {
         if (count === 0) return;
@@ -337,12 +466,27 @@ export function useCombat(
                 triggerCardFx(entry.targetId, 'dodge');
                 triggerDamageTextFx(entry.targetId, 'dodge');
                 fireDialogue(entry.targetId, 'DODGE');
-            } else {
-                triggerSparkFx(entry.targetId, entry.action === 'CRIT' ? 'crit' : 'hit');
-                triggerDamageTextFx(entry.targetId, entry.action === 'CRIT' ? 'crit' : 'damage', entry.damage);
-                fireDialogue(entry.actorId, entry.action === 'CRIT' ? 'CRIT' : 'ATTACK');
-                fireDialogue(entry.targetId, 'HIT_TAKEN');
+                return;
             }
+            // character-skills：任何帶 skillId 的事件（含技能造成的 CRIT，見
+            // combat.service.ts resolveSkillTrigger）一律走技能專用演出——所有
+            // 造成傷害的技能共用同一種爆裂特效（不分技能種類/是否爆擊），跟一般
+            // 攻擊的 hit/crit 揮砍區分開來。技能名稱／技能格亮起在 windup 階段
+            // 就已經觸發過（見 watch(windupRevealCount, ...)），這裡只負責
+            // SKILL_WINDUP_MS 暫停結束後才揭曉的實際效果（傷害/治療）。
+            if (entry.skillId) {
+                if (entry.damage !== undefined && entry.damage < 0) {
+                    triggerDamageTextFx(entry.targetId, 'heal', -entry.damage);
+                } else if (entry.damage !== undefined && entry.damage > 0) {
+                    triggerSparkFx(entry.targetId, 'skill');
+                    triggerDamageTextFx(entry.targetId, 'damage', entry.damage);
+                }
+                return;
+            }
+            triggerSparkFx(entry.targetId, entry.action === 'CRIT' ? 'crit' : 'hit');
+            triggerDamageTextFx(entry.targetId, entry.action === 'CRIT' ? 'crit' : 'damage', entry.damage);
+            fireDialogue(entry.actorId, entry.action === 'CRIT' ? 'CRIT' : 'ATTACK');
+            fireDialogue(entry.targetId, 'HIT_TAKEN');
         };
         // DEATH 跟同一批的 ATTACK/CRIT 共用 actorId/targetId，視覺特效已經由那筆
         // sibling entry 觸發過，這裡只補觸發 DEFEATED 對話，不重播其餘視覺 fx
@@ -650,6 +794,11 @@ export function useCombat(
         const stunnedUntil = new Map<string, number>();
         let prevWave = -1;
         let waveStartAt = 0;
+        // character-skills：技能觸發的 windup 暫停（見 schedule 的同名邏輯）需要
+        // 讓「敵我雙方」的行動間隔都跟著暫停，不能只靠 stunnedUntil（那只影響
+        // 觸發技能那一方自己的目標）。這裡用一個全域累加的 pauseOffset，套用在
+        // 每一批事件的 actAt 上，達成全場暫停的效果。
+        let pauseOffset = 0;
 
         groups.value.forEach((group, index) => {
             if (group.wave !== prevWave) {
@@ -660,13 +809,17 @@ export function useCombat(
                 prevWave = group.wave;
             }
 
-            let actAt = waveStartAt + group.timestamp;
+            let actAt = waveStartAt + group.timestamp + pauseOffset;
             const actorId = group.entries[0]!.actorId;
             const stunEnd = stunnedUntil.get(actorId);
             if (stunEnd !== undefined) actAt = Math.max(actAt, stunEnd);
 
+            if (group.entries.some(entry => Boolean(entry.skillId))) {
+                pauseOffset += SKILL_WINDUP_MS;
+            }
+
             result.push({
-                group, actAt, waveStartAt, 
+                group, actAt, waveStartAt,
             });
             for (const entry of group.entries) {
                 stunnedUntil.set(entry.targetId, actAt + STUN_MS);
@@ -843,6 +996,101 @@ export function useCombat(
         };
     };
 
+    // character-skills：每個目前佩戴中技能的充能週期，跟 unitCycles（一般攻擊/
+    // 行動間隔）完全分開計算——技能充能是獨立於攻擊節奏的第二條時間軸（見
+    // combat.service.ts「技能充能與觸發時機」），不會被攻擊/受擊時間影響，也
+    // 不套用 unitCycles 的受擊暫停邏輯（技能充能不會被打斷）。每個週期從這個
+    // wave 開始（waveStartAt）算起，直到玩家自己觸發該技能（entry.skillId 相符
+    // 的 SKILL/CRIT 事件）才算充滿一輪，接著立刻開始下一輪。換 wave 時比照
+    // unitCycles 的 endsWave 規則，在 banner/停頓期間顯示 0%，不沿用舊 wave
+    // 打完那一刻的滿條狀態。
+    const skillCycles = computed<Map<string, UnitCycle[]>>(() => {
+        const cycles = new Map<string, UnitCycle[]>();
+        const open = new Map<string, UnitCycle>();
+        const skillIds = equippedSkills.value.map(skill => skill.skillId);
+
+        const ensureOpen = (skillId: string, startAt: number) => {
+            if (open.has(skillId)) return;
+            const cycle: UnitCycle = {
+                start: startAt, end: null, hitDisplayTimes: [], endsWave: false, holdMs: 0,
+            };
+            if (!cycles.has(skillId)) cycles.set(skillId, []);
+            cycles.get(skillId)!.push(cycle);
+            open.set(skillId, cycle);
+        };
+
+        // 用 schedule（揭露時間軸）而不是 gaugeSchedule：技能充能滿的那一刻要在
+        // windupStartAt（暫停開始、技能格亮起）就顯示 100%，下一輪充能則要等
+        // 暫停演繹完（displayAt = windupStartAt + SKILL_WINDUP_MS）才重新開始
+        // 累加——這正是 schedule 已經算好的兩個時間點，不需要在這裡重算一次。
+        let prevWave = -1;
+        let prevDisplayAt = 0;
+        for (const {
+            group, displayAt, windupStartAt, waveStartAt,
+        } of schedule.value) {
+            if (group.wave !== prevWave) {
+                open.forEach((cycle) => {
+                    cycle.end = prevDisplayAt; cycle.endsWave = true;
+                });
+                open.clear();
+                for (const skillId of skillIds) ensureOpen(skillId, waveStartAt);
+                prevWave = group.wave;
+            }
+
+            for (const entry of group.entries) {
+                if (entry.actorId !== 'player' || !entry.skillId) continue;
+                ensureOpen(entry.skillId, waveStartAt);
+                const cycle = open.get(entry.skillId)!;
+                cycle.end = windupStartAt;
+                const next: UnitCycle = {
+                    start: displayAt, end: null, hitDisplayTimes: [], endsWave: false, holdMs: 0,
+                };
+                cycles.get(entry.skillId)!.push(next);
+                open.set(entry.skillId, next);
+            }
+
+            prevDisplayAt = displayAt;
+        }
+
+        return cycles;
+    });
+
+    const skillGaugeAt = (skillId: string, atMs: number): UnitGauge => {
+        const list = skillCycles.value.get(skillId);
+        if (!list || list.length === 0) return {
+            percent: null, paused: false,
+        };
+
+        let cycle = list[0]!;
+        for (const candidate of list) {
+            if (candidate.start > atMs) break;
+            cycle = candidate;
+        }
+        if (atMs < cycle.start) return {
+            percent: 0, paused: false,
+        };
+        if (cycle.endsWave && cycle.end !== null && atMs >= cycle.end) return {
+            percent: 0, paused: false,
+        };
+
+        // 這個週期還沒被實際的技能觸發事件收尾（還在「充能中，尚未輪到揭露」的
+        // 最新一輪）——用 chargeSec 直接推算預計充滿的時間點，讓充能條全程都有
+        // 進度可看，不用等到（甚至可能整場戰鬥都等不到）真的觸發那一刻才第一次
+        // 顯示出東西（見使用者回報：技能充能時間較長時，整場戰鬥充能條都不會動）。
+        // 真的觸發後 cycle.end 會被寫入實際時間，優先採用實際值。
+        const chargeSec = skillChargeSecById.value.get(skillId) ?? 0;
+        const projectedEnd = cycle.end ?? (cycle.start + chargeSec * 1000);
+        const total = projectedEnd - cycle.start;
+        if (total <= 0) return {
+            percent: 100, paused: false,
+        };
+
+        const percent = Math.min(100, Math.max(0, ((atMs - cycle.start) / total) * 100));
+        return {
+            percent, paused: false,
+        };
+    };
+
     let rafHandle: number | null = null;
     let playbackStartedAt = 0;
     const stopGaugeClock = () => {
@@ -864,12 +1112,37 @@ export function useCombat(
         cardFx: cardFx.get(enemy.enemyId),
         spark: sparkFx.get(enemy.enemyId),
         damageText: damageTextFx.get(enemy.enemyId),
+        skillCast: skillCastFx.get(enemy.enemyId),
+        statusBadge: statusBadgeFor(enemy.enemyId),
         rowState: waveDisplay.value.state,
     })));
     const playerGauge = computed(() => gaugeAt('player', nowMs.value));
     const playerCardFx = computed(() => cardFx.get('player'));
     const playerSpark = computed(() => sparkFx.get('player'));
     const playerDamageText = computed(() => damageTextFx.get('player'));
+    const playerSkillCastFx = computed(() => skillCastFx.get('player'));
+    const playerStatusBadge = computed(() => statusBadgeFor('player'));
+    // character-skills：這個技能是不是正處於「充能滿、暫停演繹中」的 windup
+    // 階段（見 schedule 的 windupStartAt/displayAt）——供技能格子亮起用，跟
+    // gauge.percent 是否等於 100 分開判斷（100% 之後仍要等 windup 結束才會
+    // 觸發下一輪充能，這段等待期間也要維持亮起）。
+    const isSkillWindupActive = (skillId: string): boolean => (
+        schedule.value.some(({
+            group, windupStartAt, displayAt, hasSkillTrigger,
+        }) => (
+            hasSkillTrigger
+            && nowMs.value >= windupStartAt && nowMs.value < displayAt
+            && group.entries.some(entry => entry.skillId === skillId)
+        ))
+    );
+
+    // character-skills：目前佩戴中每個技能的圖示/名稱 + 即時充能百分比，供角色
+    // stage 左側的技能欄位（見 adventure.vue）畫出「格子逐漸遮罩填滿」的充能條。
+    const playerSkillGauges = computed(() => equippedSkills.value.map(skill => ({
+        ...skill,
+        gauge: skillGaugeAt(skill.skillId, nowMs.value),
+        charging: isSkillWindupActive(skill.skillId),
+    })));
 
     let timers: ReturnType<typeof setTimeout>[] = [];
     const clearTimers = () => {
@@ -918,6 +1191,9 @@ export function useCombat(
         playerCardFx,
         playerSpark,
         playerDamageText,
+        playerSkillCastFx,
+        playerSkillGauges,
+        playerStatusBadge,
         playbackDone,
     };
 }

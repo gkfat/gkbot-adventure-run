@@ -6,11 +6,17 @@ import { z } from 'zod';
 import { itemInstanceSchema } from './item.schema';
 
 /**
- * Shop item schema — each item is priced in exactly one currency.
+ * Shop item schema — each item is priced in exactly one currency. `type`
+ * defaults to `'ITEM'` when absent (pre-`character-skills` documents); a
+ * `'SKILL_FRAGMENT'` slot carries `skillId`/`fragmentAmount` instead of `item`
+ * (character-skills「商店技能碎片商品」).
  */
 export const shopItemSchema = z.object({
     slotId: z.string(),
-    item: itemInstanceSchema,
+    type: z.enum(['ITEM', 'SKILL_FRAGMENT']).optional(),
+    item: itemInstanceSchema.optional(),
+    skillId: z.string().optional(),
+    fragmentAmount: z.number().int().min(1).optional(),
     currency: z.enum(['GOLD', 'GEMS']),
     price: z.number().int().min(0),
     sold: z.boolean(),
