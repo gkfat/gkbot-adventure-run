@@ -14,7 +14,7 @@
             :stage-name="levelProgress.stageName"
             :level-index="levelProgress.levelIndex"
             :level-total="levelProgress.levelTotal"
-            class="mx-auto mb-3"
+            class="mx-auto mb-2"
         />
 
         <div class="character-stage__cta-row d-flex flex-column align-center ga-2">
@@ -91,7 +91,7 @@ const handleStart = () => {
 .cta-btn {
     position: relative;
     min-width: 220px;
-    padding: 20px 36px;
+    padding: 12px 36px;
     border-width: 8px;
     border-style: solid;
     border-image-source: url('/images/ui/cta-btn-idle.png');

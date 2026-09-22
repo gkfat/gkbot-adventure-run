@@ -1,5 +1,5 @@
 <template>
-    <div class="character-stage d-flex flex-column align-center fill-height pa-3">
+    <div class="character-stage d-flex flex-column align-center fill-height pa-2">
         <!-- 讀取角色資料 -->
         <div
             v-if="loading && !character"
@@ -49,19 +49,14 @@
         >
             <div class="w-100 text-center character-stage__content">
                 <!-- 裝備欄位：角色圖像左右各 3 格 -->
-                <div class="character-stage__equip-row d-flex align-center justify-space-between mt-2">
-                    <div class="d-flex flex-column ga-3">
-                        <GameCharacterStageEquipSlots
-                            :slots="EQUIP_SLOTS_LEFT"
-                            :equipment="character.equipment"
-                            :item-by-id="itemById"
-                            side="left"
-                            @select="openItemDetail"
-                        />
-
-                        <!-- 目前佩戴中的技能（character-skills） -->
-                        <GameCharacterStageEquippedSkills />
-                    </div>
+                <div class="character-stage__equip-row d-flex align-center justify-space-between mt-1">
+                    <GameCharacterStageEquipSlots
+                        :slots="EQUIP_SLOTS_LEFT"
+                        :equipment="character.equipment"
+                        :item-by-id="itemById"
+                        side="left"
+                        @select="openItemDetail"
+                    />
 
                     <div class="character-stage__sprite-col d-flex flex-column align-center ga-1">
                         <div class="character-stage__identity d-flex flex-column align-center">
@@ -70,7 +65,7 @@
                                 size="small"
                                 color="primary"
                                 variant="outlined"
-                                class="font-pixel character-stage__class-chip mb-2"
+                                class="font-pixel character-stage__class-chip mb-1"
                             >
                                 {{ character.className }}
                             </v-chip>
@@ -92,14 +87,14 @@
                             <img
                                 :src="idleFrameUrl(character.spriteUrl, idleStep)"
                                 alt="角色"
-                                width="140"
-                                height="140"
+                                width="116"
+                                height="116"
                                 class="character-stage__sprite"
                             >
                         </div>
 
                         <div class="character-stage__sprite-header">
-                            <p class="font-pixel character-stage__lv-tag my-2">
+                            <p class="font-pixel character-stage__lv-tag my-1">
                                 LV {{ character.level }}
                             </p>
                             <p class="font-pixel character-stage__power-tag">
@@ -116,6 +111,9 @@
                         @select="openItemDetail"
                     />
                 </div>
+
+                <!-- 目前佩戴中的技能（character-skills）：獨立一列，避免撐高左側裝備欄導致左右不對齊 -->
+                <GameCharacterStageEquippedSkills class="mt-1" />
 
                 <!-- 裝備詳情 dialog -->
                 <GameCommonItemDetailDialog ref="itemDetailDialogRef" />
@@ -282,8 +280,8 @@ watch(character, (value) => {
 
     &__sprite-wrap {
         position: relative;
-        width: 140px;
-        height: 140px;
+        width: 116px;
+        height: 116px;
     }
 
     &__sprite {
@@ -296,7 +294,7 @@ watch(character, (value) => {
     &__equip-row {
         width: 100%;
         margin: 0 auto;
-        padding: 16px 10px;
+        padding: 8px 10px;
     }
 }
 </style>

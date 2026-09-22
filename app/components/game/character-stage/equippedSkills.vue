@@ -1,7 +1,7 @@
 <template>
     <div
         v-if="equippedSkills.length > 0"
-        class="d-flex flex-column ga-3"
+        class="d-flex justify-center ga-3"
     >
         <div
             v-for="skill in equippedSkills"

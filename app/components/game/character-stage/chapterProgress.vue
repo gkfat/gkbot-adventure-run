@@ -30,14 +30,14 @@ defineProps<{
 
 <style scoped lang="scss">
 .chapter-progress {
-    gap: 6px;
+    gap: 4px;
     width: fit-content;
     max-width: 280px;
-    padding: 8px 18px;
+    padding: 4px 18px;
 
     &__title {
         color: #ffd166;
-        font-size: 20px;
+        font-size: 16px;
         letter-spacing: 2px;
         text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.85), 0 0 10px rgba(255, 209, 102, 0.35);
     }
