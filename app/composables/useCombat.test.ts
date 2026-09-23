@@ -201,6 +201,91 @@ describe('useCombat — 行動條充能與攻擊動畫揭露同步', () => {
         expect(percentJustBeforeReveal).not.toBeNull();
         expect(percentJustBeforeReveal!).toBeGreaterThanOrEqual(99);
     });
+
+    it('被 FREEZE 命中時，充能條要暫停完整的 statusDurationSec，不能只暫停固定的 STUN_MS', () => {
+        // enemy1 對 player 施放凍結 3 秒（statusDurationSec: 3），player 自己
+        // 下一次出手（結束這個充能週期）排在 6000ms。修復前：暫停窗口固定用
+        // 800ms 的 STUN_MS，凍結期間絕大部分時間充能條仍會正常往上跑，不會
+        // 出現一段跟 statusDurationSec 對得上、真正停滯的區間。
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 1000, wave: 0, actorId: 'enemy1', targetId: 'player', action: 'SKILL', skillId: 'enemy_freeze', skillName: '凍結', statusEffectKind: 'FREEZE', statusDurationSec: 3,
+            }, {
+                timestamp: 6000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'ATTACK', damage: 10, targetHpRemaining: 90,
+            },
+        ];
+        const result = buildResult(combatLog);
+        const combat = useCombat(() => result, () => 100, () => 100);
+
+        const samples: (number | null)[] = [];
+        let revealed = false;
+        for (let i = 0; i < 3000 && !revealed; i += 1) {
+            advanceFrame(16);
+            samples.push(combat.playerGauge.value.percent);
+            revealed = combat.enemyCards.value.some(enemy => enemy.hpCurrent === 90);
+        }
+
+        expect(revealed).toBe(true);
+
+        // 找出樣本中最長的一段「連續相同百分比」區間，換算回毫秒——這段代表
+        // 充能條真正被暫停不動的時長，應該貼近 statusDurationSec（3000ms），
+        // 而不是舊版固定的 STUN_MS（800ms）。只看嚴格介於 0%~100% 之間的值：
+        // 排除開戰 banner 播放期間（percent 固定是 0，本身就有超過 2.7 秒的
+        // 合法停滯，跟 FREEZE 暫停無關）與充能滿後等待揭露的 100% 停滯。
+        let longestRun = 0;
+        let currentRun = 0;
+        for (let i = 1; i < samples.length; i += 1) {
+            const isChargingValue = samples[i] !== null && samples[i]! > 0 && samples[i]! < 100;
+            if (isChargingValue && samples[i] === samples[i - 1]) {
+                currentRun += 1;
+                longestRun = Math.max(longestRun, currentRun);
+            } else {
+                currentRun = 0;
+            }
+        }
+        const longestPauseMs = longestRun * 16;
+
+        expect(longestPauseMs).toBeGreaterThanOrEqual(2500);
+    });
+
+    it('行動條開始暫停的那一刻要對齊敵人受創/凍結狀態真正揭露的那一刻，不能提早 SKILL_WINDUP_MS', () => {
+        // 同一筆 FREEZE log：schedule（驅動 playerStatusBadge 揭露）跟
+        // gaugeSchedule（驅動 playerGauge 的暫停窗口）過去對「這一批技能觸發
+        // 事件的 actAt/displayAt」算法不一致——schedule 把 SKILL_WINDUP_MS
+        // 算進這一批自己的 displayAt，gaugeSchedule 卻只把它累加給「後面」的
+        // 批次，導致充能條提早 SKILL_WINDUP_MS（800ms）開始暫停，跟畫面上
+        // 凍結狀態實際出現的時間點對不上（見使用者回報：freeze 後行動條充能
+        // 與敵人受創時間戳斷開）。
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 1000, wave: 0, actorId: 'enemy1', targetId: 'player', action: 'SKILL', skillId: 'enemy_freeze', skillName: '凍結', statusEffectKind: 'FREEZE', statusDurationSec: 3,
+            }, {
+                timestamp: 6000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'ATTACK', damage: 10, targetHpRemaining: 90,
+            },
+        ];
+        const result = buildResult(combatLog);
+        const combat = useCombat(() => result, () => 100, () => 100);
+
+        let badgeRevealedAtFrame = -1;
+        let plateauStartFrame = -1;
+        let prevPercent: number | null = null;
+        for (let i = 0; i < 3000 && (badgeRevealedAtFrame === -1 || plateauStartFrame === -1); i += 1) {
+            advanceFrame(16);
+            const { percent } = combat.playerGauge.value;
+            if (badgeRevealedAtFrame === -1 && combat.playerStatusBadge.value?.kind === 'FREEZE') {
+                badgeRevealedAtFrame = i;
+            }
+            if (plateauStartFrame === -1 && percent !== null && percent > 0 && percent < 100 && percent === prevPercent) {
+                plateauStartFrame = i;
+            }
+            prevPercent = percent;
+        }
+
+        expect(badgeRevealedAtFrame).toBeGreaterThan(0);
+        expect(plateauStartFrame).toBeGreaterThan(0);
+        // 允許一幀（16ms）的取樣誤差，但不能相差到 SKILL_WINDUP_MS 那個量級。
+        expect(Math.abs(plateauStartFrame - badgeRevealedAtFrame)).toBeLessThanOrEqual(1);
+    });
 });
 
 describe('useCombat — 技能充能條與觸發演出（character-skills）', () => {

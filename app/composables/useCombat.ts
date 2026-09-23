@@ -41,6 +41,16 @@ const WAVE_TRANSITION_DELAY_MS = WAVE_END_DELAY_MS + (BANNER_TEXT_CYCLE_MS * 3) 
 // （伺服器排程本身不會因為受擊延後 nextAttackAt，見 combat.service.ts；這純粹
 // 是演出）。
 const STUN_MS = 800;
+// FREEZE（凍結）之類的控場技能會讓目標的 nextAttackAt 真的延後 statusDurationSec
+// 那麼久（見 combat.service.ts resolveSkillTrigger 的 FREEZE 分支），充能條的
+// 暫停窗口必須用這個實際秒數，不能沿用固定的 STUN_MS——否則暫停窗口只蓋住
+// FREEZE 實際延遲的一小段，凍結期間充能條看起來仍在正常往上跑，跟「完全被凍結
+// 卡住」的效果對不上（見使用者回報：凍結後行動條充能與演繹時間不正確）。
+const pauseDurationMsFor = (entry: CombatLogEntry): number => (
+    entry.statusEffectKind === 'FREEZE' && entry.statusDurationSec !== undefined
+        ? entry.statusDurationSec * 1000
+        : STUN_MS
+);
 
 // 依 (wave, timestamp) 分批：同一個 wave 內、同一個 timestamp 的多筆事件視為
 // 同一批一起顯示；換 wave 一定另起一批，即使雙方 timestamp 剛好都是 0。
@@ -127,7 +137,7 @@ export type WaveBanner = {
 };
 
 type GaugeScheduleEntry = { group: LogGroup; actAt: number; waveStartAt: number };
-type UnitCycle = { start: number; end: number | null; hitDisplayTimes: number[]; endsWave: boolean; holdMs: number };
+type UnitCycle = { start: number; end: number | null; hitWindows: { at: number; durationMs: number }[]; endsWave: boolean; holdMs: number };
 export type UnitGauge = { percent: number | null; paused: boolean };
 export type UnitStatus = { hpCurrent: number; hpMax: number; hpPercent: number };
 export type EnemyCardView = {
@@ -814,7 +824,15 @@ export function useCombat(
             const stunEnd = stunnedUntil.get(actorId);
             if (stunEnd !== undefined) actAt = Math.max(actAt, stunEnd);
 
+            // 這一批自己若有技能觸發，windup 暫停要先算進「這一批自己」的 actAt
+            // （不能只累加進 pauseOffset 延後後面的批次）——比照 schedule 的
+            // displayAt += SKILL_WINDUP_MS，讓這筆事件真正生效／揭露的時間點在
+            // 兩條時間軸上定義一致。少了這一步，這一批自己的 actAt 會比 schedule
+            // 對應的 displayAt（受創/效果揭露時間戳）早了 SKILL_WINDUP_MS，充能
+            // 條的暫停窗口起點就會跟畫面上凍結狀態真正出現的時間點對不上（見
+            // 使用者回報：freeze 後行動條充能與敵人受創時間戳斷開）。
             if (group.entries.some(entry => Boolean(entry.skillId))) {
+                actAt += SKILL_WINDUP_MS;
                 pauseOffset += SKILL_WINDUP_MS;
             }
 
@@ -831,8 +849,9 @@ export function useCombat(
 
     // 每個單位（玩家/敵人）自己一整場戰鬥的「充能週期」清單，從 gaugeSchedule 一次
     // 性算好：一個週期代表「從上次出手（或這個 wave 開始）到下一次出手」之間的
-    // 區間，並記錄這段期間內每一次被打中的顯示時間（hitDisplayTimes），供充能條
-    // 畫出「被打斷暫停」的視覺效果。
+    // 區間，並記錄這段期間內每一次被打中的顯示時間與暫停長度（hitWindows），供
+    // 充能條畫出「被打斷暫停」的視覺效果——一般命中固定暫停 STUN_MS，FREEZE 這類
+    // 會真的延後 nextAttackAt 的控場技能則用 statusDurationSec（見 pauseDurationMsFor）。
     // endsWave：這個週期是不是被「換 wave」強制收尾的（而不是單位自己真的出手
     // 結束）。差別在 gaugeAt 要怎麼詮釋「atMs 已經超過 end」——同一個 wave 內
     // 超過 end 代表「已就緒、等待輪到揭露」該維持滿條；但 endsWave 的週期一旦
@@ -845,7 +864,7 @@ export function useCombat(
         const ensureOpen = (unitId: string, startAt: number) => {
             if (open.has(unitId)) return;
             const cycle: UnitCycle = {
-                start: startAt, end: null, hitDisplayTimes: [], endsWave: false, holdMs: 0,
+                start: startAt, end: null, hitWindows: [], endsWave: false, holdMs: 0,
             };
             if (!cycles.has(unitId)) cycles.set(unitId, []);
             cycles.get(unitId)!.push(cycle);
@@ -871,7 +890,9 @@ export function useCombat(
             for (const entry of group.entries) {
                 ensureOpen(entry.actorId, waveStartAt);
                 ensureOpen(entry.targetId, waveStartAt);
-                open.get(entry.targetId)!.hitDisplayTimes.push(actAt);
+                open.get(entry.targetId)!.hitWindows.push({
+                    at: actAt, durationMs: pauseDurationMsFor(entry), 
+                });
             }
 
             // 出手方的攻擊卡片位移動畫還要再播 CARD_FX_MS 才會讓玩家視覺上認定「這次
@@ -884,7 +905,7 @@ export function useCombat(
             for (const unitId of actedUnitIds) {
                 open.get(unitId)!.end = actAt;
                 const next: UnitCycle = {
-                    start: actAt, end: null, hitDisplayTimes: [], endsWave: false, holdMs: CARD_FX_MS,
+                    start: actAt, end: null, hitWindows: [], endsWave: false, holdMs: CARD_FX_MS,
                 };
                 cycles.get(unitId)!.push(next);
                 open.set(unitId, next);
@@ -909,7 +930,7 @@ export function useCombat(
     });
 
     // 找出某個時間點 nowMs 落在哪個充能週期，並算出目前的百分比：
-    // - 週期內每一段命中時間窗（[hitAt, hitAt+STUN_MS)，裁切到週期範圍內、合併重疊
+    // - 週期內每一段命中時間窗（[at, at+durationMs)，裁切到週期範圍內、合併重疊
     //   區間）都會讓百分比原地暫停，時間窗結束後才繼續累加。
     // - 分母（total）要扣掉這些暫停時間才能跟分子（effectiveElapsed，同樣扣掉暫停）
     //   對齊——分母若不扣，週期內只要發生過命中，百分比在 atMs === end（行動真正
@@ -949,7 +970,7 @@ export function useCombat(
         };
 
         const {
-            start, end, hitDisplayTimes, holdMs,
+            start, end, hitWindows, holdMs,
         } = cycle;
         const total = end - start;
         if (total <= 0) return {
@@ -964,8 +985,10 @@ export function useCombat(
             percent: 0, paused: false,
         };
 
-        const windows: [number, number][] = hitDisplayTimes
-            .map((hitAt): [number, number] => [Math.max(hitAt, chargeStart), Math.min(hitAt + STUN_MS, end)])
+        const windows: [number, number][] = hitWindows
+            .map(({
+                at, durationMs, 
+            }): [number, number] => [Math.max(at, chargeStart), Math.min(at + durationMs, end)])
             .filter(([from, to]) => to > from)
             .sort((a, b) => a[0] - b[0]);
         const merged: [number, number][] = [];
@@ -1012,7 +1035,7 @@ export function useCombat(
         const ensureOpen = (skillId: string, startAt: number) => {
             if (open.has(skillId)) return;
             const cycle: UnitCycle = {
-                start: startAt, end: null, hitDisplayTimes: [], endsWave: false, holdMs: 0,
+                start: startAt, end: null, hitWindows: [], endsWave: false, holdMs: 0,
             };
             if (!cycles.has(skillId)) cycles.set(skillId, []);
             cycles.get(skillId)!.push(cycle);
@@ -1043,7 +1066,7 @@ export function useCombat(
                 const cycle = open.get(entry.skillId)!;
                 cycle.end = windupStartAt;
                 const next: UnitCycle = {
-                    start: displayAt, end: null, hitDisplayTimes: [], endsWave: false, holdMs: 0,
+                    start: displayAt, end: null, hitWindows: [], endsWave: false, holdMs: 0,
                 };
                 cycles.get(entry.skillId)!.push(next);
                 open.set(entry.skillId, next);

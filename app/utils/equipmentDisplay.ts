@@ -122,7 +122,7 @@ export const RARITY_ORDER_DESC: Rarity[] = [
 
 // Detailed item art per template — takes priority over the slot-based fallback.
 const TEMPLATE_ICON: Record<string, PixelIconName> = {
-    salvaged_wrench: 'wrench',
+    salvaged_wrench: 'workGloves',
     riot_shield_scrap: 'riotShield',
     gkbot_faceplate: 'faceplate',
     supply_crate_vest: 'crateVest',

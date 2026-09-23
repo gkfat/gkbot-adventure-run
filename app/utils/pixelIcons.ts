@@ -11,7 +11,7 @@ export type PixelIconName =
     | 'hat' | 'tshirt' | 'hand' | 'foot' | 'ringSlot'
     | 'wrench' | 'riotShield' | 'faceplate' | 'crateVest' | 'greaves' | 'chipRing' | 'engineOil'
     | 'techGoggles' | 'cargoBotPlate' | 'hydraulicArmGuard' | 'raiderGauntlet' | 'magnetRing' | 'magneticBoots'
-    | 'terminalGloves' | 'securityHelmet' | 'isolationSuit' | 'catwalkBoots' | 'weddingRing'
+    | 'terminalGloves' | 'workGloves' | 'securityHelmet' | 'isolationSuit' | 'catwalkBoots' | 'weddingRing'
     | 'vrBracer' | 'vrVisor' | 'tokenRing' | 'bartenderGloves' | 'storeVest' | 'sneakers'
     | 'storeBat' | 'serumInjector'
     | 'drillArm' | 'pulseGauntlet' | 'holoShield' | 'neuralCirclet' | 'tacticalFaceguard'
