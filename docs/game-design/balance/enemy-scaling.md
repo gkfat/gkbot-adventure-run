@@ -104,29 +104,76 @@ baseDef = 1 + levelSteps * DEF_MULT_PER_LEVEL
 
 ## 敵人 archetype 基底數值（enemyLevel = 1 時的原始值）
 
-`server/constants/combat.ts` `ENEMY_ARCHETYPES`：成長倍率套用在這些 baseAtk/baseDef/baseHp 上。
+`server/constants/templates/enemies.ts`：成長倍率套用在這些 baseAtk/baseDef/baseHp 上，全部 32 個 archetype 分成四組——GkBot 小兵／GkBot 頭目／盜賊團小兵／盜賊團頭目（`enemy-factions-and-severity` 陣營區分；頭目模板獨立於小兵，不再疊加 BOSS tier 倍率，詳見「四個 tier 的倍率」一節）。
+
+`actionIntervalSec` 為敵人出手間隔（秒），數值越大攻速越慢；實際套用時仍會被 `ENEMY_ACTION_INTERVAL_MIN_MULTIPLIER`（`server/constants/combat.ts`）夾住下限，確保敵人一定比當場玩家慢至少 15%（見 `docs/game-design/mechanics/combat.md`）。
+
+### GkBot 陣營小兵（`ENEMY_ARCHETYPES`）
 
 | Archetype | baseAtk | baseDef | baseHp | actionIntervalSec |
 |---|---|---|---|---|
-| 維修型 GkBot | 8 | 4 | 60 | 2.5 |
-| 保全機具 | 6 | 8 | 80 | 3.0 |
-| 失控搬運機 | 12 | 2 | 50 | 2.2 |
-| 廢棄零件堆 | 4 | 2 | 30 | 3.5 |
+| 維修型 GkBot | 8 | 4 | 90 | 4.5 |
+| 保全機具 | 6 | 8 | 120 | 5.0 |
+| 失控搬運機 | 12 | 2 | 75 | 4.2 |
+| 廢棄零件堆 | 4 | 2 | 45 | 5.5 |
+| 產線機械臂 | 11 | 5 | 135 | 4.4 |
+| 合成觀測員 | 7 | 3 | 53 | 4.0 |
+| 幻影投影體 | 7 | 2 | 48 | 4.1 |
+| 荷官型 GkBot | 5 | 5 | 83 | 4.6 |
 
-> 檔案開頭註解原文（`server/constants/combat.ts` line 4-9）：
+### GkBot 陣營頭目（`GKBOT_BOSS_ARCHETYPES`）
+
+| Archetype | baseAtk | baseDef | baseHp | actionIntervalSec |
+|---|---|---|---|---|
+| 看門犬型 GkBot | 10 | 16 | 374 | 4.8 |
+| 偵察無人機 | 16 | 6 | 187 | 3.8 |
+| 核心維修官 | 14 | 10 | 289 | 4.5 |
+| 產線總管 | 22 | 6 | 255 | 4.2 |
+| 幻象法師型 | 15 | 5 | 204 | 4.3 |
+| 荷官頭目 | 16 | 9 | 272 | 4.4 |
+| 倉儲搬運霸主 | 15 | 18 | 391 | 4.9 |
+| 商場保全指揮核心 | 14 | 17 | 323 | 4.7 |
+
+### 末世盜賊團陣營小兵（`HUMAN_ARCHETYPES`）
+
+| Archetype | baseAtk | baseDef | baseHp | actionIntervalSec |
+|---|---|---|---|---|
+| 看門狗 | 7 | 8 | 105 | 4.6 |
+| 偵查者（人類斥候） | 8 | 3 | 60 | 4.0 |
+| 幫派打手 | 13 | 3 | 83 | 4.1 |
+| 烏合掠奪者 | 4 | 2 | 42 | 4.8 |
+| 合成士兵 | 12 | 6 | 98 | 4.2 |
+| 狙擊掠奪者 | 14 | 2 | 57 | 4.0 |
+| 私兵護衛 | 9 | 6 | 90 | 4.4 |
+| 賭場保鑣 | 9 | 6 | 87 | 4.5 |
+
+### 末世盜賊團陣營頭目（`HUMAN_BOSS_ARCHETYPES`）
+
+| Archetype | baseAtk | baseDef | baseHp | actionIntervalSec |
+|---|---|---|---|---|
+| 百夫長 | 20 | 11 | 306 | 4.0 |
+| 財庫守門員 | 15 | 17 | 357 | 4.6 |
+| 狂暴幫主 | 24 | 6 | 255 | 4.1 |
+| 合成軍團長 | 21 | 12 | 340 | 4.3 |
+| 影武者 | 22 | 5 | 170 | 3.8 |
+| 賭場莊家王 | 16 | 10 | 272 | 4.4 |
+| 盜賊團軍師 | 14 | 9 | 255 | 4.5 |
+| 末路狂人 | 30 | 4 | 153 | 4.2 |
+
+> 檔案開頭註解原文（`server/constants/templates/enemies.ts` line 3-11）：
 > ```
 > ASSUMPTION (see combat-engine/design.md): none of this is defined anywhere
 > else in the repo — the referenced `10_戰鬥模型.md` doesn't exist, and
 > docs/worldview.md explicitly leaves monster naming/stats to this change.
 > Base stats are set at enemyLevel=1; actual combat stats are scaled via
-> getStatMultipliers() (difficulty.ts) for the node's real enemyLevel/tier.
+> getStatMultipliers() (../difficulty.ts) for the node's real enemyLevel/tier.
 > ```
-> 即這四組 archetype 的基底數值本身也是發明值（無其他 spec 依據），實際戰鬥數值 = base 值 × 上述成長倍率。
+> 即這 32 組 archetype 的基底數值本身也是發明值（無其他 spec 依據），實際戰鬥數值 = base 值 × 上述成長倍率。`actionIntervalSec` 已全數統一 +2 秒調慢敵人攻速（詳見變更歷史，非上述 ASSUMPTION 範圍內的原始發明值）。
 
 ## 落地備註
 
 - 公式與四個 tier 倍率（NORMAL/ELITE/STRONG_ELITE/BOSS）皆已在 `server/constants/difficulty.ts` `getStatMultipliers()` 落地，非提案階段內容。
 - `server/constants/difficulty.test.ts` 覆蓋：`getEnemyLevel` 的 3 組數值範例、NORMAL level=1 無 tier 加成、level 越高倍率越高、tier 遞增（NORMAL < ELITE < STRONG_ELITE）、BOSS 三項倍率皆高於 STRONG_ELITE，可作為公式正確性的最小驗證集。
 - BOSS tier 倍率（hp 4.0 / atk 2.8 / def 2.0）是原始碼明確標註的 ASSUMPTION，尚未有設計文件驗證是否符合實際戰鬥手感，若要調整需同步更新 `difficulty.ts` 與 `difficulty.test.ts` 的邊界斷言。
-- `ENEMY_ARCHETYPES` 的 baseAtk/baseDef/baseHp 同樣是 `combat.ts` 註解標明的發明值，四個 archetype 之間互有 ATK/DEF/HP 側重（爆發型 vs 坦克型 vs 均衡型），調整時建議連動檢查 `expForKill`/`goldForKill`（`combat.ts`）等獎勵公式是否仍與敵人強度匹配。
+- `ENEMY_ARCHETYPES`／`GKBOT_BOSS_ARCHETYPES`／`HUMAN_ARCHETYPES`／`HUMAN_BOSS_ARCHETYPES` 的 baseAtk/baseDef/baseHp 同樣是 `enemies.ts` 註解標明的發明值，各 archetype 之間互有 ATK/DEF/HP 側重（爆發型 vs 坦克型 vs 均衡型），調整時建議連動檢查 `expForKill`/`goldForKill`（`server/constants/combat.ts`）等獎勵公式是否仍與敵人強度匹配。
 - 本文件不含 EXP/金幣/寶石/掉落機率公式，該部分另見 `docs/game-design/balance/item-stats.md`（掉落率與裝備數值）與 `server/constants/combat.ts` 內的 `expForKill`/`goldForKill`/`gemsDropTier` 等函式（未另立文件）。

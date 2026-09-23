@@ -1,13 +1,5 @@
 <template>
     <div class="w-100 character-stage__footer">
-        <!-- 中斷中的冒險：顯示上次斷掉的位置 -->
-        <div
-            v-if="interruptedRunLabel"
-            class="text-caption text-medium-emphasis character-stage__interrupted-run"
-        >
-            上次探索中斷於：{{ interruptedRunLabel }}
-        </div>
-
         <!-- 章節關卡進度：置中顯示於開始探索按鈕上方 -->
         <GameCharacterStageChapterProgress
             v-if="levelProgress"
@@ -18,6 +10,14 @@
         />
 
         <div class="character-stage__cta-row d-flex flex-column align-center ga-2">
+            <!-- 中斷中的冒險：顯示上次斷掉的節點，置中於繼續探索按鈕上方 -->
+            <div
+                v-if="interruptedRunLabel"
+                class="text-caption text-medium-emphasis text-center character-stage__interrupted-run"
+            >
+                上次探索中斷於 {{ interruptedRunLabel }}
+            </div>
+
             <button
                 type="button"
                 class="cta-btn"

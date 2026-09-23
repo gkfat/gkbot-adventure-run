@@ -233,10 +233,10 @@ export function useCombat(
             kind: 'enemy', archetypeSlug: archetypeSlugByEnemyId.value.get(unitId), faction,
         };
     };
-    const fireDialogue = (unitId: string, trigger: DialogueTrigger) => {
+    const fireDialogue = (unitId: string, trigger: DialogueTrigger, skillId?: string) => {
         const subject = dialogueSubjectFor(unitId);
         if (!subject) return;
-        triggerDialogue(unitId, trigger, subject);
+        triggerDialogue(unitId, trigger, subject, skillId);
     };
     // 一次性把「每一批 log 該在播放開始後第幾毫秒顯示」全部算好（絕對時間軸，
     // 不是逐批用 setTimeout 互相串接）。這樣播放排程跟充能條動畫可以共用同一份
@@ -484,6 +484,7 @@ export function useCombat(
         const skillEntry = entry.group.entries.find(e => Boolean(e.skillId));
         if (!skillEntry) return;
         triggerSkillCastFx(skillEntry.actorId, skillEntry.skillName ?? skillEntry.skillId!);
+        fireDialogue(skillEntry.actorId, 'SKILL', skillEntry.skillId);
     });
 
     // 受傷音效依「被打的是誰」分類：玩家與人類陣營敵人共用 hurt.wav，GKBOT

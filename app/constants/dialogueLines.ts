@@ -25,7 +25,8 @@ export type DialogueTrigger =
     | 'BLESSING'
     | 'CURSE'
     | 'WHEEL'
-    | 'CHOICE';
+    | 'CHOICE'
+    | 'SKILL';
 
 export type DialogueLineSet = Partial<Record<DialogueTrigger, string[]>>;
 
@@ -53,6 +54,7 @@ export const GENERIC_PLAYER_LINES: DialogueLineSet = {
     CURSE: ['體內好像有什麼鬆脫了……', '一陣寒意，不只是心理作用。'],
     WHEEL: ['賭運氣，也是活下去的一種辦法。', '轉盤停在哪，由不得我。'],
     CHOICE: ['選了，就沒有回頭路。', '這種抉擇，每次都讓人手心冒汗。'],
+    SKILL: ['看招，這招不一樣！', '拿出真本事了！'],
 };
 
 const PLAYER_DIALOGUE_LINES: Record<string, DialogueLineSet> = {
@@ -403,6 +405,11 @@ export const GENERIC_ENEMY_LINES_BY_FACTION: Record<EnemyFaction, DialogueLineSe
             '[……GK 博士……教我的事……都……忘了……]',
             '[運作……終止……]',
         ],
+        SKILL: [
+            '[特殊程序啟動]',
+            '[非常規攻擊，執行中]',
+            '[權限提升，攻擊模組解鎖]',
+        ],
     },
     HUMAN: {
         ENCOUNTER: [
@@ -446,6 +453,11 @@ export const GENERIC_ENEMY_LINES_BY_FACTION: Record<EnemyFaction, DialogueLineSe
             '可惡……這趟白跑了……',
             '早知道……不該來這裡……',
             '這下……全完了……',
+        ],
+        SKILL: [
+            '看我的真本事！',
+            '這一招，看好了！',
+            '別以為我只有這點能耐！',
         ],
     },
 };
@@ -958,7 +970,83 @@ const ENEMY_DIALOGUE_LINES: Record<string, DialogueLineSet> = {
     },
 };
 
-export const resolveDialogueLines = (subject: DialogueSubject, trigger: DialogueTrigger): string[] => {
+/**
+ * character-skills 喊招台詞：以 CharacterSkill.skillId／EnemyArchetype.skill.skillId
+ * 為 key（見 shared/constants/characterSkills.ts、server/constants/templates/enemies.ts），
+ * 比 DialogueTrigger 更細——每個技能各自的招式台詞，SKILL trigger 優先查這裡，
+ * 找不到才 fallback 回 archetype/faction 的通用 SKILL 台詞池（見 resolveDialogueLines）。
+ */
+const SKILL_DIALOGUE_LINES: Record<string, string[]> = {
+    // 玩家技能（PLAYER_DIALOGUE_LINES 對應的 archetype 語氣）
+    fighter_crushing_blow: [
+        '這一拳，練的就是全力！',
+        '全身重量，灌到底！',
+        '扛好了，這下要痛！',
+    ],
+    fighter_iron_body: [
+        '繃緊了，撐住！',
+        '這具身體，扛得住！',
+        '核心收緊，防禦全開！',
+    ],
+    adventurer_gale_slash: [
+        '腳步再快一點！',
+        '跟上這個節奏！',
+        '順著氣流，加速！',
+    ],
+    adventurer_second_wind: [
+        '還沒完，喘口氣！',
+        '這口氣，撐得住！',
+        '還能走，別放棄！',
+    ],
+    scholar_weak_point_mark: [
+        '(嗝) 弱點找到了。',
+        '接縫在這裡，隨便算算就知道。',
+        '破綻，早就看穿了。',
+    ],
+    scholar_calculated_strike: [
+        '角度都算好了。',
+        '(嗝) 這下準到無聊。',
+        '命中率，早就算出來了。',
+    ],
+    tinkerer_overload_shock: [
+        '超頻上限，電流擴散！',
+        '全部一起電！',
+        '工具超頻，接招！',
+    ],
+    tinkerer_cryo_trap: [
+        '凍結吧！',
+        '給我凍住！',
+        '陷阱到位，別想跑！',
+    ],
+    gambler_all_in: [
+        '全押上去了！',
+        '這把，賭上一切！',
+        '豁出去，全下！',
+    ],
+    gambler_lucky_ward: [
+        '運氣，站在我這邊！',
+        '賭一把，擋下來！',
+        '這局，先守一手！',
+    ],
+    // 敵人技能（GKBOT 陣營，冷調系統訊息語氣）
+    enemy_assembly_overseer_overload: [
+        '[過載輸出，執行中]',
+        '[電流擴散，全區覆蓋]',
+        '[不計後果，全功率運轉]',
+    ],
+    enemy_illusion_mage_phantom: [
+        '[分身展開，惑亂目標]',
+        '[哪個才是真身？]',
+        '[投影疊加，攻擊啟動]',
+    ],
+};
+
+export const resolveDialogueLines = (subject: DialogueSubject, trigger: DialogueTrigger, skillId?: string): string[] => {
+    if (trigger === 'SKILL' && skillId) {
+        const skillLines = SKILL_DIALOGUE_LINES[skillId];
+        if (skillLines?.length) return skillLines;
+    }
+
     if (subject.kind === 'player') {
         const specific = PLAYER_DIALOGUE_LINES[subject.archetypeId]?.[trigger];
         if (specific?.length) return specific;

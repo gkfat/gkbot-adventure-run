@@ -44,7 +44,7 @@ const clearBubble = (subjectId: string) => {
 };
 
 export function useDialogueBubble() {
-    const triggerDialogue = (subjectId: string, trigger: DialogueTrigger, subject: DialogueSubject) => {
+    const triggerDialogue = (subjectId: string, trigger: DialogueTrigger, subject: DialogueSubject, skillId?: string) => {
         if (
             subject.kind === 'enemy'
             && activeEnemySpeakerId !== null
@@ -54,10 +54,10 @@ export function useDialogueBubble() {
 
         if (trigger === 'ATTACK' && Math.random() >= ATTACK_DISPLAY_CHANCE) return;
 
-        const lines = resolveDialogueLines(subject, trigger);
+        const lines = resolveDialogueLines(subject, trigger, skillId);
         if (lines.length === 0) return;
 
-        const historyKey = `${subjectId}:${trigger}`;
+        const historyKey = skillId ? `${subjectId}:${trigger}:${skillId}` : `${subjectId}:${trigger}`;
         const index = pickLineIndex(lines, historyKey);
         lastLineIndex.set(historyKey, index);
 

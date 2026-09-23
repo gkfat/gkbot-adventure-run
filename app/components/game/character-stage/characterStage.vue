@@ -196,7 +196,7 @@ const handleAdventureCta = async () => {
 const interruptedRunLabel = computed(() => {
     if (justStarting.value || !hasActiveRun.value || !currentRun.value) return null;
     const run = currentRun.value;
-    return `${getStageDisplayName(run.chapterIndex)}（第 ${run.stageNodeIndex + 1}/${run.stageNodeCount} 節點）`;
+    return `${run.stageNodeIndex + 1}/${run.stageNodeCount} 節點`;
 });
 
 const handleAbandonRun = async () => {

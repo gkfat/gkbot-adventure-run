@@ -806,12 +806,12 @@ describe('CombatService.resolve', () => {
 
         it('still records kills made before the player is defeated mid-combat', async () => {
             // Player one-shots the first enemy (ATK 1000 vs a low-level DEF).
-            // actionIntervalSec=2s puts the player's first action (2000ms)
-            // ahead of both enemy archetypes' first action (index0=2500ms,
-            // index1=3000ms — see server/constants/templates/enemies.ts), so
+            // actionIntervalSec=3s puts the player's first action (3000ms)
+            // ahead of both enemy archetypes' first action (index0=4500ms,
+            // index1=5000ms — see server/constants/templates/enemies.ts), so
             // the player still strikes first; but the second enemy's own
-            // first action (3000ms) lands before the player's second action
-            // (4000ms), so it gets to hit back — any enemy attack with ATK >
+            // first action (5000ms) lands before the player's second action
+            // (6000ms), so it gets to hit back — any enemy attack with ATK >
             // 0 deals >=1 damage (computeDamage floors at 1), which instantly
             // kills the 1-HP player before the player can act again.
             getCharacterWithStatsMock.mockResolvedValue({
@@ -822,10 +822,10 @@ describe('CombatService.resolve', () => {
                 equipment: {},
                 weaponProficiency: {},
                 dualWieldProficiency: {
-                    exp: 0, level: 1, 
+                    exp: 0, level: 1,
                 },
                 stats: {
-                    ATK: 1000, DEF: 0, HP_MAX: 1, actionIntervalSec: 2, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+                    ATK: 1000, DEF: 0, HP_MAX: 1, actionIntervalSec: 3, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
                 },
             });
             const service = new CombatService();
