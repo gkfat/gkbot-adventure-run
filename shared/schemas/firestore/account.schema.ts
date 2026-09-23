@@ -14,6 +14,8 @@ export const accountSchema = z.object({
     email: z.string().email(),
     createdAt: z.number(),
     updatedAt: z.number(),
+    bgmEnabled: z.boolean(),
+    sfxEnabled: z.boolean(),
 }).strict();
 
 export type Account = z.infer<typeof accountSchema>;

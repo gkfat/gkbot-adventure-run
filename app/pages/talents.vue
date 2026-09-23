@@ -211,6 +211,7 @@ type TalentNode = {
 const {
     character, loading, error, fetchCharacter, allocateTalent,
 } = useCharacter();
+const { playSfx } = useAudio();
 
 // 天賦點的主色統一用黃色（characterStage.vue 的 LV 標籤同色），
 // 與屬性點沿用的 warning（暗紅）區分開來。
@@ -370,6 +371,7 @@ const invest = async (node: TalentNode) => {
     const ok = await allocateTalent(node.nodeId);
     allocating.value = false;
     if (ok) {
+        playSfx('exploreStart.mp3');
         // 重新取得的節點資料（rank 已更新）— 保持 dialog 開啟以便連續投點。
         selectedNode.value = character.value?.talentTree.nodes.find(n => n.nodeId === node.nodeId) ?? null;
     }

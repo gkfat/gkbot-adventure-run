@@ -76,6 +76,8 @@ export class AccountService extends BaseService {
                 email: firebaseUser.email,
                 createdAt: timestamp,
                 updatedAt: timestamp,
+                bgmEnabled: true,
+                sfxEnabled: true,
             };
 
             await this.accountRepo.createAccount({
@@ -130,6 +132,29 @@ export class AccountService extends BaseService {
                 error,
             });
             throw new DatabaseError('Failed to get account');
+        }
+    }
+
+    /**
+     * Update audio settings (BGM/SFX) for an account. Only patched fields are updated.
+     */
+    async updateAudioSettings(
+        uid: string,
+        patch: { bgmEnabled?: boolean; sfxEnabled?: boolean },
+    ): Promise<Account> {
+        try {
+            await this.getAccount(uid);
+            return await this.accountRepo.updateAudioSettings(uid, patch);
+        } catch (error) {
+            if (error instanceof NotFoundError) {
+                throw error;
+            }
+            this.logError('Failed to update audio settings', {
+                action: 'updateAudioSettings',
+                userId: uid,
+                error,
+            });
+            throw new DatabaseError('Failed to update audio settings');
         }
     }
 

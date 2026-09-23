@@ -70,6 +70,7 @@ const { invalidate: invalidateInventory } = useInventory();
 const {
     purchase, purchaseLoading, purchaseError,
 } = useShop();
+const { playSfx } = useAudio();
 
 const open = ref(false);
 const slot = ref<ShopSlot | null>(null);
@@ -88,6 +89,7 @@ const handlePurchase = async () => {
 
     const result = await purchase(slot.value.slotId, 'INVENTORY');
     if (result) {
+        playSfx('equip.wav');
         await fetchCharacter();
         invalidateInventory();
         open.value = false;

@@ -15,6 +15,8 @@ export type Account = {
   email: string;          // User email
   createdAt: Timestamp;   // Account creation timestamp
   updatedAt: Timestamp;   // Last update timestamp
+  bgmEnabled: boolean;    // BGM on/off preference
+  sfxEnabled: boolean;    // SFX on/off preference
 };
 
 /**

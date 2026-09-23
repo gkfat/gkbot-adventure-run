@@ -40,7 +40,7 @@
             <v-row
                 v-if="character"
                 dense
-                class="pa-4 ma-0"
+                class="pa-4 ma-0 flex-grow-0"
             >
                 <v-col cols="4">
                     <SystemBtn
@@ -91,6 +91,20 @@
                         成就
                     </SystemBtn>
                 </v-col>
+                <v-col cols="4">
+                    <SystemBtn
+                        block
+                        stacked
+                        size="small"
+                        color="primary"
+                        variant="flat"
+                        class="text-none account-drawer__square-btn"
+                        @click="audioSettingsOpen = true"
+                    >
+                        <v-icon class="mb-2">mdi-volume-high</v-icon>
+                        音效設定
+                    </SystemBtn>
+                </v-col>
             </v-row>
 
             <v-spacer />
@@ -113,6 +127,7 @@
 
         <GameCommonBestiaryDialog v-model="bestiaryOpen" />
         <GameCommonAchievementsDialog v-model="achievementsOpen" />
+        <GameCommonAudioSettingsDialog v-model="audioSettingsOpen" />
     </v-navigation-drawer>
 </template>
 
@@ -122,12 +137,14 @@ const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const bestiaryOpen = ref(false);
 const achievementsOpen = ref(false);
+const audioSettingsOpen = ref(false);
 
 const { user, signOut, loading } = useAuth();
 const { character, clearSelection, reset: resetCharacter } = useCharacter();
 const { reset: resetInventory } = useInventory();
 const { reset: resetQuests } = useQuests();
 const { hasClaimable: hasClaimableAchievements, fetchAchievements, reset: resetAchievements } = useAchievements();
+const { reset: resetAudio } = useAudio();
 
 // 抽屜開啟時預先抓取成就進度，讓「成就」按鈕能即時顯示可領取紅點
 watch(() => props.modelValue, (open) => {
@@ -140,6 +157,7 @@ const handleSignOut = async () => {
     resetInventory();
     resetQuests();
     resetAchievements();
+    resetAudio();
 };
 
 const handleSwitchCharacter = () => {

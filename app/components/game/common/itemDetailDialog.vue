@@ -129,6 +129,7 @@ const {
 const {
     sellItem, sellLoading, sellError, itemById,
 } = useInventory();
+const { playSfx } = useAudio();
 
 const open = ref(false);
 const item = ref<ItemLike & { itemId: string; sellPriceGold: number } | null>(null);
@@ -165,6 +166,7 @@ const handleEquip = async (target: ItemLike & { itemId: string; sellPriceGold: n
 
     equipActionLoading.value = false;
     if (success) {
+        playSfx('equip.wav');
         open.value = false;
     } else {
         equipActionError.value = '裝備失敗，請稍後再試';
@@ -182,6 +184,7 @@ const handleUnequip = async (target: ItemLike & { itemId: string; sellPriceGold:
 
     equipActionLoading.value = false;
     if (success) {
+        playSfx('equip.wav');
         open.value = false;
     } else {
         equipActionError.value = '卸下失敗，請稍後再試';
@@ -191,6 +194,7 @@ const handleUnequip = async (target: ItemLike & { itemId: string; sellPriceGold:
 const handleSell = async (target: ItemLike & { itemId: string; sellPriceGold: number }) => {
     const goldEarned = await sellItem(target.itemId);
     if (goldEarned !== null) {
+        playSfx('gold.mp3');
         open.value = false;
     }
 };

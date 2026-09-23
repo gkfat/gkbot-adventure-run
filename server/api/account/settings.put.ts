@@ -1,7 +1,15 @@
-import { defineEventHandler } from 'h3';
+import {
+    defineEventHandler, readBody,
+} from 'h3';
 import { requireAuth } from '../../utils/auth';
 import { AccountService } from '../../services/account.service';
+import {
+    updateAccountSettingsRequestSchema, updateAccountSettingsResponseSchema,
+} from '../../../shared/schemas/api/account.schema';
 import { toH3Error } from '../../utils/errorHandler';
+import {
+    AppError, ValidationError,
+} from '../../../shared/types/errors';
 import { logRequest } from '../../utils/logger';
 
 export default defineEventHandler(async (event) => {
@@ -9,16 +17,20 @@ export default defineEventHandler(async (event) => {
     const requestId = event.context.requestId || crypto.randomUUID();
 
     try {
-        // Require authentication
         const authUser = await requireAuth(event);
 
-        // Get account from database
+        const body = await readBody(event);
+        const parseResult = updateAccountSettingsRequestSchema.safeParse(body);
+        if (!parseResult.success) {
+            throw new ValidationError('Invalid request', parseResult.error.flatten());
+        }
+
         const accountService = new AccountService();
-        const account = await accountService.getAccount(authUser.uid);
+        const account = await accountService.updateAudioSettings(authUser.uid, parseResult.data);
 
         logRequest({
             severity: 'INFO',
-            message: 'Account info retrieved',
+            message: 'Account audio settings updated',
             method: event.method,
             path: event.path,
             status: 200,
@@ -27,23 +39,22 @@ export default defineEventHandler(async (event) => {
             requestId,
         });
 
-        return {
+        const response = {
             success: true,
             data: {
-                accountId: account.accountId,
-                email: account.email,
-                createdAt: account.createdAt,
                 bgmEnabled: account.bgmEnabled,
                 sfxEnabled: account.sfxEnabled,
             },
         };
-    } catch (error: any) {
+
+        return updateAccountSettingsResponseSchema.parse(response);
+    } catch (error: unknown) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to get account info',
+            message: 'Failed to update account audio settings',
             method: event.method,
             path: event.path,
-            status: error.statusCode || 500,
+            status: error instanceof AppError ? error.statusCode : 500,
             durationMs: Date.now() - startTime,
             requestId,
             error,

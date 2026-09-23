@@ -1,12 +1,27 @@
 import type { CombatApiResult } from './useAdventureRun';
 import type {
-    CombatLogEntry, EnemyFaction,
+    CombatLogEntry, EnemyFaction, SkillEffectKind,
 } from '../../shared/types/adventure';
 import { useDialogueBubble } from './useDialogueBubble';
 import type {
     DialogueSubject, DialogueTrigger,
 } from '../constants/dialogueLines';
 import { STATUS_BADGE_STYLE } from '../utils/skillDisplay';
+
+// game-audio-integration：戰鬥中套用增益/減益類技能效果時播放對應音效，
+// 分類依據 shared/types/adventure.ts SkillEffectKind 的語意（傷害/治療類不算
+// buff/debuff，不在這兩個集合內）。
+const BUFF_EFFECT_KINDS: SkillEffectKind[] = [
+    'HASTE_SELF',
+    'DEFENSE_UP',
+    'CRIT_UP',
+    'SHIELD',
+];
+const DEBUFF_EFFECT_KINDS: SkillEffectKind[] = [
+    'FREEZE',
+    'ARMOR_BREAK',
+    'DOT',
+];
 
 // 每個 wave 開戰前都先播一段橫越戰場的 banner，一段文字的進出節奏都是
 // 「過 BANNER_TEXT_ENTER_DELAY_MS 後文字進入 → 停留 BANNER_TEXT_HOLD_MS →
@@ -189,6 +204,11 @@ export function useCombat(
     // character-skills：目前佩戴中的技能（供充能條演出用），選填——單元測試
     // 沒有提供時視為沒有佩戴任何技能，不影響既有 playback/gauge 測試。
     getEquippedSkills?: () => { skillId: string; name: string; icon: string; chargeSec: number }[],
+    // buff/debuff 音效——選填注入而非直接呼叫 useAudio()，因為 useAudio() 依賴
+    // useApi()/useAuth() 等 Nuxt runtime，useCombat.test.ts 在 Nuxt 建置流程外
+    // 用 vitest 直接載入這個檔案，注入的函式不需要就不會觸發那些依賴。
+    // eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
+    playSfx?: (sound: string) => void,
 ) {
     const equippedSkills = computed(() => getEquippedSkills?.() ?? []);
     const skillChargeSecById = computed(() => new Map(equippedSkills.value.map(skill => [skill.skillId, skill.chargeSec])));
@@ -466,6 +486,13 @@ export function useCombat(
         triggerSkillCastFx(skillEntry.actorId, skillEntry.skillName ?? skillEntry.skillId!);
     });
 
+    // 受傷音效依「被打的是誰」分類：玩家與人類陣營敵人共用 hurt.wav，GKBOT
+    // 陣營敵人另外用 robotHurt.wav——同一場戰鬥的敵人陣營一律相同（見
+    // shared/types/adventure.ts AdventureRun.factionType），不需要逐隻敵人查。
+    const hurtSfxFor = (targetId: string): string => (
+        targetId !== 'player' && getFactionType?.() === 'GKBOT' ? 'robotHurt.wav' : 'hurt.wav'
+    );
+
     watch(visibleGroupCount, (count) => {
         if (count === 0) return;
         const group = groups.value[count - 1];
@@ -485,15 +512,24 @@ export function useCombat(
             // 就已經觸發過（見 watch(windupRevealCount, ...)），這裡只負責
             // SKILL_WINDUP_MS 暫停結束後才揭曉的實際效果（傷害/治療）。
             if (entry.skillId) {
+                if (entry.statusEffectKind && BUFF_EFFECT_KINDS.includes(entry.statusEffectKind)) {
+                    playSfx?.('buff.mp3');
+                } else if (entry.statusEffectKind && DEBUFF_EFFECT_KINDS.includes(entry.statusEffectKind)) {
+                    playSfx?.('debuff.mp3');
+                }
                 if (entry.damage !== undefined && entry.damage < 0) {
+                    playSfx?.('heal.wav');
                     triggerDamageTextFx(entry.targetId, 'heal', -entry.damage);
                 } else if (entry.damage !== undefined && entry.damage > 0) {
                     triggerSparkFx(entry.targetId, 'skill');
+                    playSfx?.(hurtSfxFor(entry.targetId));
                     triggerDamageTextFx(entry.targetId, 'damage', entry.damage);
                 }
                 return;
             }
             triggerSparkFx(entry.targetId, entry.action === 'CRIT' ? 'crit' : 'hit');
+            playSfx?.(entry.action === 'CRIT' ? 'crit.mp3' : 'attack.mp3');
+            playSfx?.(hurtSfxFor(entry.targetId));
             triggerDamageTextFx(entry.targetId, entry.action === 'CRIT' ? 'crit' : 'damage', entry.damage);
             fireDialogue(entry.actorId, entry.action === 'CRIT' ? 'CRIT' : 'ATTACK');
             fireDialogue(entry.targetId, 'HIT_TAKEN');

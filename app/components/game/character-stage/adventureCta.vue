@@ -64,11 +64,14 @@ const emit = defineEmits<{
 // 一定會完整播放。animationend 會在動畫播完後把 class 移除以便下次重新觸發。
 const bouncing = ref(false);
 
+const { playSfx } = useAudio();
+
 const handleStart = () => {
     bouncing.value = false;
     requestAnimationFrame(() => {
         bouncing.value = true;
     });
+    playSfx('click.wav');
     emit('start');
 };
 </script>

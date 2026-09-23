@@ -46,6 +46,14 @@ const { selectedCharacterId } = useCharacter();
 // 冒險進行中畫面版面吃緊，隱藏底部導覽列
 const route = useRoute();
 const isAdventurePage = computed(() => route.path === '/adventure');
+
+// BGM 依冒險狀態切換；layout 跨頁面導覽不會重新掛載，用 watch 才能同時涵蓋
+// 「首次進入」與「後續切換」。登出離開遊戲內頁面（layout 卸載）時停止播放。
+const { playBgm, stopBgm } = useAudio();
+watch(isAdventurePage, (isAdventure) => {
+    playBgm(isAdventure ? 'adventure.mp3' : 'town.mp3');
+}, { immediate: true });
+onUnmounted(() => stopBgm());
 </script>
 
 <style scoped lang="scss">

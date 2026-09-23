@@ -84,6 +84,11 @@ import {
 } from '../../shared/schemas/api/character-skill.schema';
 
 import {
+    updateAccountSettingsRequestSchema,
+    updateAccountSettingsResponseSchema,
+} from '../../shared/schemas/api/account.schema';
+
+import {
     getDailyQuestsResponseSchema,
     claimDailyQuestResponseSchema,
     getPersistentQuestsResponseSchema,
@@ -127,6 +132,8 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         LoginResponse: loginResponseSchema,
         MeResponse: meResponseSchema,
         DeleteAccountResponse: deleteAccountResponseSchema,
+        UpdateAccountSettingsRequest: updateAccountSettingsRequestSchema,
+        UpdateAccountSettingsResponse: updateAccountSettingsResponseSchema,
         GetRosterResponse: getRosterResponseSchema,
         CreateCharacterRequest: createCharacterRequestSchema,
         GetCharacterResponse: getCharacterResponseSchema,
@@ -221,6 +228,25 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             200: {
                 description: 'Account successfully deleted',
                 content: { 'application/json': { schema: deleteAccountResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'put',
+        path: '/api/account/settings',
+        description: 'Update the caller\'s BGM/SFX audio preference (partial update)',
+        tags: ['Account'],
+        security: [{ bearerAuth: [] }],
+        request: { body: { content: { 'application/json': { schema: updateAccountSettingsRequestSchema } } } },
+        responses: {
+            200: {
+                description: 'Audio settings updated',
+                content: { 'application/json': { schema: updateAccountSettingsResponseSchema } },
             },
             401: {
                 description: 'Unauthorized',

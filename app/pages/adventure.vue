@@ -964,6 +964,7 @@ const enteredAdventureCold = !checked.value;
 const showLogDialog = ref(false);
 const walkFrame = useWalkFrame();
 const idleStep = useIdleFrame();
+const { playSfx } = useAudio();
 const characterSpriteSrc = computed(() => {
     if (!character.value) return '';
     const backUrl = backSpriteUrl(character.value.spriteUrl);
@@ -1044,6 +1045,7 @@ const {
     () => character.value?.archetypeId ?? 'legacy',
     () => currentRun.value?.factionType,
     () => equippedSkillsForCombat.value,
+    playSfx,
 );
 const inCombatStage = computed(() => !!lastCombatResult.value);
 
@@ -1115,6 +1117,9 @@ watch(() => currentRun.value?.state, (state, prevState) => {
     healFx.value = {
         key: Date.now(), amount: autoHealAmount,
     };
+});
+watch(healFx, (fx) => {
+    if (fx && fx.amount > 0) playSfx('heal.wav');
 });
 const {
     items: permanentItems, fetchInventory, loaded: inventoryLoaded, invalidate: invalidateInventory,
@@ -1280,6 +1285,7 @@ watch(combatAnimPlaybackDone, (done) => {
     if (!done) return;
     combatPlaybackDone.value = true;
     showCombatSummaryDialog.value = true;
+    if (combatVictory.value) playSfx('win.wav');
     commitCombatLog();
 });
 
@@ -1581,8 +1587,10 @@ const handleResolveEvent = async (choiceIndex?: number) => {
     const grantedCurseId = lastEventResult.value?.curseApplied;
     if (grantedBlessing) {
         acquiredModifierDialog.value = resolveBlessingModifier(grantedBlessing) ?? null;
+        if (acquiredModifierDialog.value) playSfx('buff.mp3');
     } else if (grantedCurseId) {
         acquiredModifierDialog.value = findCurseTemplate(grantedCurseId) ?? null;
+        if (acquiredModifierDialog.value) playSfx('debuff.mp3');
     } else if (lastEventResult.value?.eventType === EventType.WHEEL) {
         wheelResultPending.value = true;
         wheelSpinStarted.value = false;
@@ -1601,6 +1609,7 @@ const handleSelectBlessing = async (blessingId: string) => {
     if (success) {
         const entry = currentRun.value?.blessings.find(b => b.modifierId === blessingId);
         acquiredModifierDialog.value = entry ? resolveBlessingModifier(entry) ?? null : null;
+        if (acquiredModifierDialog.value) playSfx('buff.mp3');
         // BLESSING_SELECT 節點取得的祝福不經過 handleResolveEvent（那條路徑只
         // 處理 EVENT 節點的 HEAL/BLESSING/CURSE/WHEEL/CHOICE），這裡是唯一觸發
         // 點，同樣要讓玩家 murmur 一句（見使用者回報）。

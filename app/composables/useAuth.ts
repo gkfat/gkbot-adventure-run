@@ -72,6 +72,9 @@ export const useAuth = () => {
                         const token = await user.getIdToken();
                         authState.value.idToken = token;
                         console.log('[useAuth] ID token obtained, isAuthenticated should be true');
+
+                        // 同步該帳號的音效設定
+                        useAudio().fetchSettings();
                     } catch (error) {
                         console.error('[useAuth] Failed to get ID token:', error);
                         authState.value.error = '無法取得認證憑證';

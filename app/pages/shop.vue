@@ -295,6 +295,7 @@ const {
 } = useShop();
 const { fetchCharacter } = useCharacter();
 const { invalidate: invalidateInventory } = useInventory();
+const { playSfx } = useAudio();
 
 // eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding
 type ClaimDialog = { open: (result: { rewardGold: number; item: ShopItemInstance }) => void };
@@ -351,6 +352,7 @@ const handlePurchaseFragmentSlot = async (slot: ShopSlot) => {
     const result = await purchase(slot.slotId, 'INVENTORY');
     fragmentPurchaseLoadingSlotId.value = null;
     if (result?.skillFragment) {
+        playSfx('equip.wav');
         await fetchCharacter();
         if (skillsLoaded.value) fetchSkills();
         skillFragmentPurchaseDialogRef.value?.open(result.skillFragment);

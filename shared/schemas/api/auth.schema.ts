@@ -27,6 +27,8 @@ export const meResponseSchema = z.object({
         accountId: z.string(),
         email: z.string().email(),
         createdAt: z.number(),
+        bgmEnabled: z.boolean(),
+        sfxEnabled: z.boolean(),
     }),
 });
 

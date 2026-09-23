@@ -154,6 +154,7 @@ useHead({
 const {
     dailyQuests, persistentQuests, loading, loaded, error, claimLoading, fetchDaily, fetchPersistent, claim,
 } = useQuests();
+const { playSfx } = useAudio();
 
 const tab = ref<'daily' | 'persistent'>('daily');
 
@@ -192,7 +193,8 @@ onMounted(() => {
 
 const handleClaim = async (quest: QuestProgress) => {
     if (!quest.completed || quest.claimed) return;
-    await claim(quest.questId, tab.value);
+    const ok = await claim(quest.questId, tab.value);
+    if (ok) playSfx('gold.mp3');
 };
 </script>
 

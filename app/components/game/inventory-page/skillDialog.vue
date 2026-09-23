@@ -240,6 +240,7 @@ const props = defineProps<{
 const {
     skills, unlockSkill, strengthenSkill, equipSkill, actionLoading, actionError,
 } = useCharacterSkills();
+const { playSfx } = useAudio();
 
 const open = ref(false);
 const skill = ref<SkillEntry | null>(null);
@@ -296,7 +297,8 @@ const hasOpenSlot = computed(() => openSlotIndex.value !== null);
 
 const handleUnlock = async () => {
     if (!skill.value) return;
-    await unlockSkill(skill.value.skillId);
+    const success = await unlockSkill(skill.value.skillId);
+    if (success) playSfx('exploreStart.mp3');
     open.value = false;
 };
 
@@ -306,6 +308,7 @@ const handleStrengthen = async () => {
     const amount = Math.min(fragmentsToSpend.value, skill.value.fragmentCount);
     const success = await strengthenSkill(skillId, amount);
     if (!success) return;
+    playSfx('exploreStart.mp3');
     // strengthenSkill 內部已經 fetchSkills() 過一輪最新資料，把 dialog 顯示的
     // skill.value 換成重新整理後的版本，讓玩家能連續強化、即時看到新等級/效果，
     // 不需要關閉重開。

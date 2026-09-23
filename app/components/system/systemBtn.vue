@@ -65,8 +65,15 @@ const emit = defineEmits<{
     click: [event: MouseEvent];
 }>();
 
-// 處理點擊事件並轉發
+const { playSfx } = useAudio();
+
+// 處理點擊事件並轉發；點擊音效統一放在這個共用按鈕元件，讓遊戲內所有透過
+// SystemBtn 的按鈕都有一致的點擊回饋（各按鈕自己的結果音效，例如裝備/升級，
+// 仍各自在成功分支另外播放，兩者會疊在一起而非互相取代）。
 const handleClick = (event: MouseEvent) => {
+    if (!props.disabled && !props.loading) {
+        playSfx('click.wav');
+    }
     emit('click', event);
 };
 

@@ -3,12 +3,26 @@
  * Handles Firestore operations for Account collection
  */
 
+import type { DocumentData } from 'firebase-admin/firestore';
 import { BaseRepository } from './base.repository';
 import type { Account } from '../../shared/types/account';
-import { DatabaseError } from '../../shared/types/errors';
+import {
+    DatabaseError, NotFoundError,
+} from '../../shared/types/errors';
 
 export class AccountRepository extends BaseRepository<Account> {
     protected collectionName = 'accounts';
+
+    /**
+     * Fill in default audio settings for accounts created before these fields existed.
+     */
+    private withAudioSettingsDefaults(data: DocumentData): DocumentData {
+        return {
+            ...data,
+            bgmEnabled: data.bgmEnabled ?? true,
+            sfxEnabled: data.sfxEnabled ?? true,
+        };
+    }
 
     /**
      * Get account by Firebase Auth UID
@@ -30,7 +44,7 @@ export class AccountRepository extends BaseRepository<Account> {
             }
             return {
                 id: doc.id,
-                ...doc.data(),
+                ...this.withAudioSettingsDefaults(doc.data()),
             } as Account;
         } catch (error: any) {
             throw new DatabaseError(`Failed to get account by UID: ${error.message}`);
@@ -57,7 +71,7 @@ export class AccountRepository extends BaseRepository<Account> {
             }
             return {
                 id: doc.id,
-                ...doc.data(),
+                ...this.withAudioSettingsDefaults(doc.data()),
             } as Account;
         } catch (error: any) {
             throw new DatabaseError(`Failed to get account by email: ${error.message}`);
@@ -81,6 +95,8 @@ export class AccountRepository extends BaseRepository<Account> {
                 email: data.email,
                 createdAt: timestamp,
                 updatedAt: timestamp,
+                bgmEnabled: true,
+                sfxEnabled: true,
             };
 
             // Use accountId as document ID for easy lookup
@@ -93,6 +109,36 @@ export class AccountRepository extends BaseRepository<Account> {
             };
         } catch (error: any) {
             throw new DatabaseError(`Failed to create account: ${error.message}`);
+        }
+    }
+
+    /**
+     * Update audio settings (BGM/SFX) for an account. Only patched fields are written.
+     */
+    async updateAudioSettings(
+        accountId: string,
+        patch: { bgmEnabled?: boolean; sfxEnabled?: boolean },
+    ): Promise<Account> {
+        try {
+            const docRef = this.collection.doc(accountId);
+            await docRef.update({
+                ...patch,
+                updatedAt: Date.now(),
+            });
+
+            const doc = await docRef.get();
+            if (!doc.exists) {
+                throw new NotFoundError('account');
+            }
+            return {
+                id: doc.id,
+                ...this.withAudioSettingsDefaults(doc.data()!),
+            } as Account;
+        } catch (error: any) {
+            if (error instanceof NotFoundError) {
+                throw error;
+            }
+            throw new DatabaseError(`Failed to update audio settings: ${error.message}`);
         }
     }
 
