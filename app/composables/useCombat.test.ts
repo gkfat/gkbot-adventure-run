@@ -286,6 +286,76 @@ describe('useCombat — 行動條充能與攻擊動畫揭露同步', () => {
         // 允許一幀（16ms）的取樣誤差，但不能相差到 SKILL_WINDUP_MS 那個量級。
         expect(Math.abs(plateauStartFrame - badgeRevealedAtFrame)).toBeLessThanOrEqual(1);
     });
+
+    it('凍結發生在前一個 wave 時，下一個 wave 的行動條暫停仍要對齊敵人狀態揭露，不能疊加上一個 wave 殘留的暫停量（known-issue.md #1）', () => {
+        // wave 0：enemy1 先對 player 施放一次凍結（觸發 gaugeSchedule 內部
+        // 用來做「全場暫停」的 pauseOffset 累加 SKILL_WINDUP_MS），player 隨後
+        // 攻擊擊敗 enemy1，wave 0 結束。修復前：pauseOffset 這個變數是整個
+        // computed 只宣告一次、從未在換 wave 時歸零，所以即使 wave 1 的
+        // waveStartAt 已經正確承接了 wave 0 的暫停時間，wave 1 每一批事件的
+        // actAt 仍會被再疊加一次 wave 0 遺留的 pauseOffset，跟 schedule（沒有
+        // 這個變數，天生不會有殘留）的時間軸產生落差，且會逐 wave 越差越多。
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 500, wave: 0, actorId: 'enemy1', targetId: 'player', action: 'SKILL', skillId: 'enemy_freeze', skillName: '凍結', statusEffectKind: 'FREEZE', statusDurationSec: 1,
+            },
+            {
+                timestamp: 4000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'ATTACK', damage: 100, targetHpRemaining: 0,
+            },
+            // wave 1：重現跟上一個測試一樣的「凍結 → 行動條暫停對齊狀態揭露」
+            // 情境，差別只在於這是戰鬥的第二個 wave。
+            {
+                timestamp: 1000, wave: 1, actorId: 'enemy2', targetId: 'player', action: 'SKILL', skillId: 'enemy_freeze', skillName: '凍結', statusEffectKind: 'FREEZE', statusDurationSec: 3,
+            },
+            {
+                timestamp: 6000, wave: 1, actorId: 'player', targetId: 'enemy2', action: 'ATTACK', damage: 10, targetHpRemaining: 90,
+            },
+        ];
+        // buildResult() 只放了一隻敵人（enemy1），這裡橫跨兩個 wave、wave 1
+        // 換了一隻新敵人（enemy2），enemyCards 是照 summary.enemies 這份完整
+        // 名冊建的，兩隻都要列進去才能正確追蹤各自的 hpCurrent。
+        const result: CombatApiResult = {
+            ...buildResult(combatLog),
+            summary: {
+                ...buildResult(combatLog).summary,
+                enemies: [
+                    {
+                        enemyId: 'enemy1', name: '測試敵人1', level: 1, hpMax: 100, isBoss: false,
+                    }, {
+                        enemyId: 'enemy2', name: '測試敵人2', level: 1, hpMax: 100, isBoss: false,
+                    },
+                ],
+            },
+        };
+        const combat = useCombat(() => result, () => 100, () => 100);
+
+        let wave0Cleared = false;
+        let badgeRevealedAtFrame = -1;
+        let plateauStartFrame = -1;
+        let prevPercent: number | null = null;
+        for (let i = 0; i < 6000 && (badgeRevealedAtFrame === -1 || plateauStartFrame === -1); i += 1) {
+            advanceFrame(16);
+            const { percent } = combat.playerGauge.value;
+            // wave 1 開始後 enemyCards 只會列出 enemy2（各自獨立的 hp 顯示），
+            // enemy1 死亡那一刻的 hpCurrent === 0 只會出現一瞬間，所以用 latch
+            // 記住「wave 0 已結束」，不能每一幀都重新判斷。
+            if (!wave0Cleared && combat.enemyCards.value.some(enemy => enemy.hpCurrent === 0)) {
+                wave0Cleared = true;
+            }
+            if (badgeRevealedAtFrame === -1 && wave0Cleared && combat.playerStatusBadge.value?.kind === 'FREEZE') {
+                badgeRevealedAtFrame = i;
+            }
+            if (plateauStartFrame === -1 && badgeRevealedAtFrame !== -1
+                && percent !== null && percent > 0 && percent < 100 && percent === prevPercent) {
+                plateauStartFrame = i;
+            }
+            prevPercent = percent;
+        }
+
+        expect(badgeRevealedAtFrame).toBeGreaterThan(0);
+        expect(plateauStartFrame).toBeGreaterThan(0);
+        expect(Math.abs(plateauStartFrame - badgeRevealedAtFrame)).toBeLessThanOrEqual(1);
+    });
 });
 
 describe('useCombat — 技能充能條與觸發演出（character-skills）', () => {

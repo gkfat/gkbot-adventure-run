@@ -840,11 +840,6 @@ export function useCombat(
         const stunnedUntil = new Map<string, number>();
         let prevWave = -1;
         let waveStartAt = 0;
-        // character-skills：技能觸發的 windup 暫停（見 schedule 的同名邏輯）需要
-        // 讓「敵我雙方」的行動間隔都跟著暫停，不能只靠 stunnedUntil（那只影響
-        // 觸發技能那一方自己的目標）。這裡用一個全域累加的 pauseOffset，套用在
-        // 每一批事件的 actAt 上，達成全場暫停的效果。
-        let pauseOffset = 0;
 
         groups.value.forEach((group, index) => {
             if (group.wave !== prevWave) {
@@ -855,21 +850,24 @@ export function useCombat(
                 prevWave = group.wave;
             }
 
-            let actAt = waveStartAt + group.timestamp + pauseOffset;
+            let actAt = waveStartAt + group.timestamp;
             const actorId = group.entries[0]!.actorId;
             const stunEnd = stunnedUntil.get(actorId);
             if (stunEnd !== undefined) actAt = Math.max(actAt, stunEnd);
+            // schedule（行 290）用「本批絕不早於前一批」的全域 monotonic 保底做
+            // 「技能觸發時全場暫停」的效果：本批 windup 只加進自己的 actAt，後面
+            // 批次只有在自己的「本來時間點」早於這個被延後的 actAt 時才會被墊高，
+            // 天生會隨自然間隔「衰減」。gaugeSchedule 原本改用一個全域累加、從不
+            // 衰減的 pauseOffset 疊代做同樣的事，但這會不分青紅皂白地把 offset
+            // 加到「本來就已經晚於暫停結束」的未來事件上（該事件不需要、也不該被
+            // 延後），這個多算出來的落差還會經由 waveStartAt 的公式（承接上一筆
+            // actAt）一路帶進下一個 wave、逐 wave 疊加，導致行動條時間軸跟
+            // schedule（攻擊/受傷揭露時間軸）的落差越拖越大（known-issue.md #1）。
+            // 改成跟 schedule 同一種 Math.max 保底，不再用會一直累加的 pauseOffset。
+            if (index > 0) actAt = Math.max(actAt, result[index - 1]!.actAt);
 
-            // 這一批自己若有技能觸發，windup 暫停要先算進「這一批自己」的 actAt
-            // （不能只累加進 pauseOffset 延後後面的批次）——比照 schedule 的
-            // displayAt += SKILL_WINDUP_MS，讓這筆事件真正生效／揭露的時間點在
-            // 兩條時間軸上定義一致。少了這一步，這一批自己的 actAt 會比 schedule
-            // 對應的 displayAt（受創/效果揭露時間戳）早了 SKILL_WINDUP_MS，充能
-            // 條的暫停窗口起點就會跟畫面上凍結狀態真正出現的時間點對不上（見
-            // 使用者回報：freeze 後行動條充能與敵人受創時間戳斷開）。
             if (group.entries.some(entry => Boolean(entry.skillId))) {
                 actAt += SKILL_WINDUP_MS;
-                pauseOffset += SKILL_WINDUP_MS;
             }
 
             result.push({

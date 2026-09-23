@@ -342,8 +342,10 @@ const formatEffectAtRank = (effect: TalentEffect, rank: number) => {
         return `${percent >= 0 ? '+' : ''}${percent}%`;
     }
     if (effect.stat === 'actionIntervalSec') {
-        // Negative perRank means faster; show as a speed gain (positive reads as "faster").
-        return `${-total >= 0 ? '+' : ''}${(-total).toFixed(2)}s`;
+        // perRank 是負值代表攻擊間隔縮短（變快），直接顯示原始正負號，不要
+        // 反轉——避免「攻速+0.04s」被誤讀成「間隔增加 0.04 秒＝變慢」
+        // （known-issue）。
+        return `${total >= 0 ? '+' : ''}${total.toFixed(2)}s`;
     }
     return `${total >= 0 ? '+' : ''}${total}`;
 };
