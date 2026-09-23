@@ -40,7 +40,7 @@ onMounted(() => {
 watch([initialized, isAuthenticated], ([isInit, isAuth]) => {
     if (isInit || isAuth) {
         if (isAuthenticated.value) {
-            navigateTo('/main', { replace: true });
+            navigateTo('/loading', { replace: true });
         } else {
             navigateTo('/login', { replace: true });
         }

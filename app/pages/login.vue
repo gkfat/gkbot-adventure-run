@@ -85,8 +85,8 @@ watch(
     [isAuthenticated, initialized],
     ([auth, init]) => {
         if (init && auth && !loading.value) {
-            console.log('[login.vue] Auth detected, navigating to /main');
-            navigateTo('/main', { replace: true });
+            console.log('[login.vue] Auth detected, navigating to /loading');
+            navigateTo('/loading', { replace: true });
         }
     },
     { immediate: true },
