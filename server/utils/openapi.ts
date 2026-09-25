@@ -53,6 +53,16 @@ import {
 } from '../../shared/schemas/api/adventure.schema';
 
 import {
+    getLeaderboardRequestSchema,
+    getLeaderboardResponseSchema,
+} from '../../shared/schemas/api/leaderboard.schema';
+
+import {
+    getMailboxResponseSchema,
+    claimMailResponseSchema,
+} from '../../shared/schemas/api/mailbox.schema';
+
+import {
     getInventoryResponseSchema,
     deleteItemResponseSchema,
     sellItemResponseSchema,
@@ -173,6 +183,9 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         ClaimPersistentQuestResponse: claimPersistentQuestResponseSchema,
         GetAchievementsResponse: getAchievementsResponseSchema,
         ClaimAchievementResponse: claimAchievementResponseSchema,
+        GetLeaderboardResponse: getLeaderboardResponseSchema,
+        GetMailboxResponse: getMailboxResponseSchema,
+        ClaimMailResponse: claimMailResponseSchema,
         ErrorResponse: errorResponseSchema,
     };
 
@@ -1215,6 +1228,97 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
         },
     });
 
+    registry.registerPath({
+        method: 'get',
+        path: '/api/character/{characterId}/mailbox',
+        description: 'List the character\'s mail, newest first',
+        tags: ['Mailbox'],
+        security: [{ bearerAuth: [] }],
+        request: { params: z.object({ characterId: z.string() }) },
+        responses: {
+            200: {
+                description: 'Mailbox contents',
+                content: { 'application/json': { schema: getMailboxResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character not found',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/mailbox/{mailId}/claim',
+        description: 'Claim a mail\'s reward (gold/gems/items), marking it claimed',
+        tags: ['Mailbox'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({
+                characterId: z.string(), mailId: z.string(),
+            }),
+        },
+        responses: {
+            200: {
+                description: 'Mail claimed',
+                content: { 'application/json': { schema: claimMailResponseSchema } },
+            },
+            400: {
+                description: 'Inventory is full',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character or mail not found',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            409: {
+                description: 'Mail already claimed',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'get',
+        path: '/api/leaderboard',
+        description: 'Get this season\'s Top-N leaderboard, its end time (seasonEndsAt), and — if characterId is given — that character\'s own rank/entry',
+        tags: ['Leaderboard'],
+        security: [{ bearerAuth: [] }],
+        request: { query: getLeaderboardRequestSchema },
+        responses: {
+            200: {
+                description: 'Leaderboard entries, seasonEndsAt, and (if characterId was given and has a record) its own rank',
+                content: { 'application/json': { schema: getLeaderboardResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'get',
+        path: '/api/cron/leaderboard-season-settle',
+        description: 'Vercel Cron target — settles the leaderboard season that just ended and mails tiered rewards to every ranked character. Not for client use: requires an `Authorization: Bearer <CRON_SECRET>` header instead of Firebase auth',
+        tags: ['Leaderboard'],
+        responses: {
+            200: { description: 'Settlement ran (possibly with zero entries)' },
+            401: {
+                description: 'Missing or invalid CRON_SECRET',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
     return registry;
 }
 
@@ -1266,6 +1370,14 @@ export function generateOpenAPISpec() {
             {
                 name: 'Achievements',
                 description: 'Lifetime-once-per-character achievement progress and claiming',
+            },
+            {
+                name: 'Leaderboard',
+                description: 'Server-wide best-score leaderboard',
+            },
+            {
+                name: 'Mailbox',
+                description: 'Character-scoped mail and reward claiming',
             },
         ],
     });

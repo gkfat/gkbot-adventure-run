@@ -9,7 +9,7 @@ const {
     grantItemMock, equipItemMock, itemGetByIdsMock, itemDeleteByIdsMock,
     inventoryDeleteMock, getByCharacterIdMock, deleteAllByCharacterIdMock, deleteShopsForCharacterMock, updateTalentsMock,
     addEncounteredArchetypeSlugsMock, updateDefeatedArchetypeCountsMock, incrementProgressMock,
-    achievementDeleteAllByCharacterIdMock, questDeleteAllByCharacterIdMock,
+    achievementDeleteAllByCharacterIdMock, questDeleteAllByCharacterIdMock, mailboxSendMock,
 } = vi.hoisted(() => ({
     listByAccountIdMock: vi.fn(),
     createCharacterFromArchetypeMock: vi.fn(),
@@ -29,6 +29,7 @@ const {
     incrementProgressMock: vi.fn(),
     achievementDeleteAllByCharacterIdMock: vi.fn(),
     questDeleteAllByCharacterIdMock: vi.fn(),
+    mailboxSendMock: vi.fn(),
 }));
 
 vi.mock('../repositories/character.repository', () => ({
@@ -106,6 +107,12 @@ vi.mock('../repositories/quest.repository', () => ({
     }),
 }));
 
+vi.mock('./mailbox.service', () => ({
+    MailboxService: vi.fn().mockImplementation(function MailboxServiceMock() {
+        return { send: mailboxSendMock };
+    }),
+}));
+
 describe('CharacterService.getRoster', () => {
     beforeEach(() => {
         listByAccountIdMock.mockReset();
@@ -139,6 +146,7 @@ describe('CharacterService.createCharacterFromArchetype', () => {
         grantItemMock.mockReset();
         equipItemMock.mockReset();
         incrementProgressMock.mockReset();
+        mailboxSendMock.mockReset();
     });
 
     it('credits DISCOVER_FACILITIES for the starting chapter\'s facility theme', async () => {
@@ -168,6 +176,42 @@ describe('CharacterService.createCharacterFromArchetype', () => {
         await service.createCharacterFromArchetype('account-1', 'fighter');
 
         expect(incrementProgressMock).toHaveBeenCalledWith('char-1', 'DISCOVER_FACILITIES', 1);
+    });
+
+    it('sends a welcome mail with the fixed gold/gems reward', async () => {
+        const character = {
+            characterId: 'char-1',
+            accountId: 'account-1',
+            archetypeId: 'fighter',
+            className: '戰士',
+            attributes: {
+                STR: 4, AGI: 1, CON: 4, LUCK: 1,
+            },
+            talentPoints: 0,
+            talents: {},
+            weaponProficiency: {},
+            dualWieldProficiency: {
+                exp: 0, level: 1,
+            },
+            equipment: {},
+        };
+
+        listByAccountIdMock.mockResolvedValue([]);
+        createCharacterFromArchetypeMock.mockResolvedValue(character);
+        getByIdForAccountMock.mockResolvedValue(character);
+        grantItemMock.mockResolvedValue({ itemId: 'item-1' });
+
+        const service = new CharacterService();
+        await service.createCharacterFromArchetype('account-1', 'fighter');
+
+        expect(mailboxSendMock).toHaveBeenCalledWith(
+            'char-1',
+            expect.any(String),
+            expect.any(String),
+            {
+                gold: 300, gems: 5, 
+            },
+        );
     });
 
     it('rejects an unknown archetypeId', async () => {

@@ -189,6 +189,7 @@ export const PRELOAD_IMAGE_PATHS: string[] = [
     '/images/pixel-icons/terminalGloves.png',
     '/images/pixel-icons/tokenRing.png',
     '/images/pixel-icons/tournamentHelm.png',
+    '/images/pixel-icons/treasureChest.png',
     '/images/pixel-icons/tshirt.png',
     '/images/pixel-icons/vrBracer.png',
     '/images/pixel-icons/vrVisor.png',

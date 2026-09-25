@@ -77,6 +77,12 @@ vi.mock('../repositories/quest.repository', () => ({
     }),
 }));
 
+vi.mock('./mailbox.service', () => ({
+    MailboxService: vi.fn().mockImplementation(function MailboxServiceMock() {
+        return { send: vi.fn() };
+    }),
+}));
+
 function fighterCharacter(overrides: Partial<Character> = {}): Character {
     return {
         characterId: 'char-1',

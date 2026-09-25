@@ -14,6 +14,8 @@ import { InventoryService } from './inventory.service';
 import { EquipmentService } from './equipment.service';
 import { ShopService } from './shop.service';
 import { AchievementService } from './achievement.service';
+import { MailboxService } from './mailbox.service';
+import { WELCOME_MAIL } from '../constants/mailbox';
 import { AchievementType } from '../../shared/types/quest';
 import { InventoryRepository } from '../repositories/inventory.repository';
 import { AdventureRunRepository } from '../repositories/adventure-run.repository';
@@ -83,6 +85,7 @@ export class CharacterService extends BaseService {
     private achievementService: AchievementService;
     private achievementRepo: AchievementRepository;
     private questRepo: QuestRepository;
+    private mailboxService: MailboxService;
 
     constructor() {
         super();
@@ -96,6 +99,7 @@ export class CharacterService extends BaseService {
         this.achievementService = new AchievementService();
         this.achievementRepo = new AchievementRepository();
         this.questRepo = new QuestRepository();
+        this.mailboxService = new MailboxService();
     }
 
     /**
@@ -143,6 +147,10 @@ export class CharacterService extends BaseService {
         // count it too (see achievement.ts's targetCount, which now spans
         // the full FACILITY_THEMES list to match).
         await this.achievementService.incrementProgress(character.characterId, AchievementType.DISCOVER_FACILITIES, 1);
+
+        await this.mailboxService.send(character.characterId, WELCOME_MAIL.title, WELCOME_MAIL.body, {
+            gold: WELCOME_MAIL.rewardGold, gems: WELCOME_MAIL.rewardGems,
+        });
 
         const withLoadout = await this.characterRepo.getByIdForAccount(character.characterId, accountId);
         if (!withLoadout) {

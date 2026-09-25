@@ -1,6 +1,6 @@
 <template>
     <div class="fill-height shop-page pa-3">
-        <!-- 每日補給箱：每日限領一次，內容物在領取前保持未知，僅以神祕膠囊示意 -->
+        <!-- 每日補給箱：每日限領一次，內容物在領取前保持未知，以寶箱示意 -->
         <div
             v-if="dailySupply"
             class="shop-page__supply mb-3"
@@ -13,7 +13,7 @@
                         :class="{ 'shop-page__supply-slot--claimed': dailySupply.claimed }"
                     >
                         <GameCommonPixelIcon
-                            name="mysteryCapsule"
+                            name="treasureChest"
                             :size="28"
                         />
                     </div>

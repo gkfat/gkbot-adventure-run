@@ -6,3 +6,4 @@ export * from './adventure';
 export * from './shop';
 export * from './quest';
 export * from './leaderboard';
+export * from './mailbox';

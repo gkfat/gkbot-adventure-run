@@ -5,5 +5,6 @@ export * from './shop.schema';
 export * from './quest.schema';
 export * from './adventure.schema';
 export * from './leaderboard.schema';
+export * from './mailbox.schema';
 export * from './bestiary.schema';
 export * from './character-skill.schema';

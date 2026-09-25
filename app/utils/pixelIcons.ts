@@ -20,4 +20,6 @@ export type PixelIconName =
     | 'chainmailVest' | 'ridingBoots' | 'signetRing'
     | 'scrapDagger' | 'breachPike' | 'riotHalberd' | 'emPistol' | 'laserRifle' | 'pulseCrossbow'
     | 'mysteryCapsule'
-    | 'confirm' | 'cancel';
+    | 'confirm' | 'cancel'
+    | 'treasureChest'
+    | 'trophyGold' | 'trophySilver' | 'trophyBronze';

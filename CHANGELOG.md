@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 實作走路動畫
 - 實作音效與 bgm
 - 實作排行榜功能與賽季結算
+- 實作角色信箱功能，可領取信件內獎勵（金幣/鑽石/道具）
 
 ### Changed
 
