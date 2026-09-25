@@ -4,11 +4,11 @@ import {
 
 import { LeaderboardRunUpdater } from './leaderboard-run-updater';
 
-const { updateIfBetterMock } = vi.hoisted(() => ({ updateIfBetterMock: vi.fn() }));
+const { addRunScoreMock } = vi.hoisted(() => ({ addRunScoreMock: vi.fn() }));
 
 vi.mock('./leaderboard.service', () => ({
     LeaderboardService: class {
-        updateIfBetter = updateIfBetterMock;
+        addRunScore = addRunScoreMock;
     },
 }));
 
@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 
 describe('LeaderboardRunUpdater (leaderboard-season)', () => {
-    it('implements LeaderboardUpdater by delegating straight to LeaderboardService.updateIfBetter', async () => {
+    it('implements LeaderboardUpdater by delegating straight to LeaderboardService.addRunScore', async () => {
         const updater = new LeaderboardRunUpdater();
         const entry = {
             accountId: 'account-1',
@@ -28,8 +28,8 @@ describe('LeaderboardRunUpdater (leaderboard-season)', () => {
             meta: { killCount: 7 },
         };
 
-        await updater.updateIfBetter(entry);
+        await updater.addRunScore(entry);
 
-        expect(updateIfBetterMock).toHaveBeenCalledWith(entry);
+        expect(addRunScoreMock).toHaveBeenCalledWith(entry);
     });
 });

@@ -21,7 +21,7 @@ const {
     addItemMock, removeItemMock,
     rngNextMock, combatResolveMock,
     selectEventMock, eventResolveMock, generateCandidatesMock,
-    incrementProgressMock, leaderboardUpdateIfBetterMock,
+    incrementProgressMock, leaderboardAddRunScoreMock,
 } = vi.hoisted(() => ({
     getActiveByCharacterIdMock: vi.fn(),
     createRunMock: vi.fn(),
@@ -41,7 +41,7 @@ const {
     eventResolveMock: vi.fn(),
     generateCandidatesMock: vi.fn(),
     incrementProgressMock: vi.fn(),
-    leaderboardUpdateIfBetterMock: vi.fn(),
+    leaderboardAddRunScoreMock: vi.fn(),
 }));
 
 vi.mock('./combat.service', async (importOriginal) => {
@@ -79,7 +79,7 @@ vi.mock('./progress-tracker.service', () => ({
 
 vi.mock('./leaderboard-run-updater', () => ({
     LeaderboardRunUpdater: vi.fn().mockImplementation(function LeaderboardRunUpdaterMock() {
-        return { updateIfBetter: leaderboardUpdateIfBetterMock };
+        return { addRunScore: leaderboardAddRunScoreMock };
     }),
 }));
 
@@ -961,28 +961,29 @@ describe('AdventureRunService.resolveCombat', () => {
             blessingPointsGained: 0,
             enemies: [
                 {
-                    enemyId: 'e1', name: 'Test Enemy', level: 5, 
+                    enemyId: 'e1', name: 'Test Enemy', level: 5,
                 },
             ],
+            defeatedCount: 2,
             combatLog: [],
             finalRngIndex: 1,
         });
         settleRunRewardsMock.mockResolvedValue({
             character: {
-                level: 1, nickname: '玩家A', 
+                level: 1, nickname: '玩家A',
             }, leveledUp: false, unspentAttributePointsGained: 0,
         });
 
         const service = new AdventureRunService();
         await service.resolveCombat('account-1', 'char-1');
 
-        expect(leaderboardUpdateIfBetterMock).toHaveBeenCalledWith({
+        expect(leaderboardAddRunScoreMock).toHaveBeenCalledWith({
             accountId: 'account-1',
             characterId: 'char-1',
             nickname: '玩家A',
-            score: 4,
+            score: 6,
             runId: 'run-1',
-            meta: { killCount: 4 },
+            meta: { killCount: 6 },
         });
     });
 });

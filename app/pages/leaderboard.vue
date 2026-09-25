@@ -86,6 +86,26 @@
                     <span v-else class="font-pixel">{{ index + 1 }}</span>
                 </span>
                 <span class="leaderboard-row__nickname flex-grow-1 text-body-2">{{ entry.nickname }}</span>
+                <span
+                    v-if="entry.rewardGems > 0"
+                    class="leaderboard-row__reward d-flex align-center ga-1 flex-shrink-0"
+                >
+                    <GameCommonCurrencyIcon
+                        type="GEMS"
+                        :size="11"
+                    />
+                    <span class="font-pixel text-caption">{{ entry.rewardGems }}</span>
+                </span>
+                <span
+                    v-if="entry.rewardGold > 0"
+                    class="leaderboard-row__reward d-flex align-center ga-1 flex-shrink-0"
+                >
+                    <GameCommonCurrencyIcon
+                        type="GOLD"
+                        :size="11"
+                    />
+                    <span class="font-pixel text-caption">{{ entry.rewardGold }}</span>
+                </span>
                 <span class="leaderboard-row__score font-pixel flex-shrink-0">{{ entry.score }}</span>
             </div>
         </div>
@@ -109,6 +129,26 @@
                 <span v-else class="font-pixel">{{ myRank }}</span>
             </span>
             <span class="leaderboard-row__nickname flex-grow-1 text-body-2">{{ myEntry.nickname }}</span>
+            <span
+                v-if="myEntry.rewardGems > 0"
+                class="leaderboard-row__reward d-flex align-center ga-1 flex-shrink-0"
+            >
+                <GameCommonCurrencyIcon
+                    type="GEMS"
+                    :size="11"
+                />
+                <span class="font-pixel text-caption">{{ myEntry.rewardGems }}</span>
+            </span>
+            <span
+                v-if="myEntry.rewardGold > 0"
+                class="leaderboard-row__reward d-flex align-center ga-1 flex-shrink-0"
+            >
+                <GameCommonCurrencyIcon
+                    type="GOLD"
+                    :size="11"
+                />
+                <span class="font-pixel text-caption">{{ myEntry.rewardGold }}</span>
+            </span>
             <span class="leaderboard-row__score font-pixel flex-shrink-0">{{ myEntry.score }}</span>
         </div>
     </div>
@@ -228,6 +268,13 @@ onUnmounted(stopCountdown);
 
     &__score {
         color: rgb(var(--v-theme-green));
+    }
+
+    &__reward {
+        padding: 3px 6px;
+        background: rgba(196, 203, 219, 0.06);
+        border: 1px solid rgba(196, 203, 219, 0.18);
+        border-radius: 3px;
     }
 }
 </style>

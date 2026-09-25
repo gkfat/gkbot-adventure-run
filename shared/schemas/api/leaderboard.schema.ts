@@ -14,14 +14,21 @@ export const getLeaderboardRequestSchema = z.object({
     characterId: z.string().optional(),
 }).strict();
 
+// 附上該名次的賽季結算獎勵（僅顯示用，不落地儲存）——見
+// server/constants/leaderboardSeason.ts。
+const leaderboardEntryWithRewardSchema = leaderboardEntrySchema.extend({
+    rewardGold: z.number().int().min(0),
+    rewardGems: z.number().int().min(0),
+});
+
 export const getLeaderboardResponseSchema = z.object({
     success: z.boolean(),
     data: z.object({
-        entries: z.array(leaderboardEntrySchema),
+        entries: z.array(leaderboardEntryWithRewardSchema),
         total: z.number(),
         seasonEndsAt: z.number(),
         myRank: z.number().optional(),
-        myEntry: leaderboardEntrySchema.optional(),
+        myEntry: leaderboardEntryWithRewardSchema.optional(),
     }),
 });
 

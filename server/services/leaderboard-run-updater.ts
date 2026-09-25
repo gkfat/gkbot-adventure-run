@@ -12,7 +12,7 @@ import { LeaderboardService } from './leaderboard.service';
 export class LeaderboardRunUpdater implements LeaderboardUpdater {
     private leaderboardService = new LeaderboardService();
 
-    async updateIfBetter(entry: {
+    async addRunScore(entry: {
         accountId: string;
         characterId: string;
         nickname: string;
@@ -20,6 +20,6 @@ export class LeaderboardRunUpdater implements LeaderboardUpdater {
         runId: string;
         meta?: { step?: number; killCount?: number };
     }): Promise<void> {
-        await this.leaderboardService.updateIfBetter(entry);
+        await this.leaderboardService.addRunScore(entry);
     }
 }

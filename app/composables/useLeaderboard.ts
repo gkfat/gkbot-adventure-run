@@ -8,6 +8,8 @@ export type LeaderboardEntryView = {
     achievedAt: number;
     step?: number;
     killCount?: number;
+    rewardGold: number;
+    rewardGems: number;
 };
 
 interface GetLeaderboardResponse {
@@ -36,7 +38,8 @@ const now = ref(Date.now());
  * 取得本賽季排行榜（GET /api/leaderboard）與自己的名次，並提供賽季倒數
  * （見 openspec/changes/leaderboard-season）。倒數一律以伺服器回傳的
  * seasonEndsAt 為準，前端只做「目前時間到 seasonEndsAt 的差值」顯示，
- * 不自行重算週邊界規則。
+ * 不自行重算週邊界規則。startCountdown 同時啟動每 60 秒的榜單輪詢
+ * （fetchLeaderboard），stopCountdown 會一併停止。
  */
 export const useLeaderboard = () => {
     const api = useApi();
@@ -68,11 +71,16 @@ export const useLeaderboard = () => {
     };
 
     let timer: ReturnType<typeof setInterval> | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
 
     const stopCountdown = () => {
         if (timer) {
             clearInterval(timer);
             timer = null;
+        }
+        if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
         }
     };
 
@@ -82,6 +90,9 @@ export const useLeaderboard = () => {
         timer = setInterval(() => {
             now.value = Date.now();
         }, 1000);
+        pollTimer = setInterval(() => {
+            fetchLeaderboard();
+        }, 60 * 1000);
     };
 
     onUnmounted(stopCountdown);

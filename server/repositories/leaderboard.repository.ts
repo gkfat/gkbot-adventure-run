@@ -3,8 +3,9 @@
  * Handles Firestore operations for the leaderboardEntries collection.
  *
  * One document per (season, character) — doc id = `{seasonId}_{characterId}`
- * (see leaderboard-season/design.md), holding that character's best score
- * for that season only. A new season's first write always lands on a
+ * (see leaderboard-season/design.md), holding that character's cumulative
+ * score for that season only — the sum of every settled run's enemiesDefeated,
+ * not just its best run. A new season's first write always lands on a
  * fresh doc, so reset falls out of the doc-id scheme for free.
  */
 
@@ -37,11 +38,15 @@ export class LeaderboardRepository extends BaseRepository<LeaderboardEntry> {
     }
 
     /**
-     * Write `entry` only if it beats the character's existing entry for
-     * `entry.seasonId` (or none exists yet). Runs inside a transaction so a
-     * concurrent write can't overwrite a higher score with a lower one.
+     * Add one run's contribution onto the character's season total: `score`
+     * (and `killCount`, if given) are summed onto whatever's already there
+     * (or start from 0 if this is the character's first entry this season);
+     * `nickname`/`runId`/`achievedAt`/`step` are overwritten with this run's
+     * values (a "most recently contributing run" snapshot, not accumulated).
+     * Runs inside a transaction so concurrent settlements can't clobber each
+     * other's contribution.
      */
-    async upsertIfHigher(entry: LeaderboardEntry): Promise<LeaderboardEntry> {
+    async addScore(entry: LeaderboardEntry): Promise<LeaderboardEntry> {
         const docRef = this.getDocumentRef(docId(entry.seasonId, entry.characterId));
 
         try {
@@ -49,16 +54,20 @@ export class LeaderboardRepository extends BaseRepository<LeaderboardEntry> {
                 const doc = await tx.get(docRef);
                 const current = doc.exists ? (doc.data() as LeaderboardEntry) : null;
 
-                if (current && current.score >= entry.score) {
-                    return current;
-                }
+                const next: LeaderboardEntry = {
+                    ...entry,
+                    score: (current?.score ?? 0) + entry.score,
+                    ...(entry.killCount !== undefined
+                        ? { killCount: (current?.killCount ?? 0) + entry.killCount }
+                        : {}),
+                };
 
-                tx.set(docRef, entry);
-                return entry;
+                tx.set(docRef, next);
+                return next;
             });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Unknown error';
-            throw new DatabaseError(`Failed to upsert leaderboard entry: ${message}`);
+            throw new DatabaseError(`Failed to add to leaderboard entry: ${message}`);
         }
     }
 

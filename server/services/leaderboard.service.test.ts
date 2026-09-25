@@ -6,12 +6,12 @@ import { LeaderboardService } from './leaderboard.service';
 import type { LeaderboardEntry } from '../../shared/types/leaderboard';
 
 const {
-    getTopNMock, countHigherThanMock, getMock, upsertIfHigherMock,
+    getTopNMock, countHigherThanMock, getMock, addScoreMock,
 } = vi.hoisted(() => ({
     getTopNMock: vi.fn(),
     countHigherThanMock: vi.fn(),
     getMock: vi.fn(),
-    upsertIfHigherMock: vi.fn(),
+    addScoreMock: vi.fn(),
 }));
 
 vi.mock('../repositories/leaderboard.repository', () => ({
@@ -19,7 +19,7 @@ vi.mock('../repositories/leaderboard.repository', () => ({
         getTopN = getTopNMock;
         countHigherThan = countHigherThanMock;
         get = getMock;
-        upsertIfHigher = upsertIfHigherMock;
+        addScore = addScoreMock;
     },
 }));
 
@@ -40,12 +40,12 @@ beforeEach(() => {
     vi.clearAllMocks();
 });
 
-describe('LeaderboardService.updateIfBetter (leaderboard)', () => {
-    it('builds an entry with a fresh achievedAt + current seasonId and delegates to upsertIfHigher', async () => {
-        upsertIfHigherMock.mockImplementation((e: LeaderboardEntry) => e);
+describe('LeaderboardService.addRunScore (leaderboard)', () => {
+    it('builds an entry with a fresh achievedAt + current seasonId and delegates to addScore', async () => {
+        addScoreMock.mockImplementation((e: LeaderboardEntry) => e);
 
         const service = new LeaderboardService();
-        const result = await service.updateIfBetter({
+        const result = await service.addRunScore({
             accountId: 'account-1',
             characterId: 'char-1',
             nickname: '玩家A',
@@ -56,7 +56,7 @@ describe('LeaderboardService.updateIfBetter (leaderboard)', () => {
             },
         });
 
-        expect(upsertIfHigherMock).toHaveBeenCalledWith(expect.objectContaining({
+        expect(addScoreMock).toHaveBeenCalledWith(expect.objectContaining({
             seasonId: expect.any(String),
             accountId: 'account-1', score: 250, runId: 'run-9', step: 12, killCount: 30,
         }));
@@ -64,10 +64,10 @@ describe('LeaderboardService.updateIfBetter (leaderboard)', () => {
     });
 
     it('omits step/killCount entirely (not as undefined) when meta is not given — Firestore rejects explicit undefined field values', async () => {
-        upsertIfHigherMock.mockImplementation((e: LeaderboardEntry) => e);
+        addScoreMock.mockImplementation((e: LeaderboardEntry) => e);
 
         const service = new LeaderboardService();
-        await service.updateIfBetter({
+        await service.addRunScore({
             accountId: 'account-1',
             characterId: 'char-1',
             nickname: '玩家A',
@@ -75,7 +75,7 @@ describe('LeaderboardService.updateIfBetter (leaderboard)', () => {
             runId: 'run-1',
         });
 
-        const written = upsertIfHigherMock.mock.calls[0][0];
+        const written = addScoreMock.mock.calls[0][0];
         expect('step' in written).toBe(false);
         expect('killCount' in written).toBe(false);
     });
@@ -125,6 +125,9 @@ describe('LeaderboardService.getLeaderboard (leaderboard)', () => {
         expect(countHigherThanMock).toHaveBeenNthCalledWith(2, expect.any(String), 150);
         expect(result.total).toBe(5);
         expect(result.myRank).toBe(2);
-        expect(result.myEntry).toEqual(myEntry);
+        // rank 2 falls in the TOP_2_TO_3 reward tier (see server/constants/leaderboardSeason.ts)
+        expect(result.myEntry).toEqual({
+            ...myEntry, rewardGold: 300, rewardGems: 12,
+        });
     });
 });

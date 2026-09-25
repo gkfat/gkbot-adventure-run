@@ -474,10 +474,15 @@ export class AdventureRunService extends BaseService {
             };
         }
 
+        // 這場致死戰鬥死前擊殺的敵人也要算進累積擊殺數（leaderboard-season 分數
+        // 來源），否則死亡結束的 run 會少算最後一場戰鬥的擊殺（known-issue.md 排行榜
+        // 分數 bug）。
+        const enemiesDefeated = run.enemiesDefeated + resolution.defeatedCount;
         const { settlement } = await this.settleRun({
-            ...run, playerHp: 0,
+            ...run, playerHp: 0, enemiesDefeated,
         }, AdventureEndReason.DEAD, {
             playerHp: 0,
+            enemiesDefeated,
             lastCombatSummary: summary,
             rngIndex: resolution.finalRngIndex,
             rewardRngIndex: resolution.finalRewardRngIndex,
@@ -927,11 +932,12 @@ export class AdventureRunService extends BaseService {
             goldEarned, gemsEarned, expGained, endReason,
         });
 
-        // Score is the run's cumulative enemies-defeated count (see
-        // leaderboard-season/design.md), same "always call regardless of
-        // endReason" behavior as expEarned above — a DEAD/DISCONNECT run
-        // still counts whatever it defeated before ending.
-        await this.leaderboardUpdater.updateIfBetter({
+        // This run's enemies-defeated count is added onto the character's
+        // season-cumulative leaderboard score (see leaderboard-season/design.md),
+        // same "always call regardless of endReason" behavior as expEarned
+        // above — a DEAD/DISCONNECT run still counts whatever it defeated
+        // before ending.
+        await this.leaderboardUpdater.addRunScore({
             accountId: run.accountId,
             characterId: run.characterId,
             nickname: character.nickname,
@@ -969,6 +975,7 @@ export class AdventureRunService extends BaseService {
             forfeitedGold: isSuccess ? 0 : run.goldEarned,
             forfeitedGems: isSuccess ? 0 : run.gemsEarned,
             forfeitedItems: isSuccess ? [] : run.runInventory,
+            enemiesDefeated: run.enemiesDefeated,
             skillFragmentsGained: run.skillFragmentsEarned ?? {},
             chapterAdvanced,
         };

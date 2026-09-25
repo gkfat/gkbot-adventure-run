@@ -61,6 +61,11 @@ export const combatSummarySchema = z.object({
         // results always populate it.
         archetypeSlug: z.string().optional(),
     })),
+    // Enemies actually defeated this combat, independent of victory/defeat
+    // (leaderboard-season). Optional to tolerate historical lastCombatSummary
+    // docs written before this field existed — newly produced combat results
+    // always populate it (same pattern as archetypeSlug above).
+    defeatedCount: z.number().int().min(0).optional(),
     completedAt: z.number(),
 }).strict();
 
@@ -80,6 +85,12 @@ export const settleSummarySchema = z.object({
     forfeitedGold: z.number().int().min(0),
     forfeitedGems: z.number().int().min(0),
     forfeitedItems: z.array(itemInstanceSchema),
+    // 這趟 run 累計擊殺數（leaderboard-season 分數來源），不受 endReason
+    // 影響——DEAD/DISCONNECT 結束時死前的擊殺一樣算進來，見
+    // shared/types/adventure.ts SettleSummary.enemiesDefeated 註解。Optional
+    // 只是為了容忍這個欄位新增前就已經結算、存進 Firestore 的舊 run 文件
+    // （current.get.ts 可能重新讀到），新產生的結算一律會帶這個欄位。
+    enemiesDefeated: z.number().int().min(0).optional(),
     // Character-skills 戰鬥掉落累計（known-issue.md #3），見
     // shared/types/adventure.ts SettleSummary.skillFragmentsGained 註解。
     skillFragmentsGained: z.record(z.string(), z.number().int().min(0)),

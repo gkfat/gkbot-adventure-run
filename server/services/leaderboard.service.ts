@@ -1,19 +1,20 @@
 /**
  * Leaderboard Service
  *
- * Query-heavy, write-rare (only when a run's settlement beats the
- * character's existing best-this-season): see design.md. `updateIfBetter`
- * is called by the adventure-run-core run settlement flow, not by this
- * change.
+ * Query-heavy, write-rare (once per run settlement, adding that run's
+ * enemiesDefeated onto the character's season-cumulative score): see
+ * design.md. `addRunScore` is called by the adventure-run-core run
+ * settlement flow, not by this change.
  */
 
 import { BaseService } from './base.service';
 import { LeaderboardRepository } from '../repositories/leaderboard.repository';
 import {
-    getCurrentSeasonId, getSeasonEndsAt, 
+    getCurrentSeasonId, getSeasonEndsAt,
 } from '../utils/season';
+import { getSeasonRewardForRank } from '../constants/leaderboardSeason';
 import type {
-    LeaderboardEntry, LeaderboardResult,
+    LeaderboardEntry, LeaderboardEntryWithReward, LeaderboardResult,
 } from '../../shared/types/leaderboard';
 
 export class LeaderboardService extends BaseService {
@@ -21,11 +22,11 @@ export class LeaderboardService extends BaseService {
     private leaderboardRepo = new LeaderboardRepository();
 
     /**
-     * Update the character's leaderboard entry for the current season if
-     * `score` beats its existing best this season (or it has none yet).
-     * No-op (returns the unchanged entry) otherwise.
+     * Add this run's `score` (enemiesDefeated) onto the character's
+     * cumulative leaderboard total for the current season (starting from 0
+     * if it has no entry yet).
      */
-    async updateIfBetter(entry: {
+    async addRunScore(entry: {
         accountId: string;
         characterId: string;
         nickname: string;
@@ -48,7 +49,14 @@ export class LeaderboardService extends BaseService {
             ...(entry.meta?.killCount !== undefined ? { killCount: entry.meta.killCount } : {}),
         };
 
-        return this.leaderboardRepo.upsertIfHigher(candidate);
+        return this.leaderboardRepo.addScore(candidate);
+    }
+
+    private static withReward(entry: LeaderboardEntry, rank: number): LeaderboardEntryWithReward {
+        return {
+            ...entry,
+            ...getSeasonRewardForRank(rank),
+        };
     }
 
     /**
@@ -71,16 +79,18 @@ export class LeaderboardService extends BaseService {
             requesterCharacterId ? this.leaderboardRepo.get(seasonId, requesterCharacterId) : Promise.resolve(null),
         ]);
 
+        const entriesWithReward = entries.map((entry, index) => LeaderboardService.withReward(entry, index + 1));
+
         if (!myEntry) {
             return {
-                entries, total, seasonEndsAt,
+                entries: entriesWithReward, total, seasonEndsAt,
             };
         }
 
         const myRank = await this.leaderboardRepo.countHigherThan(seasonId, myEntry.score) + 1;
 
         return {
-            entries, total, seasonEndsAt, myRank, myEntry,
+            entries: entriesWithReward, total, seasonEndsAt, myRank, myEntry: LeaderboardService.withReward(myEntry, myRank),
         };
     }
 }

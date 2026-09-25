@@ -187,6 +187,13 @@ export type CombatResult = {
     // produced combat results always populate it (design.md D4).
     archetypeSlug?: string;
   }>;
+
+  // Enemies actually defeated this combat, independent of victory/defeat
+  // (a losing fight can still have killed some enemies before the player
+  // died) — used by the caller to accumulate `AdventureRun.enemiesDefeated`
+  // for the leaderboard score (leaderboard-season), unlike `enemies` above
+  // which is every enemy encountered regardless of outcome.
+  defeatedCount: number;
 };
 
 /**
@@ -303,7 +310,7 @@ export type EventResolver = {
  * (same pattern as CombatResolver/EventResolver — see design.md).
  */
 export type LeaderboardUpdater = {
-  updateIfBetter(entry: {
+  addRunScore(entry: {
     accountId: string;
     characterId: string;
     nickname: string;
@@ -345,6 +352,14 @@ export type SettleSummary = {
   forfeitedGold: number;
   forfeitedGems: number;
   forfeitedItems: ItemInstance[];
+
+  // This run's cumulative enemies-defeated count (leaderboard-season score
+  // source), independent of endReason — a DEAD/DISCONNECT ending still
+  // counts whatever it killed before ending. Optional only to tolerate
+  // settlement docs written before this field existed (current.get.ts can
+  // re-read an already-ended run); newly produced settlements always
+  // populate it.
+  enemiesDefeated?: number;
 
   // Character-skills 戰鬥掉落累計（known-issue.md #3）：這整趟 run 累計掉落的
   // 技能碎片，不受 endReason 影響（碎片掉落當下已直接寫入角色文件，不像
@@ -490,8 +505,9 @@ export type AdventureRun = {
   skillFragmentsEarned?: Record<string, number>;
 
   // Cumulative enemies defeated this run (leaderboard-season: fed to
-  // LeaderboardUpdater.updateIfBetter as `score` at settlement, same
-  // accumulate-via-checkpoint pattern as expEarned).
+  // LeaderboardUpdater.addRunScore as `score` at settlement — added onto the
+  // character's season-cumulative leaderboard total, not compared against
+  // it — same accumulate-via-checkpoint pattern as expEarned).
   enemiesDefeated: number;
 
   // Combat/event history (optional, for anti-cheat)

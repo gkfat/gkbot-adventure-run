@@ -109,20 +109,20 @@ describe('LeaderboardRepository.get (leaderboard)', () => {
     });
 });
 
-describe('LeaderboardRepository.upsertIfHigher (leaderboard)', () => {
-    it('writes to a doc id combining seasonId and characterId', async () => {
+describe('LeaderboardRepository.addScore (leaderboard)', () => {
+    it('writes to a doc id combining seasonId and characterId, starting from 0 when no entry exists yet', async () => {
         txGetMock.mockResolvedValue({ exists: false });
 
         const repo = new LeaderboardRepository();
         const candidate = entry({ score: 100 });
-        const result = await repo.upsertIfHigher(candidate);
+        const result = await repo.addScore(candidate);
 
         expect(docMock).toHaveBeenCalledWith('2026-W39_char-1');
         expect(txSetMock).toHaveBeenCalledWith(expect.objectContaining({ id: '2026-W39_char-1' }), candidate);
         expect(result).toEqual(candidate);
     });
 
-    it('writes the new entry when its score beats the existing one', async () => {
+    it('adds the new score onto the existing cumulative score', async () => {
         const existing = entry({
             score: 100, runId: 'run-old',
         });
@@ -132,58 +132,62 @@ describe('LeaderboardRepository.upsertIfHigher (leaderboard)', () => {
 
         const repo = new LeaderboardRepository();
         const candidate = entry({
-            score: 150, runId: 'run-new',
+            score: 50, runId: 'run-new',
         });
-        const result = await repo.upsertIfHigher(candidate);
+        const result = await repo.addScore(candidate);
 
-        expect(txSetMock).toHaveBeenCalledWith(expect.objectContaining({ id: '2026-W39_char-1' }), candidate);
-        expect(result).toEqual(candidate);
+        const expected = {
+            ...candidate, score: 150,
+        };
+        expect(txSetMock).toHaveBeenCalledWith(expect.objectContaining({ id: '2026-W39_char-1' }), expected);
+        expect(result).toEqual(expected);
     });
 
-    it('leaves the existing entry unchanged when the new score is lower', async () => {
+    it('overwrites nickname/runId/achievedAt/step with the contributing run\'s values (a snapshot, not accumulated)', async () => {
         const existing = entry({
-            score: 200, runId: 'run-best',
+            score: 100, runId: 'run-old', nickname: '舊暱稱', step: 5,
         });
         txGetMock.mockResolvedValue({
             exists: true, data: () => existing,
         });
 
         const repo = new LeaderboardRepository();
-        const result = await repo.upsertIfHigher(entry({
-            score: 100, runId: 'run-worse',
-        }));
+        const candidate = entry({
+            score: 10, runId: 'run-new', nickname: '新暱稱', step: 9,
+        });
+        const result = await repo.addScore(candidate);
 
-        expect(txSetMock).not.toHaveBeenCalled();
-        expect(result).toEqual(existing);
+        expect(result.runId).toBe('run-new');
+        expect(result.nickname).toBe('新暱稱');
+        expect(result.step).toBe(9);
     });
 
-    it('leaves the existing entry unchanged when the new score ties it', async () => {
+    it('sums killCount onto the existing cumulative killCount when given', async () => {
         const existing = entry({
-            score: 200, runId: 'run-best',
+            score: 100, killCount: 40,
         });
         txGetMock.mockResolvedValue({
             exists: true, data: () => existing,
         });
 
         const repo = new LeaderboardRepository();
-        const result = await repo.upsertIfHigher(entry({
-            score: 200, runId: 'run-tie',
+        const result = await repo.addScore(entry({
+            score: 10, killCount: 4,
         }));
 
-        expect(txSetMock).not.toHaveBeenCalled();
-        expect(result).toEqual(existing);
+        expect(result.killCount).toBe(44);
     });
 
-    it('does not carry a higher score over from a different season (fresh doc id resets it)', async () => {
+    it('does not carry a score over from a different season (fresh doc id resets it)', async () => {
         // A new season's doc simply doesn't exist yet — the previous season's
-        // higher score lives under a different doc id and is never read here.
+        // score lives under a different doc id and is never read here.
         txGetMock.mockResolvedValue({ exists: false });
 
         const repo = new LeaderboardRepository();
         const candidate = entry({
-            seasonId: '2026-W40', score: 10, 
+            seasonId: '2026-W40', score: 10,
         });
-        const result = await repo.upsertIfHigher(candidate);
+        const result = await repo.addScore(candidate);
 
         expect(docMock).toHaveBeenCalledWith('2026-W40_char-1');
         expect(txSetMock).toHaveBeenCalledWith(expect.objectContaining({ id: '2026-W40_char-1' }), candidate);

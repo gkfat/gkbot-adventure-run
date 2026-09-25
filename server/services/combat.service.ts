@@ -653,6 +653,7 @@ export class CombatService extends BaseService implements CombatResolver {
             enemies: disambiguateEnemyNames(encountered).map(enemy => ({
                 enemyId: enemy.id, name: enemy.name, level: enemy.level as number, hpMax: enemy.hpMax, isBoss: enemy.isBoss, archetypeSlug: enemy.archetypeSlug,
             })),
+            defeatedCount: defeated.length,
             combatLog,
             finalRngIndex: cursor.index,
             finalRewardRngIndex: rewardCursor.index,
