@@ -33,24 +33,22 @@
                 {{ settlementIsSuccess ? '探索完成' : '探索失敗' }}
             </div>
 
+            <!-- 等級／經驗面板：LV 與 EXP 進度條一律顯示（不只升級時），LEVEL UP!
+                 字樣才是升級限定的裝飾，跟下方獲得總覽分開成獨立 panel。 -->
             <div
-                v-if="lastSettlement.leveledUp"
-                class="adventure-page__levelup mb-4 text-center"
+                class="adventure-page__box adventure-page__levelup mb-3 text-center"
+                :class="{ 'adventure-page__levelup--active': lastSettlement.leveledUp }"
+                style="width: 100%;"
             >
-                <div class="font-pixel text-h6" style="color: rgb(var(--v-theme-warning));">
+                <div
+                    v-if="lastSettlement.leveledUp"
+                    class="font-pixel text-h6 mb-1"
+                    style="color: rgb(var(--v-theme-warning));"
+                >
                     LEVEL UP!
                 </div>
-                <div class="text-body-2 text-medium-emphasis">
+                <div class="text-body-2 text-medium-emphasis mb-2">
                     LV {{ lastSettlement.newLevel }}
-                </div>
-            </div>
-
-            <div class="adventure-page__box mb-3" style="width: 100%;">
-                <div class="d-flex align-center justify-space-between mb-1">
-                    <span class="text-caption text-medium-emphasis">EXP</span>
-                    <span class="font-pixel text-caption" style="color: rgb(var(--v-theme-primary));">
-                        +{{ lastSettlement.expGained }}
-                    </span>
                 </div>
                 <v-progress-linear
                     :model-value="expDisplayPercent"
@@ -61,32 +59,59 @@
                 />
             </div>
 
+            <!-- 獲得總覽：比照探索過程中上方面板的視覺語彙（label/value 一行），
+                 但改為每項獨立一列（而非 v-row/v-col 多欄 grid），道具/碎片明細
+                 （名稱、稀有度）是結算頁才需要的細節，附加在清單下方。 -->
             <div class="adventure-page__box mb-3" style="width: 100%;">
-                <div class="d-flex ga-4 mb-2">
-                    <span class="text-caption text-medium-emphasis">
-                        金幣
-                        <span class="font-pixel" style="color: #e0c063;">+{{ lastSettlement.goldEarned }}</span>
-                    </span>
-                    <span class="text-caption text-medium-emphasis">
-                        寶石
-                        <span class="font-pixel" style="color: rgb(var(--v-theme-primary));">+{{ lastSettlement.gemsEarned }}</span>
-                    </span>
+                <div class="adventure-page__loot-stat-row d-flex align-center justify-space-between">
+                    <div class="text-caption text-medium-emphasis">EXP</div>
+                    <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
+                        +{{ lastSettlement.expGained }}
+                    </div>
                 </div>
-                <div class="text-caption text-medium-emphasis mb-1">
+                <div class="adventure-page__loot-stat-row d-flex align-center justify-space-between">
+                    <div class="text-caption text-medium-emphasis">金幣</div>
+                    <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
+                        +{{ lastSettlement.goldEarned }}
+                    </div>
+                </div>
+                <div class="adventure-page__loot-stat-row d-flex align-center justify-space-between">
+                    <div class="text-caption text-medium-emphasis">寶石</div>
+                    <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
+                        +{{ lastSettlement.gemsEarned }}
+                    </div>
+                </div>
+                <div class="adventure-page__loot-stat-row d-flex align-center justify-space-between">
+                    <div class="text-caption text-medium-emphasis">道具</div>
+                    <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
+                        x{{ lastSettlement.items.length }}
+                    </div>
+                </div>
+                <div class="adventure-page__loot-stat-row d-flex align-center justify-space-between">
+                    <div class="text-caption text-medium-emphasis">技能碎片</div>
+                    <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
+                        x{{ settlementSkillFragmentTotal }}
+                    </div>
+                </div>
+                <div class="adventure-page__loot-stat-row d-flex align-center justify-space-between">
+                    <div class="text-caption text-medium-emphasis">擊殺數</div>
+                    <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
+                        {{ lastSettlement.enemiesDefeated ?? 0 }}
+                    </div>
+                </div>
+
+                <div class="text-caption text-medium-emphasis mb-1 mt-3">
                     獲得道具
                 </div>
-                <div
-                    v-if="lastSettlement.items.length"
-                    class="d-flex flex-wrap ga-2"
-                >
+                <div v-if="lastSettlement.items.length">
                     <div
                         v-for="item in lastSettlement.items"
                         :key="item.itemId"
-                        class="adventure-page__item-chip d-inline-flex align-center"
+                        class="adventure-page__item-row d-flex align-center ga-2"
                         :style="{ borderColor: RARITY_COLOR[item.rarity] }"
                     >
                         <span
-                            class="adventure-page__item-chip-rarity font-pixel"
+                            class="adventure-page__item-row-rarity font-pixel flex-shrink-0"
                             :style="{ background: RARITY_COLOR[item.rarity] }"
                         >
                             {{ item.rarity }}
@@ -95,7 +120,7 @@
                             :name="resolvePixelIcon(item)"
                             :size="20"
                         />
-                        {{ describeItem(item).name }}
+                        <span class="text-body-2 flex-grow-1">{{ describeItem(item).name }}</span>
                     </div>
                 </div>
                 <div
@@ -105,7 +130,7 @@
                     沒有取得物品
                 </div>
                 <template v-if="settlementSkillFragmentEntries.length">
-                    <div class="text-caption text-medium-emphasis mb-1 mt-2">
+                    <div class="text-caption text-medium-emphasis mb-1 mt-3">
                         獲得技能碎片
                     </div>
                     <div class="d-flex flex-wrap ga-2">
@@ -1307,6 +1332,9 @@ const settlementSkillFragmentEntries = computed(() => Object.entries(lastSettlem
         name: getCharacterSkillById(skillId)?.name ?? skillId,
         icon: getCharacterSkillById(skillId)?.icon,
     })));
+// 結算頁頂端 stat 列的技能碎片「總數」，比照頂端 summary 列 fragmentCount 同一套
+// 「累積數量」呈現方式（見 fragmentCountOf），種類細節留給下方的碎片 chip 清單。
+const settlementSkillFragmentTotal = computed(() => fragmentCountOf(lastSettlement.value?.skillFragmentsGained));
 
 // GameAdventureCombatResultPanel 現在是純渲染元件（不再自己呼叫 useCombat），結算文字用
 // 的欄位從 lastCombatResult.summary 直接取出當 props 傳下去。
@@ -2029,6 +2057,16 @@ onMounted(() => {
         font-weight: 700;
     }
 
+    // 結算頁獲得總覽：每項獨立一列（見使用者調整），同一套 border-bottom
+    // 分隔線語彙比照 __potion-row。
+    &__loot-stat-row {
+        padding: 6px 0;
+
+        &:not(:last-child) {
+            border-bottom: 1px solid rgba(196, 203, 219, 0.1);
+        }
+    }
+
     &__potion-row {
         padding: 6px 0;
 
@@ -2066,7 +2104,9 @@ onMounted(() => {
     }
 
     &__levelup {
-        animation: settlement-levelup-pop 0.4s ease-out;
+        &--active {
+            animation: settlement-levelup-pop 0.4s ease-out;
+        }
     }
 
     &__item-chip {
@@ -2106,6 +2146,30 @@ onMounted(() => {
         font-size: 10px;
         line-height: 1.4;
         color: rgb(var(--v-theme-green));
+        white-space: nowrap;
+    }
+
+    // 結算頁「獲得道具」一列一列式呈現（比起道具/技能碎片 chip 改用 flex-wrap，
+    // 物品名稱長短不一時逐列排列更好讀），每列一個 border box，稀有度色沿用
+    // __item-chip-rarity 同一套配色但改為行內 badge，不用 chip 的絕對定位角標。
+    &__item-row {
+        padding: 6px 8px;
+        font-size: 12px;
+        border: 1px solid rgba(196, 203, 219, 0.25);
+        border-radius: 3px;
+        background: rgba(196, 203, 219, 0.04);
+
+        &:not(:last-child) {
+            margin-bottom: 6px;
+        }
+    }
+
+    &__item-row-rarity {
+        padding: 1px 4px;
+        font-size: 9px;
+        line-height: 1.4;
+        color: #14171c;
+        border-radius: 2px;
         white-space: nowrap;
     }
 }
