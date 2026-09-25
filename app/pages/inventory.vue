@@ -359,7 +359,10 @@ const TAB_OPTIONS: { key: TabKey; label: string }[] = [
     { key: 'POTION', label: '道具' },
 ];
 
-const tab = ref<TabKey>('EQUIPMENT');
+// 支援從外部連結直接指定初始 tab（如主頁裝配技能欄位點擊跳轉，見 equippedSkills.vue）
+const route = useRoute();
+const initialTab = TAB_OPTIONS.some(option => option.key === route.query.tab) ? (route.query.tab as TabKey) : 'EQUIPMENT';
+const tab = ref<TabKey>(initialTab);
 
 const sortedItems = computed(() => {
     const filtered = items.value.filter(item => item.type === tab.value);

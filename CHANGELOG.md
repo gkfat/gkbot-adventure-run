@@ -44,4 +44,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- 主頁裝配技能欄位改為 3 個固定欄位（含未裝配），點擊可跳轉至角色頁技能 tab
 - 冒險 UI 走路/受擊特效重製，敵人立繪與角色背影素材補齊
