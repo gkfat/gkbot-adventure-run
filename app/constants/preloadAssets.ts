@@ -215,7 +215,9 @@ export const PRELOAD_AUDIO_PATHS: string[] = [
     '/audio/sfx/exploreStart.mp3',
     '/audio/sfx/gold.mp3',
     '/audio/sfx/heal.wav',
+    '/audio/sfx/humanScream.mp3',
     '/audio/sfx/hurt.wav',
+    '/audio/sfx/robotDeath.mp3',
     '/audio/sfx/robotHurt.wav',
     '/audio/sfx/win.wav',
 ];

@@ -7,6 +7,35 @@ const bgmEnabled = ref(true);
 const sfxEnabled = ref(true);
 const error = ref<string | null>(null);
 
+/**
+ * 所有會被 playSfx() 用到的音效檔名，需與 public/audio/sfx/ 目錄內容同步。
+ * 用來在 unlockAudioPlayback() 時預先建立並解鎖每個音效各自的 Audio 物件——
+ * iOS Safari 的 autoplay policy 只認得「同一個 HTMLAudioElement 實例」是否曾在
+ * 使用者手勢內成功 play() 過，之後對同一個實例再呼叫 play() 才不會被擋。
+ */
+const SFX_FILES = [
+    'attack.mp3',
+    'buff.mp3',
+    'click.wav',
+    'crit.mp3',
+    'debuff.mp3',
+    'equip.wav',
+    'exploreStart.mp3',
+    'gold.mp3',
+    'heal.wav',
+    'humanScream.mp3',
+    'hurt.wav',
+    'robotDeath.mp3',
+    'robotHurt.wav',
+    'win.wav',
+];
+
+// 每個音效檔名對應一個固定重複使用的 Audio 物件（而非 playSfx 每次呼叫都 new
+// 一個），這樣 unlockAudioPlayback() 解鎖過的實例才能在非使用者手勢的情境下
+// （例如戰鬥流程裡由 requestAnimationFrame/setTimeout 觸發的傷害音效）繼續播放。
+const sfxPool = new Map<string, HTMLAudioElement>();
+let audioUnlocked = false;
+
 let currentBgm: HTMLAudioElement | null = null;
 // 記住最後一次要求播放的曲目，讓關閉後重新打開 BGM 開關、或分頁恢復可見時能從
 // 原本的曲目繼續播放（開關/可見度本身不記得「播到哪首」）。
@@ -57,19 +86,56 @@ function stopBgm(): void {
     bgmPausedByVisibility = false;
 }
 
+function getPooledSfx(sound: string): HTMLAudioElement {
+    let audio = sfxPool.get(sound);
+    if (!audio) {
+        audio = new Audio(`/audio/sfx/${sound}`);
+        sfxPool.set(sound, audio);
+    }
+    return audio;
+}
+
 /**
  * 播放單次音效。開關關閉、分頁不可見，或音檔載入/播放失敗時靜默失敗。
+ * 重複使用 sfxPool 內固定的 Audio 物件，讓 unlockAudioPlayback() 解鎖過的
+ * 實例可以在非使用者手勢的情境下繼續播放（見 iOS Safari 的 autoplay policy）。
  */
 function playSfx(sound: string): void {
     if (!sfxEnabled.value || !pageAudible) return;
 
     try {
-        const audio = new Audio(`/audio/sfx/${sound}`);
+        const audio = getPooledSfx(sound);
+        audio.currentTime = 0;
         audio.play().catch((err) => {
             console.warn('[useAudio] Failed to play SFX:', sound, err);
         });
     } catch (err) {
         console.warn('[useAudio] Failed to load SFX:', sound, err);
+    }
+}
+
+/**
+ * 在使用者第一次手勢（click/touchend）內，把 sfxPool 裡每個音效的 Audio 物件
+ * 都各自 play() 一次（靜音、立刻 pause）：iOS Safari 只允許「曾在使用者手勢內
+ * 成功播放過」的 HTMLAudioElement 實例之後在非手勢情境下繼續播放，這一步讓
+ * 戰鬥流程（由 requestAnimationFrame/setTimeout 觸發，不在手勢呼叫堆疊內）
+ * 播放的傷害音效不會被靜默擋下。只需成功解鎖一次，之後不再重複執行。
+ */
+function unlockAudioPlayback(): void {
+    if (audioUnlocked || typeof document === 'undefined') return;
+    audioUnlocked = true;
+
+    for (const sound of SFX_FILES) {
+        const audio = getPooledSfx(sound);
+        const originalVolume = audio.volume;
+        audio.volume = 0;
+        audio.play().then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = originalVolume;
+        }).catch(() => {
+            audio.volume = originalVolume;
+        });
     }
 }
 
@@ -112,6 +178,11 @@ if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', handleAudibilityChange);
     window.addEventListener('blur', handleAudibilityChange);
     window.addEventListener('focus', handleAudibilityChange);
+
+    document.addEventListener('click', unlockAudioPlayback, { once: true });
+    document.addEventListener('touchend', unlockAudioPlayback, {
+        once: true, passive: true, 
+    });
 }
 
 /**
