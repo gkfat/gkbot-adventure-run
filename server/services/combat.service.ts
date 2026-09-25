@@ -628,7 +628,7 @@ export class CombatService extends BaseService implements CombatResolver {
         const rewards = victory
             ? this.computeRewards(run, rewardCursor, context, defeated, character.attributes.LUCK, character.archetypeId, activeModifiers)
             : {
-                expGained: 0, goldDropped: 0, gemsDropped: 0, itemsDropped: [], blessingPointsGained: 0, skillFragmentDrop: undefined,
+                expGained: 0, goldDropped: 0, gemsDropped: 0, itemsDropped: [], blessingPointsGained: 0,
             };
 
         // Character skills (character-skills「戰鬥掉落」): apply the
@@ -1335,7 +1335,7 @@ export class CombatService extends BaseService implements CombatResolver {
             gemsDropped,
             itemsDropped,
             blessingPointsGained,
-            skillFragmentDrop,
+            ...(skillFragmentDrop ? { skillFragmentDrop } : {}),
         };
     }
 }

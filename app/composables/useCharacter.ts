@@ -96,9 +96,6 @@ interface SetNicknameResponse {
     data: { nickname: string; hasRenamed: boolean; gems: number; gemsSpent: number };
 }
 
-// 角色改名費用（首次免費, 之後每次改名扣除的寶石數）
-export const RENAME_COST_GEMS = 5;
-
 interface GetRosterResponse {
     success: boolean;
     data: { characters: CharacterSummary[]; archetypes: Archetype[] };
@@ -338,7 +335,7 @@ export const useCharacter = () => {
     };
 
     /**
-     * 修改目前選定角色的暱稱。第一次免費, 之後每次修改扣 RENAME_COST_GEMS 寶石
+     * 修改目前選定角色的暱稱。第一次免費, 之後每次修改扣寶石
      * （費用計算與扣款皆由後端 transaction 判定, 這裡只負責呼叫與刷新資料）。
      * 失敗時（例如寶石不足）拋出錯誤, 由呼叫端（UI dialog）顯示訊息。
      */

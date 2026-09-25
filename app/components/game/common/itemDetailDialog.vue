@@ -119,7 +119,7 @@
 
 <script setup lang="ts">
 import {
-    describeItem, pickTargetSlot, SLOT_LABEL, type ItemLike,
+    describeItem, pickCompareSlot, pickTargetSlot, SLOT_LABEL, type ItemLike,
 } from '../../../utils/equipmentDisplay';
 import type { EquipmentSlot } from '../../../../shared/types/common';
 
@@ -139,7 +139,9 @@ const detailInfo = computed(() => (item.value ? describeItem(item.value) : null)
 // 若正在檢視的就是目前裝備中的道具本身，則不重複顯示。
 const equippedInSlot = computed(() => {
     if (!item.value?.equipSlot) return undefined;
-    const equippedItemId = character.value?.equipment?.[item.value.equipSlot];
+    const compareSlot = pickCompareSlot(item.value, character.value?.equipment ?? {});
+    if (!compareSlot) return undefined;
+    const equippedItemId = character.value?.equipment?.[compareSlot];
     if (!equippedItemId || equippedItemId === item.value.itemId) return undefined;
     return itemById(equippedItemId);
 });

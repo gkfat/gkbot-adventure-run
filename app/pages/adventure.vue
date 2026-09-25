@@ -62,9 +62,18 @@
             </div>
 
             <div class="adventure-page__box mb-3" style="width: 100%;">
-                <div class="d-flex ga-4 text-caption text-medium-emphasis mb-2">
-                    <span>金幣 +{{ lastSettlement.goldEarned }}</span>
-                    <span>寶石 +{{ lastSettlement.gemsEarned }}</span>
+                <div class="d-flex ga-4 mb-2">
+                    <span class="text-caption text-medium-emphasis">
+                        金幣
+                        <span class="font-pixel" style="color: #e0c063;">+{{ lastSettlement.goldEarned }}</span>
+                    </span>
+                    <span class="text-caption text-medium-emphasis">
+                        寶石
+                        <span class="font-pixel" style="color: rgb(var(--v-theme-primary));">+{{ lastSettlement.gemsEarned }}</span>
+                    </span>
+                </div>
+                <div class="text-caption text-medium-emphasis mb-1">
+                    獲得道具
                 </div>
                 <div
                     v-if="lastSettlement.items.length"
@@ -95,18 +104,28 @@
                 >
                     沒有取得物品
                 </div>
-                <div
-                    v-if="settlementSkillFragmentEntries.length"
-                    class="d-flex flex-wrap ga-2 mt-2"
-                >
-                    <div
-                        v-for="entry in settlementSkillFragmentEntries"
-                        :key="entry.skillId"
-                        class="adventure-page__item-chip d-inline-flex align-center"
-                    >
-                        {{ entry.name }} +{{ entry.amount }}
+                <template v-if="settlementSkillFragmentEntries.length">
+                    <div class="text-caption text-medium-emphasis mb-1 mt-2">
+                        獲得技能碎片
                     </div>
-                </div>
+                    <div class="d-flex flex-wrap ga-2">
+                        <div
+                            v-for="entry in settlementSkillFragmentEntries"
+                            :key="entry.skillId"
+                            class="adventure-page__item-chip d-inline-flex align-center"
+                        >
+                            <span class="adventure-page__item-chip-count font-pixel">
+                                +{{ entry.amount }}
+                            </span>
+                            <GameCommonPixelIcon
+                                v-if="entry.icon"
+                                :name="(entry.icon as PixelIconName)"
+                                :size="20"
+                            />
+                            {{ entry.name }}
+                        </div>
+                    </div>
+                </template>
             </div>
 
             <div
@@ -155,7 +174,7 @@
             <SystemBtn
                 variant="flat"
                 color="primary"
-                class="text-none"
+                class="text-none w-100 flex-grow-0 mt-auto"
                 @click="handleReturnHome"
             >
                 回到營地
@@ -260,7 +279,7 @@
                     <v-row dense>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">EXP</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
@@ -269,7 +288,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">金幣</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
@@ -278,7 +297,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">寶石</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
@@ -287,7 +306,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">道具</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
@@ -296,7 +315,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">祝福</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
@@ -305,7 +324,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">詛咒</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
@@ -419,7 +438,7 @@
                     <v-row dense>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">EXP</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
@@ -428,7 +447,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">金幣</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
@@ -437,7 +456,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">寶石</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
@@ -446,7 +465,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">道具</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
@@ -455,7 +474,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">祝福</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
@@ -464,7 +483,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">詛咒</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
@@ -473,7 +492,7 @@
                         </v-col>
                         <v-col
                             cols="4"
-                            class="adventure-page__loot-stat d-flex flex-column"
+                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
                         >
                             <div class="text-caption text-medium-emphasis">技能碎片</div>
                             <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
@@ -1283,7 +1302,10 @@ const settlementIsSuccess = computed(() => lastSettlement.value?.endReason === '
 // SettleSummary.skillFragmentsGained 註解）。
 const settlementSkillFragmentEntries = computed(() => Object.entries(lastSettlement.value?.skillFragmentsGained ?? {})
     .map(([skillId, amount]) => ({
-        skillId, amount, name: getCharacterSkillById(skillId)?.name ?? skillId,
+        skillId,
+        amount,
+        name: getCharacterSkillById(skillId)?.name ?? skillId,
+        icon: getCharacterSkillById(skillId)?.icon,
     })));
 
 // GameAdventureCombatResultPanel 現在是純渲染元件（不再自己呼叫 useCombat），結算文字用
@@ -1999,7 +2021,7 @@ onMounted(() => {
     }
 
     &__loot-stat {
-        gap: 2px;
+        gap: 6px;
     }
 
     &__loot-value {
@@ -2073,6 +2095,17 @@ onMounted(() => {
         line-height: 1.4;
         color: #14171c;
         border-radius: 2px;
+        white-space: nowrap;
+    }
+
+    &__item-chip-count {
+        position: absolute;
+        top: -8px;
+        right: -6px;
+        padding: 0 4px;
+        font-size: 10px;
+        line-height: 1.4;
+        color: rgb(var(--v-theme-green));
         white-space: nowrap;
     }
 }

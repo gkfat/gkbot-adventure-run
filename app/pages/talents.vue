@@ -466,9 +466,11 @@ const invest = async (node: TalentNode) => {
     padding: 10px 8px;
     border: 2px solid rgba(196, 203, 219, 0.25);
     border-radius: 4px;
+    // 底色固定不透明（比照 quests.vue 的 quest-row），未投點／鎖定狀態改用
+    // 文字/圖示的顏色變淡表達，不能整個 button 用 opacity 淡化——那樣會連
+    // 底色一起被沖淡，導致面板看起來像沒有底色。
     background: #14171c;
-    color: rgb(var(--v-theme-primary));
-    opacity: 0.55;
+    color: rgba(196, 203, 219, 0.5);
     cursor: pointer;
 
     &__name {
@@ -487,25 +489,26 @@ const invest = async (node: TalentNode) => {
     }
 
     &--investable {
-        opacity: 1;
+        color: rgb(var(--v-theme-primary));
         border-color: rgb(var(--v-theme-warning));
     }
 
     &--invested {
-        opacity: 1;
-        border-color: rgb(var(--v-theme-green));
         color: rgb(var(--v-theme-green));
+        border-color: rgb(var(--v-theme-green));
     }
 
     &--maxed {
-        opacity: 1;
-        border-color: rgb(var(--v-theme-green));
         color: rgb(var(--v-theme-green));
-        background: rgba(var(--v-theme-green), 0.08);
+        border-color: rgb(var(--v-theme-green));
+        // 底色必須不透明（見上方 .talent-node 註解）：rgba 疊在透明底上會透出
+        // 頁面背景，這裡改用 #14171c 疊加 8% green 後算出的不透明色，維持同樣
+        // 的視覺色調。
+        background: #1d2326;
     }
 
     &--locked {
-        opacity: 0.35;
+        color: rgba(196, 203, 219, 0.3);
     }
 }
 </style>

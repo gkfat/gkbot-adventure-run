@@ -176,7 +176,10 @@ onUnmounted(stopCountdown);
 
     &--mine {
         border-color: rgb(var(--v-theme-green));
-        background: rgba(129, 178, 154, 0.1);
+        // 不透明色，等同 #14171c 疊加 10% green 算出的等效色——半透明疊在
+        // （沒有不透明底色的）頁面背景上會透出裝飾圖案，看起來像沒有底色
+        // （known-issue.md #4，同 talents.vue --maxed 的修法）。
+        background: #1f2729;
     }
 
     &--pinned {

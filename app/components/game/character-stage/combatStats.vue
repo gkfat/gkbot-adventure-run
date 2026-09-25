@@ -184,7 +184,9 @@ const statEntries = computed(() => {
     width: 100%;
     max-width: 280px;
     padding: 10px 12px;
-    background: rgba(196, 203, 219, 0.04);
+    // 底色固定不透明（比照 quests.vue 的 quest-row），半透明疊色會透出頁面
+    // 背景的裝飾圖案，看起來像沒有底色（known-issue.md #4）。
+    background: #14171c;
     border: 1px solid rgba(196, 203, 219, 0.15);
     border-radius: 3px;
 }

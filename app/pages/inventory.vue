@@ -458,16 +458,17 @@ onMounted(() => {
     &__tab {
         flex: 1 1 0;
         padding: 8px;
-        background: rgba(196, 203, 219, 0.04);
+        // 底色固定不透明、非啟用狀態改用文字顏色變淡表達（比照 talents.vue
+        // .talent-node 的修法）：整個 button 用 opacity 淡化會連底色一起被
+        // 頁面背景透出去，看起來像沒有底色（known-issue.md #4）。
+        background: #14171c;
         border: 1px solid rgba(196, 203, 219, 0.15);
         border-radius: 3px;
-        color: rgb(var(--v-theme-primary));
-        opacity: 0.5;
+        color: rgba(196, 203, 219, 0.5);
         cursor: pointer;
-        transition: opacity 0.08s ease-out;
+        transition: color 0.08s ease-out;
 
         &--active {
-            opacity: 1;
             border-color: rgb(var(--v-theme-green));
             color: rgb(var(--v-theme-green));
         }

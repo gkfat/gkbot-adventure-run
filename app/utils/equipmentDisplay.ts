@@ -331,9 +331,10 @@ export function equippedStatColor(item: ItemLike | undefined): string | undefine
 
 /**
  * Decide which slot to request when equipping an item. Hand items (sword/
- * dagger-type equipment) prefer whichever hand is currently empty — right
- * first, then left — so the player doesn't have to think about it; if both
- * hands are full, falls back to the item's own default slot (replacing
+ * dagger-type equipment) prefer whichever hand is currently empty so the
+ * player doesn't have to think about it; if BOTH hands are empty, the
+ * item's own default hand wins instead of always picking right-first; if
+ * both hands are full, falls back to the item's own default slot (replacing
  * whatever is there). Any other equipSlot is used as-is.
  */
 export function pickTargetSlot(
@@ -347,6 +348,27 @@ export function pickTargetSlot(
         return undefined;
     }
 
+    const emptyHands = HAND_SLOTS.filter(slot => !equipment[slot]);
+    if (emptyHands.length === HAND_SLOTS.length) {
+        return item.equipSlot;
+    }
+    return emptyHands[0] ?? item.equipSlot;
+}
+
+/**
+ * Decide which slot's current item to compare against in the equip dialog.
+ * Hand items prefer an empty hand slot (nothing to compare, shows no
+ * comparison); if both hands are occupied, always compares against
+ * RIGHT_HAND regardless of the item's own default equipSlot. Any other
+ * equipSlot is used as-is.
+ */
+export function pickCompareSlot(
+    item: ItemLike,
+    equipment: Partial<Record<EquipmentSlot, string>>,
+): EquipmentSlot | undefined {
+    if (!item.equipSlot) return undefined;
+    if (!HAND_SLOTS.includes(item.equipSlot)) return item.equipSlot;
+
     const emptyHand = HAND_SLOTS.find(slot => !equipment[slot]);
-    return emptyHand ?? item.equipSlot;
+    return emptyHand ?? EquipmentSlot.RIGHT_HAND;
 }

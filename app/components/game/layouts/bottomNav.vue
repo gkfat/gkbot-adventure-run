@@ -141,8 +141,8 @@ $talent-point-color: #ffd166;
     display: grid;
     grid-template-columns: 1fr 1fr auto 1fr 1fr;
     align-items: end;
-    height: 54px;
-    padding-bottom: 4px;
+    height: 64px;
+    padding-bottom: 16px;
     background: rgb(var(--v-theme-background));
     border-top: 1px solid rgba(196, 203, 219, 0.12);
 

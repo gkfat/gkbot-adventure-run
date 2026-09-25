@@ -155,9 +155,6 @@ const rows = computed(() => DIMENSIONS.map((key) => {
     width: 100%;
     max-width: none;
     padding: 10px 12px;
-    background: rgba(196, 203, 219, 0.04);
-    border: 1px solid rgba(196, 203, 219, 0.15);
-    border-radius: 3px;
 }
 
 .weapon-proficiency {
@@ -167,9 +164,12 @@ const rows = computed(() => DIMENSIONS.map((key) => {
 
     &__row {
         padding: 6px 8px;
-        border: 1px solid rgba(196, 203, 219, 0.12);
+        border: 1px solid rgba(196, 203, 219, 0.15);
         border-radius: 3px;
-        background: rgba(196, 203, 219, 0.02);
+        // 底色固定不透明（比照 quests.vue 的 quest-row）：每個熟練度項目
+        // 自己有底色即可，不需要外層再包一層底色變成整塊（known-issue.md #4，
+        // 使用者回報不要整塊底色）。
+        background: #14171c;
     }
 
     &__bar {
