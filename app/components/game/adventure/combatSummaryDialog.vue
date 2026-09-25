@@ -58,6 +58,18 @@
                     +{{ gemsDropped }}
                 </div>
             </div>
+            <div
+                v-if="skillFragmentDrop"
+                class="combat-summary-dialog__stat d-flex flex-column align-center"
+            >
+                <div class="text-caption text-medium-emphasis">技能碎片</div>
+                <div
+                    class="font-pixel combat-summary-dialog__stat-value"
+                    style="color: rgb(var(--v-theme-green));"
+                >
+                    {{ skillFragmentName }} +{{ skillFragmentDrop.amount }}
+                </div>
+            </div>
         </div>
 
         <template v-if="droppedItems.length > 0">
@@ -106,15 +118,21 @@
 import {
     RARITY_COLOR, resolvePixelIcon, describeItem, type ItemLike,
 } from '../../../utils/equipmentDisplay';
+import { getCharacterSkillById } from '../../../../shared/constants/characterSkills';
 
-defineProps<{
+const props = defineProps<{
     victory: boolean;
     roundCount: number;
     expGained: number;
     goldDropped: number;
     gemsDropped: number;
     droppedItems: (ItemLike & { itemId: string })[];
+    skillFragmentDrop?: { skillId: string; amount: number };
 }>();
+
+const skillFragmentName = computed(() => (
+    props.skillFragmentDrop ? getCharacterSkillById(props.skillFragmentDrop.skillId)?.name ?? props.skillFragmentDrop.skillId : ''
+));
 </script>
 
 <style scoped lang="scss">

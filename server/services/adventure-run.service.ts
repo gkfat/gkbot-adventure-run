@@ -443,6 +443,14 @@ export class AdventureRunService extends BaseService {
                 expEarned: run.expEarned + resolution.expGained,
                 goldEarned: run.goldEarned + resolution.goldDropped,
                 gemsEarned: run.gemsEarned + resolution.gemsDropped,
+                ...(resolution.skillFragmentDrop ? {
+                    skillFragmentsEarned: {
+                        ...(run.skillFragmentsEarned ?? {}),
+                        [resolution.skillFragmentDrop.skillId]:
+                            (run.skillFragmentsEarned?.[resolution.skillFragmentDrop.skillId] ?? 0)
+                            + resolution.skillFragmentDrop.amount,
+                    },
+                } : {}),
                 enemiesDefeated: run.enemiesDefeated + resolution.enemies.length,
                 blessingPoints: run.blessingPoints + resolution.blessingPointsGained,
                 runInventory,
@@ -961,6 +969,7 @@ export class AdventureRunService extends BaseService {
             forfeitedGold: isSuccess ? 0 : run.goldEarned,
             forfeitedGems: isSuccess ? 0 : run.gemsEarned,
             forfeitedItems: isSuccess ? [] : run.runInventory,
+            skillFragmentsGained: run.skillFragmentsEarned ?? {},
             chapterAdvanced,
         };
 

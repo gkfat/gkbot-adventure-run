@@ -633,12 +633,12 @@ export class CombatService extends BaseService implements CombatResolver {
 
         // Character skills (character-skills「戰鬥掉落」): apply the
         // combat-victory fragment drop (if any) rolled inside computeRewards.
-        // Destructured (not left on `rewards`) so it doesn't leak into the
-        // returned CombatResult below — this outcome isn't part of that
-        // public shape (see design.md decision 8).
-        const {
-            skillFragmentDrop, ...rewardsForResult 
-        } = rewards;
+        // `skillFragmentDrop` is kept on the returned CombatResult (unlike
+        // design.md decision 8's original public shape) so the adventure
+        // screen can show it (known-issue.md #3) — it's display-only, the
+        // grant itself already happened here regardless of what the caller
+        // does with the returned value.
+        const { skillFragmentDrop } = rewards;
         if (skillFragmentDrop) {
             await this.characterSkillService.grantFragments(
                 run.characterId, character.skillFragments ?? {}, skillFragmentDrop.skillId, skillFragmentDrop.amount,
@@ -649,7 +649,7 @@ export class CombatService extends BaseService implements CombatResolver {
             victory,
             roundCount: combatLog.filter(entry => entry.action !== 'DEATH').length,
             playerHpRemaining: Math.max(0, player.hp),
-            ...rewardsForResult,
+            ...rewards,
             enemies: disambiguateEnemyNames(encountered).map(enemy => ({
                 enemyId: enemy.id, name: enemy.name, level: enemy.level as number, hpMax: enemy.hpMax, isBoss: enemy.isBoss, archetypeSlug: enemy.archetypeSlug,
             })),

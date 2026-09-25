@@ -95,6 +95,18 @@
                 >
                     沒有取得物品
                 </div>
+                <div
+                    v-if="settlementSkillFragmentEntries.length"
+                    class="d-flex flex-wrap ga-2 mt-2"
+                >
+                    <div
+                        v-for="entry in settlementSkillFragmentEntries"
+                        :key="entry.skillId"
+                        class="adventure-page__item-chip d-inline-flex align-center"
+                    >
+                        {{ entry.name }} +{{ entry.amount }}
+                    </div>
+                </div>
             </div>
 
             <div
@@ -459,6 +471,15 @@
                                 x{{ displayedRunTotals.curseCount }}
                             </div>
                         </v-col>
+                        <v-col
+                            cols="4"
+                            class="adventure-page__loot-stat d-flex flex-column"
+                        >
+                            <div class="text-caption text-medium-emphasis">技能碎片</div>
+                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
+                                x{{ displayedRunTotals.fragmentCount }}
+                            </div>
+                        </v-col>
                     </v-row>
                 </div>
 
@@ -494,6 +515,7 @@
                             :gold-dropped="combatGoldDropped"
                             :gems-dropped="combatGemsDropped"
                             :dropped-items="combatDroppedItems"
+                            :skill-fragment-drop="combatSkillFragmentDrop"
                         />
                     </template>
                     <!-- lastCombatResult 為空才是「還沒開打」的預備畫面；lastCombatResult
@@ -929,6 +951,7 @@ import { useCombat } from '../composables/useCombat';
 import { useDialogueBubble } from '../composables/useDialogueBubble';
 import type { PixelIconName } from '../utils/pixelIcons';
 import type { DialogueTrigger } from '../constants/dialogueLines';
+import { getCharacterSkillById } from '../../shared/constants/characterSkills';
 
 definePageMeta({
     middleware: ['auth'],
@@ -997,8 +1020,15 @@ const frozenRunTotals = ref<{
     itemCount: number
     blessingCount: number
     curseCount: number
+    fragmentCount: number
 } | null>(null);
 const combatTotalsFrozen = ref(false);
+// character-skills「戰鬥掉落」（known-issue.md #3）：頂端 summary 列只顯示碎片
+// 「總數」，不分技能種類——比照 itemCount 同一個「累積數量」呈現方式，種類
+// 細節留給角色頁技能 tab。
+const fragmentCountOf = (skillFragmentsEarned: Record<string, number> | undefined) => (
+    Object.values(skillFragmentsEarned ?? {}).reduce((sum, count) => sum + count, 0)
+);
 const displayedRunTotals = computed(() => {
     if (combatTotalsFrozen.value && frozenRunTotals.value) return frozenRunTotals.value;
     return {
@@ -1008,6 +1038,7 @@ const displayedRunTotals = computed(() => {
         itemCount: currentRun.value?.runInventory.length ?? 0,
         blessingCount: currentRun.value?.blessings.length ?? 0,
         curseCount: currentRun.value?.curses.length ?? 0,
+        fragmentCount: fragmentCountOf(currentRun.value?.skillFragmentsEarned),
     };
 });
 // character-skills：目前佩戴中的技能（含圖示/名稱），供角色 stage 左側的技能
@@ -1247,6 +1278,13 @@ const describeModifierEffect = (modifier: Pick<RunModifier, 'statModifiers' | 'd
 };
 
 const settlementIsSuccess = computed(() => lastSettlement.value?.endReason === 'COMPLETED');
+// character-skills「戰鬥掉落」（known-issue.md #3）：探索完成頁列出這趟 run
+// 累計取得的技能碎片，名稱用靜態 catalog 解析（不受 endReason 影響，見
+// SettleSummary.skillFragmentsGained 註解）。
+const settlementSkillFragmentEntries = computed(() => Object.entries(lastSettlement.value?.skillFragmentsGained ?? {})
+    .map(([skillId, amount]) => ({
+        skillId, amount, name: getCharacterSkillById(skillId)?.name ?? skillId,
+    })));
 
 // GameAdventureCombatResultPanel 現在是純渲染元件（不再自己呼叫 useCombat），結算文字用
 // 的欄位從 lastCombatResult.summary 直接取出當 props 傳下去。
@@ -1256,6 +1294,7 @@ const combatExpGained = computed(() => lastCombatResult.value?.summary.expGained
 const combatGoldDropped = computed(() => lastCombatResult.value?.summary.goldDropped ?? 0);
 const combatGemsDropped = computed(() => lastCombatResult.value?.summary.gemsDropped ?? 0);
 const combatDroppedItems = computed(() => lastCombatResult.value?.summary.itemsDropped ?? []);
+const combatSkillFragmentDrop = computed(() => lastCombatResult.value?.summary.skillFragmentDrop);
 
 // 戰鬥結果的 log 演繹（stage 上的 playerGauge/playerSpark 等）播完前，不能顯示
 // 「繼續前進」，避免玩家在還沒看完戰鬥過程時就跳過結算。lastCombatResult 換成
@@ -1483,6 +1522,7 @@ const handleStartCombat = async () => {
         itemCount: currentRun.value?.runInventory.length ?? 0,
         blessingCount: currentRun.value?.blessings.length ?? 0,
         curseCount: currentRun.value?.curses.length ?? 0,
+        fragmentCount: fragmentCountOf(currentRun.value?.skillFragmentsEarned),
     };
     combatTotalsFrozen.value = true;
     return await startCombat(character.value.characterId);

@@ -42,6 +42,12 @@ export const combatSummarySchema = z.object({
     gemsDropped: z.number().int().min(0),
     itemsDropped: z.array(itemInstanceSchema),
     blessingPointsGained: z.number().int().min(0),
+    // Character-skills 戰鬥掉落（known-issue.md #3），見 shared/types/adventure.ts
+    // CombatResult.skillFragmentDrop 註解。
+    skillFragmentDrop: z.object({
+        skillId: z.string(),
+        amount: z.number().int().min(1),
+    }).optional(),
 
     // Enemy info
     enemies: z.array(z.object({
@@ -74,6 +80,9 @@ export const settleSummarySchema = z.object({
     forfeitedGold: z.number().int().min(0),
     forfeitedGems: z.number().int().min(0),
     forfeitedItems: z.array(itemInstanceSchema),
+    // Character-skills 戰鬥掉落累計（known-issue.md #3），見
+    // shared/types/adventure.ts SettleSummary.skillFragmentsGained 註解。
+    skillFragmentsGained: z.record(z.string(), z.number().int().min(0)),
     chapterAdvanced: z.boolean(),
 }).strict();
 
@@ -149,6 +158,9 @@ export const adventureRunSchema = z.object({
     expEarned: z.number().int().min(0),
     goldEarned: z.number().int().min(0),
     gemsEarned: z.number().int().min(0),
+    // Character-skills 戰鬥掉落累計（known-issue.md #3），見
+    // shared/types/adventure.ts AdventureRun.skillFragmentsEarned 註解。
+    skillFragmentsEarned: z.record(z.string(), z.number().int().min(0)).optional(),
 
     // Cumulative enemies defeated this run (leaderboard-season)
     enemiesDefeated: z.number().int().min(0),

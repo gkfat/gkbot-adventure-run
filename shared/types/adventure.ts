@@ -168,6 +168,11 @@ export type CombatResult = {
   gemsDropped: number;
   itemsDropped: ItemInstance[];
   blessingPointsGained: number;
+  // Character-skills 戰鬥掉落（known-issue.md #3）：命中時的技能碎片獎勵，
+  // undefined 代表這場戰鬥沒有掉落。與 itemsDropped 不同，碎片已在
+  // CombatService 內直接寫入 character.skillFragments（不經過 run 結算/
+  // 戰敗作廢流程），這裡回傳純粹是給前端顯示用。
+  skillFragmentDrop?: { skillId: string; amount: number };
 
   // Enemies encountered this combat (included here, not just on CombatSummary,
   // so the caller can build combatSummary/combatLog display without a second
@@ -341,6 +346,11 @@ export type SettleSummary = {
   forfeitedGems: number;
   forfeitedItems: ItemInstance[];
 
+  // Character-skills 戰鬥掉落累計（known-issue.md #3）：這整趟 run 累計掉落的
+  // 技能碎片，不受 endReason 影響（碎片掉落當下已直接寫入角色文件，不像
+  // gold/gems/items 走 run 結算才轉移，所以沒有對應的 forfeited 版本）。
+  skillFragmentsGained: Record<string, number>;
+
   // Chapter/Level advance (chapter-level-structure) — true only when this
   // settlement cleared the chapter's last level and moved to the next
   // facility theme; false for a same-chapter level advance, and for
@@ -472,6 +482,12 @@ export type AdventureRun = {
   expEarned: number;
   goldEarned: number;
   gemsEarned: number;
+  // Character-skills 戰鬥掉落累計（known-issue.md #3）：skillId -> 本次 run
+  // 累計掉落的碎片數，純粹是顯示用快照——實際碎片已在掉落當下直接寫入
+  // character.skillFragments，不隨 run 戰敗作廢。Optional 只是為了容忍
+  // 這個欄位新增前建立的舊 run 文件，讀取時比照 stageCombatEncountered 用
+  // `?? {}` 補預設值。
+  skillFragmentsEarned?: Record<string, number>;
 
   // Cumulative enemies defeated this run (leaderboard-season: fed to
   // LeaderboardUpdater.updateIfBetter as `score` at settlement, same

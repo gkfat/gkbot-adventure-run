@@ -165,6 +165,7 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
                 expEarned: 0,
                 goldEarned: 0,
                 gemsEarned: 0,
+                skillFragmentsEarned: {},
                 enemiesDefeated: 0,
 
                 lastActivityAt: timestamp,
