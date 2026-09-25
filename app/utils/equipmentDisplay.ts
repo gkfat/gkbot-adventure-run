@@ -178,6 +178,8 @@ export type ItemLike = {
     equipSlot?: EquipmentSlot;
     weight?: number;
     weaponType?: WeaponType;
+    aoeChance?: number;
+    splashChance?: number;
     rarity: Rarity;
     name?: string;
     description?: string;
@@ -303,6 +305,19 @@ export function describeItem(item: ItemLike): {
             label, value: formatValue(item.stats[key] as number), positive: isBeneficial(item.stats[key] as number),
         }));
 
+    // 攻擊目標型態（AoE／濺射，weapon-attack-pattern spec）：非 stats 欄位的武器
+    // 專屬屬性，武器 template 最多只會設定其中一項，兩者互斥同時顯示也不衝突。
+    if (item.aoeChance) {
+        effects.push({
+            label: '範圍傷害機率', value: `${Math.round(item.aoeChance * 100)}%`, positive: true,
+        });
+    }
+    if (item.splashChance) {
+        effects.push({
+            label: '濺射傷害機率', value: `${Math.round(item.splashChance * 100)}%`, positive: true,
+        });
+    }
+
     const effectText = effects.length > 0
         ? effects.map(({
             label, value,
@@ -356,11 +371,10 @@ export function pickTargetSlot(
 }
 
 /**
- * Decide which slot's current item to compare against in the equip dialog.
- * Hand items prefer an empty hand slot (nothing to compare, shows no
- * comparison); if both hands are occupied, always compares against
- * RIGHT_HAND regardless of the item's own default equipSlot. Any other
- * equipSlot is used as-is.
+ * Decide which slot's current item to compare against in the equip dialog —
+ * always the same slot pickTargetSlot() would actually equip into, so the
+ * comparison matches what pressing "裝備" does. Non-hand items just use
+ * their own equipSlot as-is.
  */
 export function pickCompareSlot(
     item: ItemLike,
@@ -369,6 +383,5 @@ export function pickCompareSlot(
     if (!item.equipSlot) return undefined;
     if (!HAND_SLOTS.includes(item.equipSlot)) return item.equipSlot;
 
-    const emptyHand = HAND_SLOTS.find(slot => !equipment[slot]);
-    return emptyHand ?? EquipmentSlot.RIGHT_HAND;
+    return pickTargetSlot(item, equipment);
 }

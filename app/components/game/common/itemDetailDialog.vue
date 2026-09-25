@@ -135,10 +135,16 @@ const open = ref(false);
 const item = ref<ItemLike & { itemId: string; sellPriceGold: number } | null>(null);
 const detailInfo = computed(() => (item.value ? describeItem(item.value) : null));
 
-// 若正在檢視的道具有裝備欄位，且該欄位已裝備「其他」道具，於 header 顯示該道具供比較；
-// 若正在檢視的就是目前裝備中的道具本身，則不重複顯示。
+const isEquipped = (target: { itemId: string }) => (
+    Object.values(character.value?.equipment ?? {}).includes(target.itemId)
+);
+
+// 若正在檢視的道具有裝備欄位、目前「不是」裝備中的道具本身，且該欄位已裝備
+// 其他道具，於 header 顯示該道具供比較；正在檢視的道具已經裝備中時，沒有
+// 「換裝」的意義，不顯示比較欄位（pickCompareSlot 對雙手武器的 fallback
+// 邏輯只認 equipSlot/兩手是否有空位，不知道 item 本身是否已裝備在另一手）。
 const equippedInSlot = computed(() => {
-    if (!item.value?.equipSlot) return undefined;
+    if (!item.value?.equipSlot || isEquipped(item.value)) return undefined;
     const compareSlot = pickCompareSlot(item.value, character.value?.equipment ?? {});
     if (!compareSlot) return undefined;
     const equippedItemId = character.value?.equipment?.[compareSlot];
@@ -149,10 +155,6 @@ const equippedDetailInfo = computed(() => (equippedInSlot.value ? describeItem(e
 
 const equipActionLoading = ref(false);
 const equipActionError = ref<string | null>(null);
-
-const isEquipped = (target: { itemId: string }) => (
-    Object.values(character.value?.equipment ?? {}).includes(target.itemId)
-);
 
 const findEquippedSlot = (target: { itemId: string }): EquipmentSlot | undefined => {
     const entry = Object.entries(character.value?.equipment ?? {}).find(([, id]) => id === target.itemId);
