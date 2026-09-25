@@ -41,22 +41,27 @@ export class AchievementService extends BaseService {
     async getAll(characterId: string): Promise<AchievementWithTemplate[]> {
         const achievements = await this.getOrCreateAll(characterId);
 
-        return achievements.map((achievement) => {
-            const template = getAchievementTemplate(achievement.templateId);
-            const isPeak = template?.mode === 'PEAK';
-            return {
-                ...achievement,
-                name: template?.name ?? achievement.templateId,
-                description: template?.description ?? '',
-                // PEAK achievements (e.g. MAX_SCORE) track a single-attempt
-                // peak value internally, not a running total — showing the
-                // raw score/step against its threshold reads like a
-                // cumulative counter it isn't, so the client only ever sees
-                // a plain 0/1 (see AchievementProgressMode).
-                currentCount: isPeak ? (achievement.completed ? 1 : 0) : achievement.currentCount,
-                targetCount: isPeak ? 1 : achievement.targetCount,
-            };
-        });
+        // Achievements whose template was removed (e.g. a retired
+        // MAX_SCORE achievement) leave orphaned progress docs behind —
+        // skip them rather than showing a raw templateId as the name.
+        return achievements
+            .filter(achievement => getAchievementTemplate(achievement.templateId) !== undefined)
+            .map((achievement) => {
+                const template = getAchievementTemplate(achievement.templateId);
+                const isPeak = template?.mode === 'PEAK';
+                return {
+                    ...achievement,
+                    name: template!.name,
+                    description: template!.description,
+                    // PEAK achievements (e.g. MAX_SCORE) track a single-attempt
+                    // peak value internally, not a running total — showing the
+                    // raw score/step against its threshold reads like a
+                    // cumulative counter it isn't, so the client only ever sees
+                    // a plain 0/1 (see AchievementProgressMode).
+                    currentCount: isPeak ? (achievement.completed ? 1 : 0) : achievement.currentCount,
+                    targetCount: isPeak ? 1 : achievement.targetCount,
+                };
+            });
     }
 
     /**

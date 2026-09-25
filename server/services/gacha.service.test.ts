@@ -7,7 +7,7 @@ import { ItemType } from '../../shared/types/item';
 import type { Character } from '../../shared/types/character';
 
 const {
-    collectionMock, txGetMock, txSetMock, txUpdateMock, runTransactionMock, docs,
+    collectionMock, txGetMock, txSetMock, txUpdateMock, runTransactionMock, docs, incrementProgressMock,
 } = vi.hoisted(() => {
     const docs = new Map<string, { exists: boolean; data?: () => unknown }>();
 
@@ -27,9 +27,10 @@ const {
     const runTransactionMock = vi.fn(async (callback: (_tx: unknown) => unknown) => callback({
         get: txGetMock, set: txSetMock, update: txUpdateMock,
     }));
+    const incrementProgressMock = vi.fn();
 
     return {
-        collectionMock, txGetMock, txSetMock, txUpdateMock, runTransactionMock, docs,
+        collectionMock, txGetMock, txSetMock, txUpdateMock, runTransactionMock, docs, incrementProgressMock,
     };
 });
 
@@ -37,6 +38,12 @@ vi.mock('../utils/firebaseAdmin', () => ({
     getAdminFirestore: () => ({
         collection: collectionMock,
         runTransaction: runTransactionMock,
+    }),
+}));
+
+vi.mock('./progress-tracker.service', () => ({
+    QuestAchievementProgressTracker: vi.fn().mockImplementation(function QuestAchievementProgressTrackerMock() {
+        return { incrementProgress: incrementProgressMock };
     }),
 }));
 

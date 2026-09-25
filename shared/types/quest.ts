@@ -101,6 +101,12 @@ export enum AchievementType {
   ATTACK_SPEED = 'ATTACK_SPEED',         // Character's computed actionIntervalSec crosses a threshold
   CHARACTER_LEVEL = 'CHARACTER_LEVEL',   // Character reaches level X
   NO_DAMAGE_CLEAR = 'NO_DAMAGE_CLEAR',   // Complete a run without ever taking damage
+  KILL_BOSS = 'KILL_BOSS',               // Total BOSS-tier combat nodes won (all time)
+  SLOT_MACHINE_PULL = 'SLOT_MACHINE_PULL', // Total gacha/slot-machine pulls (all time)
+  CHOOSE_EPIC_BLESSING = 'CHOOSE_EPIC_BLESSING', // Total EPIC-rarity Blessings granted (all time)
+  CURSE_TRIGGERED = 'CURSE_TRIGGERED',   // Total Curses applied (all time)
+  CLAIM_DAILY_SUPPLY = 'CLAIM_DAILY_SUPPLY', // Total daily supply claims (all time)
+  SHOP_PURCHASE = 'SHOP_PURCHASE',       // Total shop item purchases (all time)
 
   // weapon-proficiency-system (design.md D9)
   WEAPON_PROFICIENCY_LEVEL = 'WEAPON_PROFICIENCY_LEVEL', // Any single WeaponType reaches level X (PEAK/GTE)

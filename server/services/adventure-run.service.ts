@@ -27,7 +27,7 @@ import {
 import { EventService } from './event.service';
 import { BlessingService } from './blessing.service';
 import {
-    findCurseTemplate, blessingLevelEffect,
+    findCurseTemplate, blessingLevelEffect, BLESSING_TEMPLATES_BY_ID,
 } from '../../shared/constants/blessings';
 import type { BlessingCandidate } from '../../shared/constants/blessings';
 import { LeaderboardRunUpdater } from './leaderboard-run-updater';
@@ -469,6 +469,11 @@ export class AdventureRunService extends BaseService {
                 type: (run.factionType ?? 'GKBOT') === 'GKBOT' ? 'ENEMY_KILLED_GKBOT' : 'ENEMY_KILLED_HUMAN',
                 amount: resolution.enemies.length,
             });
+            if (nodeData.tier === NodeType.BOSS) {
+                await this.progressTracker.incrementProgress({
+                    accountId: run.accountId, characterId: run.characterId, type: 'BOSS_KILLED', amount: 1,
+                });
+            }
             return {
                 combatLog: resolution.combatLog, summary,
             };
@@ -536,12 +541,20 @@ export class AdventureRunService extends BaseService {
             patch.blessings = upserted.blessings;
             hpMax = upserted.hpMax;
             hp = upserted.hp;
+            if (BLESSING_TEMPLATES_BY_ID[result.blessingGranted.modifierId]?.rarity === 'EPIC') {
+                await this.progressTracker.incrementProgress({
+                    accountId: run.accountId, characterId: run.characterId, type: 'BLESSING_EPIC_GRANTED', amount: 1,
+                });
+            }
         }
         if (result.curseApplied) {
             patch.curses = [...run.curses, result.curseApplied];
             ({
                 hpMax, hp,
             } = applyCurseHpMaxModifier(result.curseApplied, hpMax, hp));
+            await this.progressTracker.incrementProgress({
+                accountId: run.accountId, characterId: run.characterId, type: 'CURSE_TRIGGERED', amount: 1,
+            });
         }
         if (hpMax !== run.playerHpMax) patch.playerHpMax = hpMax;
         if (hp !== run.playerHp) patch.playerHp = hp;
@@ -590,6 +603,14 @@ export class AdventureRunService extends BaseService {
             currentNodeData: FieldValue.delete(),
             lastActivityAt: Date.now(),
         });
+        await this.progressTracker.incrementProgress({
+            accountId: run.accountId, characterId: run.characterId, type: 'STEP_REACHED', amount: run.step + 1,
+        });
+        if (chosen.rarity === 'EPIC') {
+            await this.progressTracker.incrementProgress({
+                accountId: run.accountId, characterId: run.characterId, type: 'BLESSING_EPIC_GRANTED', amount: 1,
+            });
+        }
 
         return chosen;
     }
@@ -885,6 +906,9 @@ export class AdventureRunService extends BaseService {
             currentNodeData: FieldValue.delete(),
             lastActivityAt: Date.now(),
         });
+        await this.progressTracker.incrementProgress({
+            accountId: run.accountId, characterId: run.characterId, type: 'STEP_REACHED', amount: run.step + 1,
+        });
         return { run: updated };
     }
 
@@ -948,6 +972,14 @@ export class AdventureRunService extends BaseService {
         await this.progressTracker.incrementProgress({
             accountId: run.accountId, characterId: run.characterId, type: 'ADVENTURE_COMPLETED', amount: 1,
         });
+        // 拾荒富豪成就（TOTAL_GOLD）先前沒有 emitter，一直是 inert 狀態——這裡補上：
+        // 用實際入帳的金幣（isSuccess 為 false 時 goldEarned 已經是 0），失敗的 run
+        // 不計入，跟金幣本身「只有 isSuccess 才會真的發放」的規則一致。
+        if (goldEarned > 0) {
+            await this.progressTracker.incrementProgress({
+                accountId: run.accountId, characterId: run.characterId, type: 'GOLD_EARNED', amount: goldEarned,
+            });
+        }
         if (isSuccess && !run.damageTakenThisRun) {
             await this.progressTracker.incrementProgress({
                 accountId: run.accountId, characterId: run.characterId, type: 'ADVENTURE_COMPLETED_NO_DAMAGE', amount: 1,

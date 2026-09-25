@@ -11,12 +11,14 @@
 
 import { BaseService } from './base.service';
 import { getAdminFirestore } from '../utils/firebaseAdmin';
+import { AchievementService } from './achievement.service';
 import type { Character } from '../../shared/types/character';
 import type { ItemInstance } from '../../shared/types/item';
 import type { EquipmentSlot } from '../../shared/types';
 import {
-    ItemType, HAND_SLOTS,
+    ItemType, HAND_SLOTS, Rarity,
 } from '../../shared/types';
+import { AchievementType } from '../../shared/types/quest';
 import {
     NotFoundError, ValidationError,
 } from '../../shared/types/errors';
@@ -29,6 +31,7 @@ export type EquipResult = {
 export class EquipmentService extends BaseService {
     protected serviceName = 'equipment';
     private db = getAdminFirestore();
+    private achievementService = new AchievementService();
 
     /**
      * Equip an item onto one of the account's characters. If the target slot
@@ -82,6 +85,11 @@ export class EquipmentService extends BaseService {
             return {
                 equipped: item, unequipped,
             };
+        }).then(async (result) => {
+            if (result.equipped.rarity === Rarity.L) {
+                await this.achievementService.incrementProgress(characterId, AchievementType.EQUIP_LEGENDARY, 1);
+            }
+            return result;
         });
     }
 

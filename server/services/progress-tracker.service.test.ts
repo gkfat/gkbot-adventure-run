@@ -51,3 +51,17 @@ describe('QuestAchievementProgressTracker — weapon proficiency event wiring (w
         expect(questIncrementProgressMock).not.toHaveBeenCalled();
     });
 });
+
+describe('QuestAchievementProgressTracker — GOLD_EARNED event wiring (拾荒富豪 TOTAL_GOLD achievement)', () => {
+    it('routes GOLD_EARNED to AchievementType.TOTAL_GOLD', async () => {
+        const tracker = new QuestAchievementProgressTracker();
+
+        await tracker.incrementProgress({
+            accountId: 'account-1', characterId: 'char-1', type: 'GOLD_EARNED', amount: 36,
+        });
+
+        expect(achievementIncrementProgressMock).toHaveBeenCalledWith('char-1', AchievementType.TOTAL_GOLD, 36);
+        // No QuestType mapping for gold earned — quest progress must not be touched.
+        expect(questIncrementProgressMock).not.toHaveBeenCalled();
+    });
+});

@@ -1202,6 +1202,59 @@ describe('AdventureRunService — Stage completion settles the run (single-stage
         expect(result.settlement?.goldEarned).toBe(20);
     });
 
+    it('settling with goldEarned > 0 reports GOLD_EARNED progress (拾荒富豪 TOTAL_GOLD achievement)', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.RESOLUTION,
+            currentNodeType: NodeType.BOSS,
+            chapterIndex: 2, stageNodeIndex: 14, stageNodeCount: 15,
+            expEarned: 500, goldEarned: 20, gemsEarned: 3,
+        }));
+
+        const service = new AdventureRunService();
+        await service.advance('account-1', 'char-1');
+
+        expect(incrementProgressMock).toHaveBeenCalledWith({
+            accountId: 'account-1', characterId: 'char-1', type: 'GOLD_EARNED', amount: 20,
+        });
+    });
+
+    it('settling with no gold earned (e.g. DEAD, which forfeits gold) does not report GOLD_EARNED progress', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.COMBAT,
+            currentNodeData: {
+                enemyLevel: 5,
+                tier: NodeType.COMBAT,
+                waveCount: 1,
+                enemyCountPerWave: 1,
+                firstWaveEnemies: [
+                    {
+                        archetypeIndex: 0, name: 'Test Enemy', description: 'flavor', level: 5, hp: 60,
+                    },
+                ],
+            },
+            goldEarned: 20,
+        }));
+        combatResolveMock.mockResolvedValue({
+            victory: false,
+            roundCount: 1,
+            playerHpRemaining: 0,
+            expGained: 0,
+            goldDropped: 0,
+            gemsDropped: 0,
+            itemsDropped: [],
+            blessingPointsGained: 0,
+            enemies: [],
+            defeatedCount: 0,
+            combatLog: [],
+            finalRngIndex: 1,
+        });
+
+        const service = new AdventureRunService();
+        await service.resolveCombat('account-1', 'char-1');
+
+        expect(incrementProgressMock).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'GOLD_EARNED' }));
+    });
+
     it('Boss victory settles immediately even when blessingPoints has reached the threshold (skips BLESSING_SELECT)', async () => {
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
             state: AdventureStateType.RESOLUTION,

@@ -1,18 +1,22 @@
 /**
  * Real `ProgressTracker` implementation (see shared/types/adventure.ts) —
- * translates the generic run/combat settlement events AdventureRunService
- * emits into QuestService/AchievementService.incrementProgress calls.
- * Wired into AdventureRunService in place of NoopProgressTracker.
+ * translates the generic run/combat settlement events AdventureRunService,
+ * ShopService, and GachaService emit into QuestService/AchievementService
+ * .incrementProgress calls. Wired into AdventureRunService in place of
+ * NoopProgressTracker.
  *
- * Event name -> QuestType/AchievementType mapping only covers what
- * AdventureRunService and ShopService actually emit today
- * (`ADVENTURE_COMPLETED`, `ADVENTURE_COMPLETED_NO_DAMAGE`, `ENEMY_KILLED`,
- * `ENEMY_KILLED_GKBOT`, `ENEMY_KILLED_HUMAN`, `CHARACTER_LEVEL_REACHED`,
- * `FACILITY_DISCOVERED`, `PURCHASE_SHOP`); other QuestType/AchievementType
- * values (EARN_GOLD, REACH_STEP, MAX_SCORE, TOTAL_GOLD, EQUIP_LEGENDARY,
- * ATTACK_SPEED) have no emitter yet and stay dormant until their owning
- * change (equipment, leaderboard's score redesign, …) adds one — see
- * design.md's event type reference.
+ * Event name -> QuestType/AchievementType mapping covers everything those
+ * services emit today (`ADVENTURE_COMPLETED`, `ADVENTURE_COMPLETED_NO_DAMAGE`,
+ * `ENEMY_KILLED`, `ENEMY_KILLED_GKBOT`, `ENEMY_KILLED_HUMAN`,
+ * `CHARACTER_LEVEL_REACHED`, `FACILITY_DISCOVERED`, `PURCHASE_SHOP`,
+ * `GOLD_EARNED`, `BOSS_KILLED`, `STEP_REACHED`, `SLOT_MACHINE_PULL`,
+ * `BLESSING_EPIC_GRANTED`, `CURSE_TRIGGERED`, `DAILY_SUPPLY_CLAIMED`).
+ * EQUIP_LEGENDARY and ATTACK_SPEED are emitted directly by EquipmentService/
+ * CharacterService via AchievementService (equip/attribute/talent changes
+ * aren't quest-tracked, so they skip this event-name indirection). MAX_SCORE
+ * has no run "score" system to report against at all (leaderboard-season's
+ * score is a season-cumulative Firestore field, not a per-run progress
+ * event) — no template uses it.
  */
 
 import type { ProgressTracker } from '../../shared/types/adventure';
@@ -36,6 +40,14 @@ const ACHIEVEMENT_EVENT_TYPE: Record<string, AchievementType> = {
     CHARACTER_LEVEL_REACHED: AchievementType.CHARACTER_LEVEL,
     FACILITY_DISCOVERED: AchievementType.DISCOVER_FACILITIES,
     ADVENTURE_COMPLETED_NO_DAMAGE: AchievementType.NO_DAMAGE_CLEAR,
+    GOLD_EARNED: AchievementType.TOTAL_GOLD,
+    BOSS_KILLED: AchievementType.KILL_BOSS,
+    STEP_REACHED: AchievementType.REACH_STEP,
+    SLOT_MACHINE_PULL: AchievementType.SLOT_MACHINE_PULL,
+    BLESSING_EPIC_GRANTED: AchievementType.CHOOSE_EPIC_BLESSING,
+    CURSE_TRIGGERED: AchievementType.CURSE_TRIGGERED,
+    DAILY_SUPPLY_CLAIMED: AchievementType.CLAIM_DAILY_SUPPLY,
+    PURCHASE_SHOP: AchievementType.SHOP_PURCHASE,
 
     // weapon-proficiency-system (design.md D9): emitted by CombatService.resolve()
     WEAPON_LEVEL_REACHED: AchievementType.WEAPON_PROFICIENCY_LEVEL,

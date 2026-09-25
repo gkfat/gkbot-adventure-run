@@ -195,6 +195,21 @@ export class CharacterService extends BaseService {
     }
 
     /**
+     * Recompute this character's stats and report the reading toward
+     * ATTACK_SPEED (PEAK/LTE — "crosses a threshold", see AchievementType).
+     * Called from EquipmentService's equip/unequip routes, which can't call
+     * back into CharacterService directly (CharacterService already depends
+     * on EquipmentService for starter-gear auto-equip).
+     */
+    async checkAttackSpeedAchievement(accountId: string, characterId: string): Promise<void> {
+        const character = await this.characterRepo.getByIdForAccount(characterId, accountId);
+        if (!character) {
+            throw new NotFoundError('character');
+        }
+        await this.reportAttackSpeed(character);
+    }
+
+    /**
      * Allocate unspent attribute points on a character owned by the caller.
      * Rejects when the requested total exceeds unspentAttributePoints.
      */
@@ -217,10 +232,12 @@ export class CharacterService extends BaseService {
         };
         const unspentAttributePoints = character.unspentAttributePoints - total;
 
-        return this.characterRepo.updateAttributes(characterId, {
+        const updated = await this.characterRepo.updateAttributes(characterId, {
             attributes,
             unspentAttributePoints,
         });
+        await this.reportAttackSpeed(updated);
+        return updated;
     }
 
     /**
@@ -273,10 +290,24 @@ export class CharacterService extends BaseService {
         };
         const talentPoints = character.talentPoints - 1;
 
-        return this.characterRepo.updateTalents(characterId, {
+        const updated = await this.characterRepo.updateTalents(characterId, {
             talents,
             talentPoints,
         });
+        await this.reportAttackSpeed(updated);
+        return updated;
+    }
+
+    /**
+     * Recompute stats after a mutation that can move `actionIntervalSec`
+     * (attribute/talent allocation) and report the reading toward
+     * ATTACK_SPEED (PEAK/LTE — "crosses a threshold", see AchievementType).
+     */
+    private async reportAttackSpeed(character: Character): Promise<void> {
+        const { stats } = await this.withStats(character);
+        await this.achievementService.incrementProgress(
+            character.characterId, AchievementType.ATTACK_SPEED, stats.actionIntervalSec,
+        );
     }
 
     /**

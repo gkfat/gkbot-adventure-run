@@ -4,14 +4,13 @@
  *
  * Wiring status (see server/services/progress-tracker.service.ts and
  * openspec/changes/quests-and-achievements/design.md's event type reference):
- * TOTAL_KILLS, TOTAL_RUNS, KILL_GKBOT, KILL_HUMAN, CHARACTER_LEVEL,
- * DISCOVER_FACILITIES, and NO_DAMAGE_CLEAR are wired to real adventure-run-core
- * events. MAX_SCORE,
- * REACH_STEP, TOTAL_GOLD, EQUIP_LEGENDARY, and ATTACK_SPEED have no emitter
- * yet (no run "score" system, no per-run step reporting, and stat-threshold
- * checks would need hooking into every equip/attribute/talent call site) —
- * they stay inert, same as before this batch, until their owning system
- * reports progress.
+ * every AchievementType used below is wired to a real emitter — TOTAL_KILLS,
+ * TOTAL_RUNS, KILL_GKBOT, KILL_HUMAN, CHARACTER_LEVEL, DISCOVER_FACILITIES,
+ * NO_DAMAGE_CLEAR, TOTAL_GOLD, REACH_STEP, EQUIP_LEGENDARY, ATTACK_SPEED,
+ * KILL_BOSS, SLOT_MACHINE_PULL, CHOOSE_EPIC_BLESSING, CURSE_TRIGGERED,
+ * CLAIM_DAILY_SUPPLY, and SHOP_PURCHASE. MAX_SCORE has no run "score" system
+ * to report against at all (leaderboard-season's score is a season-cumulative
+ * Firestore field, not a per-run progress event) — no template here uses it.
  */
 
 import type { AchievementTemplate } from '../../../shared/types';
@@ -60,24 +59,6 @@ export const ACHIEVEMENT_TEMPLATES: Record<string, AchievementTemplate> = {
         targetCount: 100,
         rewardGems: 8,
     },
-    'high_score': {
-        templateId: 'high_score',
-        type: AchievementType.MAX_SCORE,
-        name: '高分紀錄',
-        description: '單場冒險分數達到 10,000 分',
-        targetCount: 10000,
-        mode: 'PEAK',
-        rewardGems: 5,
-    },
-    'legendary_score': {
-        templateId: 'legendary_score',
-        type: AchievementType.MAX_SCORE,
-        name: '傳奇分數',
-        description: '單場冒險分數達到 50,000 分',
-        targetCount: 50000,
-        mode: 'PEAK',
-        rewardGems: 8,
-    },
     'deep_incursion': {
         templateId: 'deep_incursion',
         type: AchievementType.REACH_STEP,
@@ -100,7 +81,7 @@ export const ACHIEVEMENT_TEMPLATES: Record<string, AchievementTemplate> = {
         templateId: 'scrap_tycoon',
         type: AchievementType.TOTAL_GOLD,
         name: '拾荒富豪',
-        description: '累計獲得 100,000 枚金幣',
+        description: '從探索中搜集 100,000 枚金幣',
         targetCount: 100000,
         rewardGems: 5,
     },
@@ -187,6 +168,54 @@ export const ACHIEVEMENT_TEMPLATES: Record<string, AchievementTemplate> = {
         targetCount: 1,
         rewardGems: 5,
     },
+    'boss_slayer': {
+        templateId: 'boss_slayer',
+        type: AchievementType.KILL_BOSS,
+        name: '屠魔者',
+        description: '累計擊殺 50 隻頭目敵人',
+        targetCount: 50,
+        rewardGems: 8,
+    },
+    'slot_machine_addict': {
+        templateId: 'slot_machine_addict',
+        type: AchievementType.SLOT_MACHINE_PULL,
+        name: '賭徒精神',
+        description: '在老虎機累計轉動 50 次',
+        targetCount: 50,
+        rewardGems: 5,
+    },
+    'lucky_star': {
+        templateId: 'lucky_star',
+        type: AchievementType.CHOOSE_EPIC_BLESSING,
+        name: '幸運眷顧',
+        description: '累計獲得 EPIC 等級祝福 50 次',
+        targetCount: 50,
+        rewardGems: 6,
+    },
+    'unlucky_fellow': {
+        templateId: 'unlucky_fellow',
+        type: AchievementType.CURSE_TRIGGERED,
+        name: '倒楣鬼',
+        description: '累計觸發詛咒 50 次',
+        targetCount: 50,
+        rewardGems: 5,
+    },
+    'diligent_supplier': {
+        templateId: 'diligent_supplier',
+        type: AchievementType.CLAIM_DAILY_SUPPLY,
+        name: '勤勞補給兵',
+        description: '累計領取每日補給 30 次',
+        targetCount: 30,
+        rewardGems: 5,
+    },
+    'regular_customer': {
+        templateId: 'regular_customer',
+        type: AchievementType.SHOP_PURCHASE,
+        name: '常客',
+        description: '累計在商店購買道具 100 次',
+        targetCount: 100,
+        rewardGems: 6,
+    },
 
     // weapon-proficiency-system (design.md D9)
     'weapon_apprentice': {
@@ -202,7 +231,7 @@ export const ACHIEVEMENT_TEMPLATES: Record<string, AchievementTemplate> = {
         templateId: 'fist_mastery',
         type: AchievementType.WEAPON_MASTERY_FIST,
         name: '鐵拳宗師',
-        description: 'FIST 熟練度達到 Lv.10',
+        description: '拳套熟練度達到 Lv.10',
         targetCount: 10,
         mode: 'PEAK',
         rewardGems: 8,
@@ -211,7 +240,7 @@ export const ACHIEVEMENT_TEMPLATES: Record<string, AchievementTemplate> = {
         templateId: 'blade_mastery',
         type: AchievementType.WEAPON_MASTERY_BLADE,
         name: '劍刃宗師',
-        description: 'BLADE 熟練度達到 Lv.10',
+        description: '刀劍熟練度達到 Lv.10',
         targetCount: 10,
         mode: 'PEAK',
         rewardGems: 8,
@@ -220,7 +249,7 @@ export const ACHIEVEMENT_TEMPLATES: Record<string, AchievementTemplate> = {
         templateId: 'blunt_mastery',
         type: AchievementType.WEAPON_MASTERY_BLUNT,
         name: '重擊宗師',
-        description: 'BLUNT 熟練度達到 Lv.10',
+        description: '鈍器熟練度達到 Lv.10',
         targetCount: 10,
         mode: 'PEAK',
         rewardGems: 8,
@@ -229,7 +258,7 @@ export const ACHIEVEMENT_TEMPLATES: Record<string, AchievementTemplate> = {
         templateId: 'polearm_mastery',
         type: AchievementType.WEAPON_MASTERY_POLEARM,
         name: '長柄宗師',
-        description: 'POLEARM 熟練度達到 Lv.10',
+        description: '長柄熟練度達到 Lv.10',
         targetCount: 10,
         mode: 'PEAK',
         rewardGems: 8,
@@ -238,7 +267,7 @@ export const ACHIEVEMENT_TEMPLATES: Record<string, AchievementTemplate> = {
         templateId: 'ranged_mastery',
         type: AchievementType.WEAPON_MASTERY_RANGED,
         name: '槍械宗師',
-        description: 'RANGED 熟練度達到 Lv.10',
+        description: '槍械熟練度達到 Lv.10',
         targetCount: 10,
         mode: 'PEAK',
         rewardGems: 8,

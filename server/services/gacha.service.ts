@@ -17,6 +17,7 @@ import { CharacterRepository } from '../repositories/character.repository';
 import { getAdminFirestore } from '../utils/firebaseAdmin';
 import { generateItemInstance } from './item.service';
 import { getAllItemTemplates } from '../constants/templates';
+import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import {
     GACHA_CONFIG, GACHA_GOLD_RARITY_WEIGHTS, GACHA_GEMS_RARITY_WEIGHTS,
 } from '../constants/gacha';
@@ -39,10 +40,12 @@ export class GachaService extends BaseService {
     protected serviceName = 'gacha';
     private characterRepo: CharacterRepository;
     private db = getAdminFirestore();
+    private progressTracker: QuestAchievementProgressTracker;
 
     constructor() {
         super();
         this.characterRepo = new CharacterRepository();
+        this.progressTracker = new QuestAchievementProgressTracker();
     }
 
     /**
@@ -61,7 +64,7 @@ export class GachaService extends BaseService {
         const characterRef = this.db.collection('characters').doc(characterId);
         const inventoryRef = this.db.collection('inventories').doc(characterId);
 
-        return this.db.runTransaction(async (tx) => {
+        const result = await this.db.runTransaction(async (tx) => {
             const characterDoc = await tx.get(characterRef);
             if (!characterDoc.exists) {
                 throw new NotFoundError('character');
@@ -111,6 +114,12 @@ export class GachaService extends BaseService {
                 remainingBalance,
             };
         });
+
+        await this.progressTracker.incrementProgress({
+            accountId, characterId, type: 'SLOT_MACHINE_PULL', amount: 1,
+        });
+
+        return result;
     }
 }
 

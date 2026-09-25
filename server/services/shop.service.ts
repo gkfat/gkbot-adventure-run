@@ -374,7 +374,7 @@ export class ShopService extends BaseService {
         const characterRef = this.db.collection('characters').doc(characterId);
         const inventoryRef = this.db.collection('inventories').doc(characterId);
 
-        return this.db.runTransaction(async (tx) => {
+        const result = await this.db.runTransaction(async (tx) => {
             const supplyDoc = await tx.get(supplyRef);
             if (!supplyDoc.exists) {
                 throw new NotFoundError('daily supply');
@@ -422,6 +422,12 @@ export class ShopService extends BaseService {
                 item,
             };
         });
+
+        await this.progressTracker.incrementProgress({
+            accountId, characterId, type: 'DAILY_SUPPLY_CLAIMED', amount: 1,
+        });
+
+        return result;
     }
 }
 

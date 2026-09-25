@@ -3,6 +3,7 @@ import {
 } from 'h3';
 import { requireAuth } from '../../../utils/auth';
 import { EquipmentService } from '../../../services/equipment.service';
+import { CharacterService } from '../../../services/character.service';
 import {
     unequipItemRequestSchema, unequipItemResponseSchema,
 } from '../../../../shared/schemas/api/inventory.schema';
@@ -30,6 +31,7 @@ export default defineEventHandler(async (event) => {
 
         const equipmentService = new EquipmentService();
         const unequipped = await equipmentService.unequipItem(authUser.uid, characterId, parseResult.data.slot);
+        await new CharacterService().checkAttackSpeedAchievement(authUser.uid, characterId);
 
         logRequest({
             severity: 'INFO',

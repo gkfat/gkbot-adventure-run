@@ -61,7 +61,7 @@ vi.mock('./shop.service', () => ({
 
 vi.mock('./achievement.service', () => ({
     AchievementService: vi.fn().mockImplementation(function AchievementServiceMock() {
-        return {};
+        return { incrementProgress: vi.fn() };
     }),
 }));
 
