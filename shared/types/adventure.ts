@@ -404,6 +404,12 @@ export type AdventureRun = {
   // within the same Chapter get different node sequences, while re-entering
   // the same Level (DEAD/DISCONNECT retry) reproduces the same one.
   levelIndex: number;
+  // Snapshot of the character's chapterTotalLevels at run creation
+  // (boss-tier-enhancements) — used to decide whether this run's Level is
+  // the last Level of its Chapter (levelIndex + 1 >= chapterTotalLevels)
+  // without an extra character read. Optional: missing on pre-migration
+  // run docs, in which case the chapter-final-boss bonus does not apply.
+  chapterTotalLevels?: number;
   stageNodeIndex: number;        // 0-based, resets to 0 on stage change
   stageNodeCount: number;        // node count for this stage, rolled once at stage start
 
@@ -863,6 +869,20 @@ export function rollChapterTotalLevels(characterPower: number, chapterIndex: num
  */
 export function getStageDisplayName(chapterIndex: number): string {
     return getFacilityTheme(chapterIndex);
+}
+
+/**
+ * Whether this run's Level is the last Level of its Chapter (boss-tier-
+ * enhancements) — drives the chapter-final-boss stat/visual bonus. `run`
+ * only carries a snapshot of `chapterTotalLevels` taken at createRun
+ * (missing on pre-migration run docs), so a missing value conservatively
+ * resolves to "not the final boss" rather than guessing.
+ */
+export function isChapterFinalBossRun(run: Pick<AdventureRun, 'levelIndex' | 'chapterTotalLevels'>): boolean {
+    if (run.chapterTotalLevels === undefined) {
+        return false;
+    }
+    return run.levelIndex + 1 >= run.chapterTotalLevels;
 }
 
 /**

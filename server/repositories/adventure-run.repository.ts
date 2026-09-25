@@ -83,6 +83,7 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
         playerHpMax: number;
         chapterIndex: number;
         levelIndex: number;
+        chapterTotalLevels: number;
         characterAttributes: Attributes;
     }): Promise<AdventureRun> {
         try {
@@ -141,6 +142,7 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
 
                 chapterIndex: params.chapterIndex,
                 levelIndex: params.levelIndex,
+                chapterTotalLevels: params.chapterTotalLevels,
                 stageNodeIndex: 0,
                 stageNodeCount,
                 stageCombatEncountered: false,

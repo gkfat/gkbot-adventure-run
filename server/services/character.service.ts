@@ -57,8 +57,12 @@ import {
 /**
  * All 32 bestiary entries (enemy-bestiary spec.md "查詢圖鑑 API"), each
  * paired with the faction/tier needed to resolve its portrait fallback.
+ * `tier` is narrowed to 'normal' | 'boss' (never 'elite' — a bestiary
+ * archetype's own base tier, not the combat-time tier applied on top; see
+ * boss-tier-enhancements spec.md) so it can also be returned as-is via
+ * `BestiaryEntry.tier`.
  */
-const BESTIARY_ARCHETYPES: { archetype: EnemyArchetype; faction: EnemyFaction; tier: EnemyAvatarTier }[] = [
+const BESTIARY_ARCHETYPES: { archetype: EnemyArchetype; faction: EnemyFaction; tier: Extract<EnemyAvatarTier, 'normal' | 'boss'> }[] = [
     ...ENEMY_ARCHETYPES.map(archetype => ({
         archetype, faction: 'GKBOT' as const, tier: 'normal' as const,
     })),
@@ -405,6 +409,7 @@ export class CharacterService extends BaseService {
                 description: archetype.description,
                 portraitUrl: getEnemyPortraitUrl(archetype.slug, faction, tier),
                 defeatedCount: character.defeatedArchetypeCounts[archetype.slug] ?? 0,
+                tier,
             };
         });
 

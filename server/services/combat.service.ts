@@ -21,7 +21,7 @@ import {
     RngService, type RngCursor,
 } from './rng.service';
 import {
-    getStatMultipliers, type EnemyTier,
+    getStatMultipliers, applyChapterFinalBossBonus, type EnemyTier,
 } from '../constants/difficulty';
 import {
     ENEMY_ARCHETYPES, HUMAN_ARCHETYPES, GKBOT_BOSS_ARCHETYPES, HUMAN_BOSS_ARCHETYPES,
@@ -49,7 +49,7 @@ import { ItemType } from '../../shared/types/item';
 import type { ItemInstance } from '../../shared/types/item';
 import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import {
-    NodeType, disambiguateEnemyNames,
+    NodeType, disambiguateEnemyNames, isChapterFinalBossRun,
 } from '../../shared/types/adventure';
 import {
     EquipmentSlot, WeaponType, type Stats,
@@ -456,6 +456,7 @@ export class CombatService extends BaseService implements CombatResolver {
             const enemies = this.spawnWave(
                 cursor, context, mobArchetypes, bossArchetypes, severityTier, player.actionIntervalSec,
                 wave === 0 ? context.firstWaveArchetypeIndices : undefined,
+                isChapterFinalBossRun(run),
             );
             encountered.push(...enemies);
 
@@ -681,11 +682,15 @@ export class CombatService extends BaseService implements CombatResolver {
         severityTier: FacilitySeverity,
         playerActionIntervalSec: number,
         archetypeIndices?: number[],
+        isChapterFinalBoss = false,
     ): CombatUnit[] {
         const enemyLevel = context.enemyLevel;
         const isBossTier = context.tier === NodeType.BOSS;
         const uniformMultipliers = isBossTier ? undefined : getStatMultipliers(enemyLevel, NODE_TYPE_TO_ENEMY_TIER[context.tier], severityTier);
-        const bossMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'NORMAL', severityTier) : undefined;
+        let bossMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'NORMAL', severityTier) : undefined;
+        if (isBossTier && isChapterFinalBoss) {
+            bossMultipliers = applyChapterFinalBossBonus(bossMultipliers!);
+        }
         const minionMultipliers = isBossTier ? getStatMultipliers(enemyLevel, 'BOSS_MINION', severityTier) : undefined;
 
         const enemies: CombatUnit[] = [];

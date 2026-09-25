@@ -25,6 +25,13 @@
                     color="primary"
                 />
             </div>
+            <span
+                v-if="selected?.encountered && selected.tier"
+                class="bestiary-dialog__tier mt-2"
+                :class="`bestiary-dialog__tier--${selected.tier}`"
+            >
+                {{ tierLabel(selected.tier) }}
+            </span>
             <div class="text-subtitle-1 font-weight-medium mt-2">
                 {{ selected?.encountered ? selected.name : UNKNOWN_ENEMY_NAME }}
             </div>
@@ -65,6 +72,13 @@
                             size="18"
                             color="primary"
                         />
+                        <span
+                            v-if="entry.encountered && entry.tier"
+                            class="bestiary-dialog__cell-tier"
+                            :class="`bestiary-dialog__cell-tier--${entry.tier}`"
+                        >
+                            {{ tierLabel(entry.tier) }}
+                        </span>
                     </button>
                 </v-col>
             </v-row>
@@ -87,6 +101,10 @@ import type { GetBestiaryResponse, BestiaryEntry } from '../../../../shared/sche
 import {
     UNKNOWN_ENEMY_ICON, UNKNOWN_ENEMY_NAME, UNKNOWN_ENEMY_DESCRIPTION,
 } from '../../../utils/enemyAvatar';
+
+// boss-tier-enhancements：圖鑑呈現敵人固有位階（小兵／Boss），未遇過的敵人
+// 不顯示（tier 只在 entry.encountered 為 true 時由後端回傳，見 bestiary.schema.ts）。
+const tierLabel = (tier: 'normal' | 'boss') => (tier === 'boss' ? 'Boss' : '小兵');
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
@@ -143,12 +161,56 @@ watch(() => props.modelValue, (open) => {
         image-rendering: pixelated;
     }
 
+    // boss-tier-enhancements：位階標籤，樣式比照 combatResultPanel.vue 的
+    // __tier--boss/__tier--minion 配色慣例。
+    &__tier {
+        display: inline-block;
+        font-size: 10px;
+        line-height: 1;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 700;
+
+        &--boss {
+            background: rgba(var(--v-theme-warning), 0.2);
+            color: rgb(var(--v-theme-warning));
+        }
+
+        &--normal {
+            background: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.7);
+        }
+    }
+
+    &__cell-tier {
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        font-size: 8px;
+        line-height: 1;
+        padding: 1px 3px;
+        border-radius: 3px;
+        font-weight: 700;
+        pointer-events: none;
+
+        &--boss {
+            background: rgba(var(--v-theme-warning), 0.85);
+            color: #0a0c10;
+        }
+
+        &--normal {
+            background: rgba(0, 0, 0, 0.6);
+            color: rgba(255, 255, 255, 0.8);
+        }
+    }
+
     &__grid-scroll {
         overflow-y: auto;
         min-height: 0;
     }
 
     &__cell {
+        position: relative;
         width: 100%;
         aspect-ratio: 1;
         background: #14171c;

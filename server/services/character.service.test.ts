@@ -411,6 +411,7 @@ describe('CharacterService.getBestiary', () => {
         expect(encounteredEntry?.description).toBeTruthy();
         expect(encounteredEntry?.portraitUrl).toBe('/images/enemies/gkbot-repair.png');
         expect(encounteredEntry?.defeatedCount).toBe(4);
+        expect(encounteredEntry?.tier).toBe('normal');
 
         const unencounteredEntry = bestiary.find(entry => entry.slug !== 'gkbot-repair');
         expect(unencounteredEntry?.encountered).toBe(false);
@@ -418,6 +419,31 @@ describe('CharacterService.getBestiary', () => {
         expect(unencounteredEntry?.description).toBeUndefined();
         expect(unencounteredEntry?.portraitUrl).toBeUndefined();
         expect(unencounteredEntry?.defeatedCount).toBeUndefined();
+        expect(unencounteredEntry?.tier).toBeUndefined();
+    });
+
+    // boss-tier-enhancements: an encountered archetype's `tier` reflects
+    // which static template array it came from — 'normal' for
+    // ENEMY_ARCHETYPES/HUMAN_ARCHETYPES, 'boss' for the *_BOSS_ARCHETYPES
+    // lists — and is withheld entirely for un-encountered archetypes.
+    it('reports tier=\'boss\' for an encountered boss archetype and withholds tier when un-encountered', async () => {
+        getByIdForAccountMock.mockResolvedValue({
+            characterId: 'char-1',
+            accountId: 'account-1',
+            // 'guard-hound-gkbot' is GKBOT_BOSS_ARCHETYPES[0].
+            encounteredArchetypeSlugs: ['guard-hound-gkbot'],
+            defeatedArchetypeCounts: {},
+        });
+        const service = new CharacterService();
+
+        const bestiary = await service.getBestiary('account-1', 'char-1');
+
+        const bossEntry = bestiary.find(entry => entry.slug === 'guard-hound-gkbot');
+        expect(bossEntry?.encountered).toBe(true);
+        expect(bossEntry?.tier).toBe('boss');
+
+        const unencounteredEntry = bestiary.find(entry => entry.slug !== 'guard-hound-gkbot');
+        expect(unencounteredEntry?.tier).toBeUndefined();
     });
 
     it('reports defeatedCount 0 for an encountered archetype with no recorded kills yet', async () => {

@@ -103,6 +103,7 @@ export const adventureRunSchema = z.object({
     // Stage progression (adventure-stage-progression)
     chapterIndex: z.number().int().min(0),
     levelIndex: z.number().int().min(0),
+    chapterTotalLevels: z.number().int().min(1).optional(),
     stageNodeIndex: z.number().int().min(0),
     stageNodeCount: z.number().int().min(0),
 

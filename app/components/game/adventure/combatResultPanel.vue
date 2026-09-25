@@ -35,6 +35,7 @@
                         'combat-result-panel__unit--dead': !enemy.alive,
                         'combat-result-panel__unit--entering': enemy.rowState === 'entering',
                         'combat-result-panel__unit--exiting': enemy.rowState === 'exiting',
+                        'combat-result-panel__unit--boss': enemy.isBoss,
                     }"
                 >
                     <div class="combat-result-panel__fx-anchor">
@@ -215,6 +216,12 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
 
         &--dead {
             opacity: 0.45;
+        }
+
+        // boss-tier-enhancements：BOSS 節點的頭目本體卡片（含頭像）放大為小兵
+        // 的 1.2 倍，讓玩家能直接從畫面尺寸分辨敵人位階；隨從/小兵維持原尺寸。
+        &--boss {
+            width: 86px;
         }
 
         // 換 wave 進出場：上一波往上滑出淡出，下一波由上滑入淡入，時長跟

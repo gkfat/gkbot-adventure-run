@@ -610,6 +610,81 @@ describe('CombatService.resolve', () => {
         });
     });
 
+    // boss-tier-enhancements: the boss unit on the last Level of a Chapter
+    // gets an extra 1.5x on its NORMAL-tier stats; escort minions must not.
+    describe('Chapter-final-boss stat bonus', () => {
+        it('scales the boss unit\'s hp/atk/def by 1.5x when this run is the chapter final boss', async () => {
+            const service = new CombatService();
+            const enemyLevel = 6;
+            const bossArchetype = GKBOT_BOSS_ARCHETYPES[0]!;
+            const context: CombatContext = {
+                enemyLevel, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+            };
+
+            const finalBossRun = baseRun({
+                levelIndex: 2, chapterTotalLevels: 3, 
+            });
+            const finalBossResult = await service.resolve(finalBossRun, context);
+
+            const regularBossRun = baseRun({
+                levelIndex: 1, chapterTotalLevels: 3, 
+            });
+            const regularBossResult = await service.resolve(regularBossRun, context);
+
+            // CombatResolution.enemies only exposes hpMax (not atk/def) — atk/
+            // def go through the exact same `multipliers` object as hp inside
+            // buildEnemyUnit, so the hp ratio is a faithful proxy for all
+            // three stats sharing the same 1.5x bonus.
+            const regularMultipliers = getStatMultipliers(enemyLevel, 'NORMAL');
+            const expectedFinalHp = Math.round(bossArchetype.baseHp * regularMultipliers.hp * 1.5);
+
+            expect(finalBossResult.enemies[0]?.hpMax).toBe(expectedFinalHp);
+            expect(finalBossResult.enemies[0]?.hpMax).toBeGreaterThan(regularBossResult.enemies[0]!.hpMax);
+        });
+
+        it('does not scale escort minion stats for a chapter final boss', async () => {
+            const service = new CombatService();
+            const context: CombatContext = {
+                enemyLevel: 1, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 3, firstWaveArchetypeIndices: [
+                    0,
+                    0,
+                    0,
+                ],
+            };
+
+            const finalBossRun = baseRun({
+                levelIndex: 2, chapterTotalLevels: 3, 
+            });
+            const finalBossResult = await service.resolve(finalBossRun, context);
+
+            const regularBossRun = baseRun({
+                levelIndex: 1, chapterTotalLevels: 3, 
+            });
+            const regularBossResult = await service.resolve(regularBossRun, context);
+
+            expect(finalBossResult.enemies[1]?.hpMax).toBe(regularBossResult.enemies[1]?.hpMax);
+            expect(finalBossResult.enemies[2]?.hpMax).toBe(regularBossResult.enemies[2]?.hpMax);
+            expect(finalBossResult.enemies[0]?.hpMax).not.toBe(regularBossResult.enemies[0]?.hpMax);
+        });
+
+        it('does not scale the boss unit when chapterTotalLevels is missing (pre-migration run)', async () => {
+            const service = new CombatService();
+            const context: CombatContext = {
+                enemyLevel: 6, tier: NodeType.BOSS, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [0],
+            };
+
+            const run = baseRun({ levelIndex: 2 });
+            const result = await service.resolve(run, context);
+
+            const regularBossRun = baseRun({
+                levelIndex: 1, chapterTotalLevels: 3, 
+            });
+            const regularBossResult = await service.resolve(regularBossRun, context);
+
+            expect(result.enemies[0]?.hpMax).toBe(regularBossResult.enemies[0]?.hpMax);
+        });
+    });
+
     // Confirms blessing_speed (actionIntervalSec: -0.3) isn't just stored on
     // the run but actually reaches the combat loop's nextAttackAt scheduling
     // and increases how often the player acts (see applyModifiers/resolve()).
@@ -806,14 +881,17 @@ describe('CombatService.resolve', () => {
 
         it('still records kills made before the player is defeated mid-combat', async () => {
             // Player one-shots the first enemy (ATK 1000 vs a low-level DEF).
-            // actionIntervalSec=3s puts the player's first action (3000ms)
-            // ahead of both enemy archetypes' first action (index0=4500ms,
-            // index1=5000ms — see server/constants/templates/enemies.ts), so
-            // the player still strikes first; but the second enemy's own
-            // first action (5000ms) lands before the player's second action
-            // (6000ms), so it gets to hit back — any enemy attack with ATK >
-            // 0 deals >=1 damage (computeDamage floors at 1), which instantly
-            // kills the 1-HP player before the player can act again.
+            // Enemy actionIntervalSec base values were doubled in
+            // enemies.ts (enemy action frequency halved), so archetype 0/1's
+            // first action lands at 9000ms / 10000ms (see
+            // server/constants/templates/enemies.ts for the current values).
+            // actionIntervalSec=6s puts the player's first action (6000ms)
+            // ahead of both enemies' first action, so the player still
+            // strikes first; but the second enemy's own first action
+            // (10000ms) lands before the player's second action (12000ms),
+            // so it gets to hit back — any enemy attack with ATK > 0 deals
+            // >=1 damage (computeDamage floors at 1), which instantly kills
+            // the 1-HP player before the player can act again.
             getCharacterWithStatsMock.mockResolvedValue({
                 nickname: 'Tester',
                 attributes: { LUCK: 0 },
@@ -825,7 +903,7 @@ describe('CombatService.resolve', () => {
                     exp: 0, level: 1,
                 },
                 stats: {
-                    ATK: 1000, DEF: 0, HP_MAX: 1, actionIntervalSec: 3, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
+                    ATK: 1000, DEF: 0, HP_MAX: 1, actionIntervalSec: 6, critChance: 0, critMultiplier: 1.5, dodgeChance: 0,
                 },
             });
             const service = new CombatService();

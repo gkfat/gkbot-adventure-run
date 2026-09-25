@@ -112,53 +112,53 @@ baseDef = 1 + levelSteps * DEF_MULT_PER_LEVEL
 
 | Archetype | baseAtk | baseDef | baseHp | actionIntervalSec |
 |---|---|---|---|---|
-| 維修型 GkBot | 8 | 4 | 90 | 4.5 |
-| 保全機具 | 6 | 8 | 120 | 5.0 |
-| 失控搬運機 | 12 | 2 | 75 | 4.2 |
-| 廢棄零件堆 | 4 | 2 | 45 | 5.5 |
-| 產線機械臂 | 11 | 5 | 135 | 4.4 |
-| 合成觀測員 | 7 | 3 | 53 | 4.0 |
-| 幻影投影體 | 7 | 2 | 48 | 4.1 |
-| 荷官型 GkBot | 5 | 5 | 83 | 4.6 |
+| 維修型 GkBot | 8 | 4 | 90 | 9.0 |
+| 保全機具 | 6 | 8 | 120 | 10.0 |
+| 失控搬運機 | 12 | 2 | 75 | 8.4 |
+| 廢棄零件堆 | 4 | 2 | 45 | 11.0 |
+| 產線機械臂 | 11 | 5 | 135 | 8.8 |
+| 合成觀測員 | 7 | 3 | 53 | 8.0 |
+| 幻影投影體 | 7 | 2 | 48 | 8.2 |
+| 荷官型 GkBot | 5 | 5 | 83 | 9.2 |
 
 ### GkBot 陣營頭目（`GKBOT_BOSS_ARCHETYPES`）
 
 | Archetype | baseAtk | baseDef | baseHp | actionIntervalSec |
 |---|---|---|---|---|
-| 看門犬型 GkBot | 10 | 16 | 374 | 4.8 |
-| 偵察無人機 | 16 | 6 | 187 | 3.8 |
-| 核心維修官 | 14 | 10 | 289 | 4.5 |
-| 產線總管 | 22 | 6 | 255 | 4.2 |
-| 幻象法師型 | 15 | 5 | 204 | 4.3 |
-| 荷官頭目 | 16 | 9 | 272 | 4.4 |
-| 倉儲搬運霸主 | 15 | 18 | 391 | 4.9 |
-| 商場保全指揮核心 | 14 | 17 | 323 | 4.7 |
+| 看門犬型 GkBot | 10 | 16 | 374 | 9.6 |
+| 偵察無人機 | 16 | 6 | 187 | 7.6 |
+| 核心維修官 | 14 | 10 | 289 | 9.0 |
+| 產線總管 | 22 | 6 | 255 | 8.4 |
+| 幻象法師型 | 15 | 5 | 204 | 8.6 |
+| 荷官頭目 | 16 | 9 | 272 | 8.8 |
+| 倉儲搬運霸主 | 15 | 18 | 391 | 9.8 |
+| 商場保全指揮核心 | 14 | 17 | 323 | 9.4 |
 
 ### 末世盜賊團陣營小兵（`HUMAN_ARCHETYPES`）
 
 | Archetype | baseAtk | baseDef | baseHp | actionIntervalSec |
 |---|---|---|---|---|
-| 看門狗 | 7 | 8 | 105 | 4.6 |
-| 偵查者（人類斥候） | 8 | 3 | 60 | 4.0 |
-| 幫派打手 | 13 | 3 | 83 | 4.1 |
-| 烏合掠奪者 | 4 | 2 | 42 | 4.8 |
-| 合成士兵 | 12 | 6 | 98 | 4.2 |
-| 狙擊掠奪者 | 14 | 2 | 57 | 4.0 |
-| 私兵護衛 | 9 | 6 | 90 | 4.4 |
-| 賭場保鑣 | 9 | 6 | 87 | 4.5 |
+| 看門狗 | 7 | 8 | 105 | 9.2 |
+| 偵查者（人類斥候） | 8 | 3 | 60 | 8.0 |
+| 幫派打手 | 13 | 3 | 83 | 8.2 |
+| 烏合掠奪者 | 4 | 2 | 42 | 9.6 |
+| 合成士兵 | 12 | 6 | 98 | 8.4 |
+| 狙擊掠奪者 | 14 | 2 | 57 | 8.0 |
+| 私兵護衛 | 9 | 6 | 90 | 8.8 |
+| 賭場保鑣 | 9 | 6 | 87 | 9.0 |
 
 ### 末世盜賊團陣營頭目（`HUMAN_BOSS_ARCHETYPES`）
 
 | Archetype | baseAtk | baseDef | baseHp | actionIntervalSec |
 |---|---|---|---|---|
-| 百夫長 | 20 | 11 | 306 | 4.0 |
-| 財庫守門員 | 15 | 17 | 357 | 4.6 |
-| 狂暴幫主 | 24 | 6 | 255 | 4.1 |
-| 合成軍團長 | 21 | 12 | 340 | 4.3 |
-| 影武者 | 22 | 5 | 170 | 3.8 |
-| 賭場莊家王 | 16 | 10 | 272 | 4.4 |
-| 盜賊團軍師 | 14 | 9 | 255 | 4.5 |
-| 末路狂人 | 30 | 4 | 153 | 4.2 |
+| 百夫長 | 20 | 11 | 306 | 8.0 |
+| 財庫守門員 | 15 | 17 | 357 | 9.2 |
+| 狂暴幫主 | 24 | 6 | 255 | 8.2 |
+| 合成軍團長 | 21 | 12 | 340 | 8.6 |
+| 影武者 | 22 | 5 | 170 | 7.6 |
+| 賭場莊家王 | 16 | 10 | 272 | 8.8 |
+| 盜賊團軍師 | 14 | 9 | 255 | 9.0 |
+| 末路狂人 | 30 | 4 | 153 | 8.4 |
 
 > 檔案開頭註解原文（`server/constants/templates/enemies.ts` line 3-11）：
 > ```
@@ -168,7 +168,20 @@ baseDef = 1 + levelSteps * DEF_MULT_PER_LEVEL
 > Base stats are set at enemyLevel=1; actual combat stats are scaled via
 > getStatMultipliers() (../difficulty.ts) for the node's real enemyLevel/tier.
 > ```
-> 即這 32 組 archetype 的基底數值本身也是發明值（無其他 spec 依據），實際戰鬥數值 = base 值 × 上述成長倍率。`actionIntervalSec` 已全數統一 +2 秒調慢敵人攻速（詳見變更歷史，非上述 ASSUMPTION 範圍內的原始發明值）。
+> 即這 32 組 archetype 的基底數值本身也是發明值（無其他 spec 依據），實際戰鬥數值 = base 值 × 上述成長倍率。`actionIntervalSec` 經歷過兩次調慢敵人攻速的變更（皆非上述 ASSUMPTION 範圍內的原始發明值）：先前已全數統一 +2 秒，後續再全數統一 ×2（即上表數值），使敵人整體行動頻率降為原本的一半。
+
+## 章節最後一關 Boss 加成（boss-tier-enhancements）
+
+每個 Chapter 的最後一個 Level（`run.levelIndex + 1 >= run.chapterTotalLevels`，`chapterTotalLevels` 為建立 run 時對角色 `chapterTotalLevels` 的快照，見 `shared/types/adventure.ts` `isChapterFinalBossRun()`）的 BOSS 節點，boss 本體（不含隨從/minion）在既有 NORMAL tier 倍率之上，額外乘上 `CHAPTER_FINAL_BOSS_MULTIPLIER = 1.5`（`server/constants/difficulty.ts` `applyChapterFinalBossBonus()`）：
+
+```
+finalBossMultiplier = getStatMultipliers(enemyLevel, 'NORMAL', severityTier) × 1.5
+```
+
+- 套用點：`adventure-run.service.ts` `buildBossNodeData`（戰前預覽）與 `combat.service.ts` `spawnWave`（實際戰鬥）各自獨立呼叫，但都源自同一個 `run` 文件的 `levelIndex`/`chapterTotalLevels`，兩處計算結果保證一致。
+- `chapterTotalLevels` 缺值（pre-migration run 文件）時，`isChapterFinalBossRun()` fallback 為 `false`，不套用加成。
+- 隨從/minion（`BOSS_MINION` tier）不受此加成影響。
+- `1.5` 倍率是本次新增的發明值（無其他數值依據），若要調整需同步更新 `difficulty.ts` 的 `CHAPTER_FINAL_BOSS_MULTIPLIER` 與 `difficulty.test.ts`/`adventure-run.service.test.ts`/`combat.service.test.ts` 的相關斷言。
 
 ## 落地備註
 

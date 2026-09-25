@@ -33,14 +33,14 @@ import type { BlessingCandidate } from '../../shared/constants/blessings';
 import { LeaderboardRunUpdater } from './leaderboard-run-updater';
 import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import {
-    getEnemyLevel, getStatMultipliers, rollWaveCount, rollEnemyCount,
+    getEnemyLevel, getStatMultipliers, rollWaveCount, rollEnemyCount, applyChapterFinalBossBonus,
 } from '../constants/difficulty';
 import {
     AdventureStateType, AdventureEndReason, NodeType, NODE_CONFIG, STAGE_NODE_COUNT_FALLBACK, isCombatNodeType,
     type AdventureRun, type LeaderboardUpdater, type ProgressTracker,
     type CombatResolver, type CombatContext, type CombatResolution, type CombatSummary, type CombatLogEntry,
     type EventResult, type SettleSummary, type EnemyPreview, type BlessingEntry,
-    disambiguateEnemyNames,
+    disambiguateEnemyNames, isChapterFinalBossRun,
 } from '../../shared/types/adventure';
 import type { Character } from '../../shared/types/character';
 import type { ItemInstance } from '../../shared/types/item';
@@ -247,6 +247,7 @@ export class AdventureRunService extends BaseService {
             playerHpMax: characterWithStats.stats.HP_MAX,
             chapterIndex: characterWithStats.nextChapterIndex,
             levelIndex: characterWithStats.currentLevelIndex,
+            chapterTotalLevels: characterWithStats.chapterTotalLevels,
             characterAttributes: characterWithStats.attributes,
         });
     }
@@ -793,7 +794,10 @@ export class AdventureRunService extends BaseService {
         // baseAtk/baseDef/baseHp is already a boss-scale value, not stacked
         // with the BOSS tier multiplier); escort minions use BOSS_MINION
         // tier on top of their own (mob-scale) baseHp/baseAtk/baseDef.
-        const bossMultipliers = getStatMultipliers(enemyLevel, 'NORMAL', severityTier);
+        let bossMultipliers = getStatMultipliers(enemyLevel, 'NORMAL', severityTier);
+        if (isChapterFinalBossRun(run)) {
+            bossMultipliers = applyChapterFinalBossBonus(bossMultipliers);
+        }
         const minionMultipliers = getStatMultipliers(enemyLevel, 'BOSS_MINION', severityTier);
 
         const firstWaveEnemies: EnemyPreview[] = [

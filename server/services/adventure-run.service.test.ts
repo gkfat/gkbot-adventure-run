@@ -528,6 +528,80 @@ describe('AdventureRunService.advance — node generation priority', () => {
             expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({ currentNodeType: NodeType.BOSS }));
         });
     });
+
+    // boss-tier-enhancements: the boss on the last Level of a Chapter gets
+    // its preview hp scaled up an extra 1.5x on top of the normal BOSS-tier
+    // curve; escort minions are unaffected.
+    describe('Chapter-final-boss preview bonus', () => {
+        it('scales the boss preview hp by 1.5x when this run is the chapter final boss', async () => {
+            rngNextMock.mockResolvedValue(0);
+            getActiveByCharacterIdMock.mockResolvedValueOnce(baseRun({
+                step: 9, stageNodeIndex: 14, stageNodeCount: 15, levelIndex: 2, chapterTotalLevels: 3,
+            }));
+
+            const finalBossService = new AdventureRunService();
+            const finalBossResult = await finalBossService.advance('account-1', 'char-1');
+            const finalBossHp = (finalBossResult.run.currentNodeData as { firstWaveEnemies: { hp: number; isBoss: boolean }[] })
+                .firstWaveEnemies.find(enemy => enemy.isBoss)!.hp;
+
+            getActiveByCharacterIdMock.mockResolvedValueOnce(baseRun({
+                step: 9, stageNodeIndex: 14, stageNodeCount: 15, levelIndex: 1, chapterTotalLevels: 3,
+            }));
+
+            const regularBossService = new AdventureRunService();
+            const regularBossResult = await regularBossService.advance('account-1', 'char-1');
+            const regularBossHp = (regularBossResult.run.currentNodeData as { firstWaveEnemies: { hp: number; isBoss: boolean }[] })
+                .firstWaveEnemies.find(enemy => enemy.isBoss)!.hp;
+
+            expect(finalBossHp).toBeGreaterThan(regularBossHp);
+            expect(finalBossHp).toBeCloseTo(regularBossHp * 1.5, 0);
+        });
+
+        it('does not scale escort minion preview hp for a chapter final boss', async () => {
+            rngNextMock.mockResolvedValue(0);
+            getActiveByCharacterIdMock.mockResolvedValueOnce(baseRun({
+                step: 9, stageNodeIndex: 14, stageNodeCount: 15, levelIndex: 2, chapterTotalLevels: 3,
+            }));
+
+            const finalBossService = new AdventureRunService();
+            const finalBossResult = await finalBossService.advance('account-1', 'char-1');
+            const finalBossMinionHp = (finalBossResult.run.currentNodeData as { firstWaveEnemies: { hp: number; isBoss: boolean }[] })
+                .firstWaveEnemies.find(enemy => !enemy.isBoss)!.hp;
+
+            getActiveByCharacterIdMock.mockResolvedValueOnce(baseRun({
+                step: 9, stageNodeIndex: 14, stageNodeCount: 15, levelIndex: 1, chapterTotalLevels: 3,
+            }));
+
+            const regularBossService = new AdventureRunService();
+            const regularBossResult = await regularBossService.advance('account-1', 'char-1');
+            const regularBossMinionHp = (regularBossResult.run.currentNodeData as { firstWaveEnemies: { hp: number; isBoss: boolean }[] })
+                .firstWaveEnemies.find(enemy => !enemy.isBoss)!.hp;
+
+            expect(finalBossMinionHp).toBe(regularBossMinionHp);
+        });
+
+        it('does not scale the boss preview hp when chapterTotalLevels is missing (pre-migration run)', async () => {
+            rngNextMock.mockResolvedValue(0);
+            getActiveByCharacterIdMock.mockResolvedValueOnce(baseRun({
+                step: 9, stageNodeIndex: 14, stageNodeCount: 15, levelIndex: 2,
+            }));
+
+            const service = new AdventureRunService();
+            const result = await service.advance('account-1', 'char-1');
+            const bossHp = (result.run.currentNodeData as { firstWaveEnemies: { hp: number; isBoss: boolean }[] })
+                .firstWaveEnemies.find(enemy => enemy.isBoss)!.hp;
+
+            getActiveByCharacterIdMock.mockResolvedValueOnce(baseRun({
+                step: 9, stageNodeIndex: 14, stageNodeCount: 15, levelIndex: 1, chapterTotalLevels: 3,
+            }));
+            const regularService = new AdventureRunService();
+            const regularResult = await regularService.advance('account-1', 'char-1');
+            const regularBossHp = (regularResult.run.currentNodeData as { firstWaveEnemies: { hp: number; isBoss: boolean }[] })
+                .firstWaveEnemies.find(enemy => enemy.isBoss)!.hp;
+
+            expect(bossHp).toBe(regularBossHp);
+        });
+    });
 });
 
 describe('AdventureRunService.advance — COMBAT/EVENT nodes are not resolvable yet', () => {

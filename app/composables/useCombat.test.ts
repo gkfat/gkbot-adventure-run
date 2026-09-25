@@ -508,3 +508,77 @@ describe('useCombat — 技能充能條與觸發演出（character-skills）', (
         expect(combat.playerSkillGauges.value).toEqual([]);
     });
 });
+
+// 死亡音效：GKBOT 陣營敵人死亡播機械爆破聲，玩家與人類陣營敵人死亡（含玩家
+// 自己戰敗）共用慘叫聲——比照既有 hurtSfxFor 的陣營判斷邏輯（見 useCombat.ts）。
+describe('useCombat — 死亡音效', () => {
+    beforeEach(setupClocks);
+    afterEach(() => vi.useRealTimers());
+
+    const runUntilPlaySfxCalled = async (playSfxMock: ReturnType<typeof vi.fn>) => {
+        for (let i = 0; i < 500 && playSfxMock.mock.calls.length === 0; i += 1) {
+            advanceFrame(16);
+            await Promise.resolve();
+        }
+    };
+
+    it('GKBOT 陣營敵人死亡時播放機械死亡音效', async () => {
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 1000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'ATTACK', damage: 100, targetHpRemaining: 0,
+            }, {
+                timestamp: 1000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'DEATH',
+            },
+        ];
+        const result = buildResult(combatLog);
+        const playSfxMock = vi.fn();
+        useCombat(
+            () => result, () => 100, () => 100, undefined, () => 'GKBOT', undefined, playSfxMock,
+        );
+
+        await runUntilPlaySfxCalled(playSfxMock);
+
+        expect(playSfxMock).toHaveBeenCalledWith('robotDeath.mp3');
+        expect(playSfxMock).not.toHaveBeenCalledWith('humanScream.mp3');
+    });
+
+    it('HUMAN 陣營敵人死亡時播放人類慘叫音效', async () => {
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 1000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'ATTACK', damage: 100, targetHpRemaining: 0,
+            }, {
+                timestamp: 1000, wave: 0, actorId: 'player', targetId: 'enemy1', action: 'DEATH',
+            },
+        ];
+        const result = buildResult(combatLog);
+        const playSfxMock = vi.fn();
+        useCombat(
+            () => result, () => 100, () => 100, undefined, () => 'HUMAN', undefined, playSfxMock,
+        );
+
+        await runUntilPlaySfxCalled(playSfxMock);
+
+        expect(playSfxMock).toHaveBeenCalledWith('humanScream.mp3');
+        expect(playSfxMock).not.toHaveBeenCalledWith('robotDeath.mp3');
+    });
+
+    it('玩家戰敗時播放人類慘叫音效，即使敵方陣營是 GKBOT', async () => {
+        const combatLog: CombatLogEntry[] = [
+            {
+                timestamp: 1000, wave: 0, actorId: 'enemy1', targetId: 'player', action: 'ATTACK', damage: 100, targetHpRemaining: 0,
+            }, {
+                timestamp: 1000, wave: 0, actorId: 'enemy1', targetId: 'player', action: 'DEATH',
+            },
+        ];
+        const result = buildResult(combatLog);
+        const playSfxMock = vi.fn();
+        useCombat(
+            () => result, () => 100, () => 100, undefined, () => 'GKBOT', undefined, playSfxMock,
+        );
+
+        await runUntilPlaySfxCalled(playSfxMock);
+
+        expect(playSfxMock).toHaveBeenCalledWith('humanScream.mp3');
+        expect(playSfxMock).not.toHaveBeenCalledWith('robotDeath.mp3');
+    });
+});

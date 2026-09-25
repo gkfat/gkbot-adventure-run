@@ -3,7 +3,7 @@ import {
 } from 'vitest';
 import {
     getEnemyLevel, getStatMultipliers, rollWaveCount, rollEnemyCount,
-    getWave2Chance, getEnemy2Chance, getEnemy3Chance,
+    getWave2Chance, getEnemy2Chance, getEnemy3Chance, applyChapterFinalBossBonus,
 } from './difficulty';
 
 describe('getEnemyLevel', () => {
@@ -51,6 +51,18 @@ describe('getStatMultipliers', () => {
         expect(highlyActive.hp).toBeGreaterThanOrEqual(deepWreck.hp);
         expect(highlyActive.atk).toBeGreaterThanOrEqual(deepWreck.atk);
         expect(highlyActive.def).toBeGreaterThanOrEqual(deepWreck.def);
+    });
+});
+
+// boss-tier-enhancements: the chapter-final-boss bonus stacks 1.5x on top of
+// whatever multipliers are passed in — a pure multiply, no tier knowledge.
+describe('applyChapterFinalBossBonus', () => {
+    it('multiplies hp/atk/def by 1.5x', () => {
+        const base = getStatMultipliers(6, 'NORMAL');
+
+        expect(applyChapterFinalBossBonus(base)).toEqual({
+            hp: base.hp * 1.5, atk: base.atk * 1.5, def: base.def * 1.5,
+        });
     });
 });
 

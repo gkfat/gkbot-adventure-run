@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: 查詢圖鑑 API 依遭遇狀態決定資料揭露程度
-系統 SHALL 提供 `GET /api/character/:characterId/bestiary`（角色須屬於呼叫者本人帳號），回傳 `server/constants/templates/enemies.ts` 定義的全部 archetype（`ENEMY_ARCHETYPES`、`GKBOT_BOSS_ARCHETYPES`、`HUMAN_ARCHETYPES`、`HUMAN_BOSS_ARCHETYPES`）清單，每筆包含 `slug` 與 `encountered: boolean`（依該角色 `encounteredArchetypeSlugs` 判定）。當 `encountered` 為 `true` 時，該筆額外包含 `name`/`description`/`portraitUrl`/`defeatedCount`（依該角色 `defeatedArchetypeCounts` 判定，無紀錄視為 `0`）/`tier`（該 archetype 的位階：來自 `ENEMY_ARCHETYPES`/`HUMAN_ARCHETYPES` 者為 `'NORMAL'`，來自 `GKBOT_BOSS_ARCHETYPES`/`HUMAN_BOSS_ARCHETYPES` 者為 `'BOSS'`）；當 `encountered` 為 `false` 時，系統 SHALL NOT 於回應中包含該 archetype 的 `name`/`description`/`portraitUrl`/`defeatedCount`/`tier`。回應清單 SHALL 將 `encountered` 為 `true` 的項目排列在 `encountered` 為 `false` 的項目之前；同一組內部仍維持 `ENEMY_ARCHETYPES`/`GKBOT_BOSS_ARCHETYPES`/`HUMAN_ARCHETYPES`/`HUMAN_BOSS_ARCHETYPES` 原始順序。
+系統 SHALL 提供 `GET /api/character/:characterId/bestiary`（角色須屬於呼叫者本人帳號），回傳 `server/constants/templates/enemies.ts` 定義的全部 archetype（`ENEMY_ARCHETYPES`、`GKBOT_BOSS_ARCHETYPES`、`HUMAN_ARCHETYPES`、`HUMAN_BOSS_ARCHETYPES`）清單，每筆包含 `slug` 與 `encountered: boolean`（依該角色 `encounteredArchetypeSlugs` 判定）。當 `encountered` 為 `true` 時，該筆額外包含 `name`/`description`/`portraitUrl`/`defeatedCount`（依該角色 `defeatedArchetypeCounts` 判定，無紀錄視為 `0`）/`tier`（該 archetype 的固有位階：來自 `ENEMY_ARCHETYPES`/`HUMAN_ARCHETYPES` 者為 `'normal'`，來自 `GKBOT_BOSS_ARCHETYPES`/`HUMAN_BOSS_ARCHETYPES` 者為 `'boss'`——沿用既有 `EnemyAvatarTier`（`shared/utils/enemyAvatar.ts`）的小寫值域，不另外發明新的大寫列舉，因為一個 archetype 從未獨立存在「菁英」這個固有分類，那是戰鬥時疊加在 `normal` archetype 上的動態 tier，不屬於圖鑑要呈現的固有位階範圍)；當 `encountered` 為 `false` 時，系統 SHALL NOT 於回應中包含該 archetype 的 `name`/`description`/`portraitUrl`/`defeatedCount`/`tier`。回應清單 SHALL 將 `encountered` 為 `true` 的項目排列在 `encountered` 為 `false` 的項目之前；同一組內部仍維持 `ENEMY_ARCHETYPES`/`GKBOT_BOSS_ARCHETYPES`/`HUMAN_ARCHETYPES`/`HUMAN_BOSS_ARCHETYPES` 原始順序。
 
 #### Scenario: 查詢已遇過的敵人
 - **WHEN** 已登入玩家查詢自己角色的圖鑑，且該角色已遇過 `slug` 為 `gkbot-repair` 的 archetype
@@ -11,13 +11,13 @@
 - **WHEN** 已登入玩家查詢自己角色的圖鑑，且該角色已遇過 `slug` 為 `gkbot-repair` 的 archetype 但從未擊敗過（例如僅在戰前預覽/戰鬥開始時看過）
 - **THEN** 回應中 `gkbot-repair` 該筆的 `defeatedCount` 為 `0`
 
-#### Scenario: 已遇過的 boss archetype 回傳 BOSS 位階
+#### Scenario: 已遇過的 boss archetype 回傳 boss 位階
 - **WHEN** 已登入玩家查詢自己角色的圖鑑，且該角色已遇過 `slug` 屬於 `GKBOT_BOSS_ARCHETYPES` 或 `HUMAN_BOSS_ARCHETYPES` 的 archetype
-- **THEN** 回應中該筆的 `tier` 為 `'BOSS'`
+- **THEN** 回應中該筆的 `tier` 為 `'boss'`
 
-#### Scenario: 已遇過的一般敵人 archetype 回傳 NORMAL 位階
+#### Scenario: 已遇過的一般敵人 archetype 回傳 normal 位階
 - **WHEN** 已登入玩家查詢自己角色的圖鑑，且該角色已遇過 `slug` 屬於 `ENEMY_ARCHETYPES` 或 `HUMAN_ARCHETYPES` 的 archetype
-- **THEN** 回應中該筆的 `tier` 為 `'NORMAL'`
+- **THEN** 回應中該筆的 `tier` 為 `'normal'`
 
 #### Scenario: 查詢尚未遇過的敵人
 - **WHEN** 已登入玩家查詢自己角色的圖鑑，且該角色尚未遇過 `slug` 為 `human-elite-sniper` 的 archetype

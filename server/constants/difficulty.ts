@@ -85,6 +85,24 @@ export function getStatMultipliers(
 }
 
 /**
+ * Chapter-final-boss bonus (boss-tier-enhancements): the boss unit (not its
+ * escort minions) on the last Level of a Chapter gets its stat multipliers
+ * scaled up further, on top of the normal BOSS-tier curve above, so a
+ * chapter's closing fight reads as a distinct step up in difficulty.
+ */
+export const CHAPTER_FINAL_BOSS_MULTIPLIER = 1.5;
+
+export function applyChapterFinalBossBonus(
+    multipliers: { hp: number; atk: number; def: number },
+): { hp: number; atk: number; def: number } {
+    return {
+        hp: multipliers.hp * CHAPTER_FINAL_BOSS_MULTIPLIER,
+        atk: multipliers.atk * CHAPTER_FINAL_BOSS_MULTIPLIER,
+        def: multipliers.def * CHAPTER_FINAL_BOSS_MULTIPLIER,
+    };
+}
+
+/**
  * `clamp(base + perStep*step, 0, cap)` — shared shape for every step-scaled
  * probability below.
  */

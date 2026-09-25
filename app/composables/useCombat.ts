@@ -494,6 +494,12 @@ export function useCombat(
         targetId !== 'player' && getFactionType?.() === 'GKBOT' ? 'robotHurt.wav' : 'hurt.wav'
     );
 
+    // 死亡音效比照 hurtSfxFor 的陣營判斷：GKBOT 陣營敵人死亡播機械爆破聲，
+    // 玩家與人類陣營敵人死亡（含玩家自己戰敗）共用慘叫聲。
+    const deathSfxFor = (targetId: string): string => (
+        targetId !== 'player' && getFactionType?.() === 'GKBOT' ? 'robotDeath.mp3' : 'humanScream.mp3'
+    );
+
     watch(visibleGroupCount, (count) => {
         if (count === 0) return;
         const group = groups.value[count - 1];
@@ -536,11 +542,12 @@ export function useCombat(
             fireDialogue(entry.targetId, 'HIT_TAKEN');
         };
         // DEATH 跟同一批的 ATTACK/CRIT 共用 actorId/targetId，視覺特效已經由那筆
-        // sibling entry 觸發過，這裡只補觸發 DEFEATED 對話，不重播其餘視覺 fx
-        // （見 tasks.md 4.3）。
+        // sibling entry 觸發過，這裡只補觸發死亡音效與 DEFEATED 對話，不重播
+        // 其餘視覺 fx（見 tasks.md 4.3）。
         let stagger = 0;
         for (const entry of group.entries) {
             if (entry.action === 'DEATH') {
+                playSfx?.(deathSfxFor(entry.targetId));
                 fireDialogue(entry.targetId, 'DEFEATED');
                 continue;
             }
