@@ -84,6 +84,11 @@
                     @click="tab = option.key"
                 >
                     {{ option.label }}
+                    <span
+                        v-if="option.key === 'SKILL' && hasProgressableSkill"
+                        class="inventory-page__tab-dot-badge"
+                        aria-label="有技能可解鎖或升級"
+                    />
                 </button>
             </div>
 
@@ -248,6 +253,7 @@ import {
     equippedStatValue, equippedStatColor, type ItemLike,
 } from '../utils/equipmentDisplay';
 import { WEIGHT_OVERLOAD_PENALTY } from '../../shared/constants/equipmentWeight';
+import { SKILL_MAX_LEVEL } from '../../shared/constants/skills';
 
 definePageMeta({
     middleware: ['auth'],
@@ -268,6 +274,15 @@ const {
 const {
     skills, unlockedSlotCount, equippedSkillIds, loaded: skillsLoaded, fetchSkills,
 } = useCharacterSkills();
+
+// 技能 tab 紅點：任一技能可解鎖（碎片達門檻）或可強化升級（未滿級且持有碎片），
+// 邏輯比照 skillGrid.vue 的 canProgress，讓玩家不用點進 tab 也知道有東西可點。
+const canSkillProgress = (skill: SkillEntry): boolean => {
+    const fragmentCount = skill.fragmentCount ?? 0;
+    if (!skill.unlocked) return fragmentCount >= skill.unlockFragmentCost;
+    return (skill.level ?? 1) < SKILL_MAX_LEVEL && fragmentCount > 0;
+};
+const hasProgressableSkill = computed(() => skills.value.some(canSkillProgress));
 
 type AttributeKey = 'STR' | 'AGI' | 'CON' | 'LUCK';
 
@@ -456,6 +471,7 @@ onMounted(() => {
     }
 
     &__tab {
+        position: relative;
         flex: 1 1 0;
         padding: 8px;
         // 底色固定不透明、非啟用狀態改用文字顏色變淡表達（比照 talents.vue
@@ -472,6 +488,29 @@ onMounted(() => {
             border-color: rgb(var(--v-theme-green));
             color: rgb(var(--v-theme-green));
         }
+    }
+
+    // 技能 tab 紅點：有技能可解鎖/升級時顯示，視覺語彙比照
+    // skillGrid.vue 的 pixel-slot__dot-badge（含 pulse 動畫）。
+    &__tab-dot-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: rgb(var(--v-theme-error));
+        border: 1.5px solid rgb(var(--v-theme-background));
+        animation: inventory-page-tab-badge-pulse 1.4s ease-in-out infinite;
+    }
+}
+
+@keyframes inventory-page-tab-badge-pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.15);
     }
 }
 
