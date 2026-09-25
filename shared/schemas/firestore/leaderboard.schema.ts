@@ -8,6 +8,7 @@ import { z } from 'zod';
  * Leaderboard entry schema
  */
 export const leaderboardEntrySchema = z.object({
+    seasonId: z.string(),
     accountId: z.string(),
     characterId: z.string(),
     nickname: z.string(),

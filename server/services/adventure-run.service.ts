@@ -30,7 +30,7 @@ import {
     findCurseTemplate, blessingLevelEffect,
 } from '../../shared/constants/blessings';
 import type { BlessingCandidate } from '../../shared/constants/blessings';
-import { NoopLeaderboardUpdater } from './adventure-run-stubs';
+import { LeaderboardRunUpdater } from './leaderboard-run-updater';
 import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import {
     getEnemyLevel, getStatMultipliers, rollWaveCount, rollEnemyCount,
@@ -217,7 +217,7 @@ export class AdventureRunService extends BaseService {
         this.itemRepo = new ItemRepository();
         this.inventoryRepo = new InventoryRepository();
         this.rngService = new RngService();
-        this.leaderboardUpdater = new NoopLeaderboardUpdater();
+        this.leaderboardUpdater = new LeaderboardRunUpdater();
         this.progressTracker = new QuestAchievementProgressTracker();
         this.combatResolver = new CombatService();
         this.eventService = new EventService();
@@ -442,6 +442,7 @@ export class AdventureRunService extends BaseService {
                 expEarned: run.expEarned + resolution.expGained,
                 goldEarned: run.goldEarned + resolution.goldDropped,
                 gemsEarned: run.gemsEarned + resolution.gemsDropped,
+                enemiesDefeated: run.enemiesDefeated + resolution.enemies.length,
                 blessingPoints: run.blessingPoints + resolution.blessingPointsGained,
                 runInventory,
                 lastCombatSummary: summary,
@@ -914,11 +915,17 @@ export class AdventureRunService extends BaseService {
             goldEarned, gemsEarned, expGained, endReason,
         });
 
-        // ASSUMPTION (see design.md): leaderboard's `score` param is fed
-        // expEarned until the leaderboard capability is redesigned (it's
-        // currently a no-op stub).
+        // Score is the run's cumulative enemies-defeated count (see
+        // leaderboard-season/design.md), same "always call regardless of
+        // endReason" behavior as expEarned above — a DEAD/DISCONNECT run
+        // still counts whatever it defeated before ending.
         await this.leaderboardUpdater.updateIfBetter({
-            accountId: run.accountId, characterId: run.characterId, score: expGained,
+            accountId: run.accountId,
+            characterId: run.characterId,
+            nickname: character.nickname,
+            score: run.enemiesDefeated,
+            runId: run.runId,
+            meta: { killCount: run.enemiesDefeated },
         });
         await this.progressTracker.incrementProgress({
             accountId: run.accountId, characterId: run.characterId, type: 'ADVENTURE_COMPLETED', amount: 1,

@@ -298,7 +298,14 @@ export type EventResolver = {
  * (same pattern as CombatResolver/EventResolver — see design.md).
  */
 export type LeaderboardUpdater = {
-  updateIfBetter(entry: { accountId: string; characterId: string; score: number }): Promise<void>;
+  updateIfBetter(entry: {
+    accountId: string;
+    characterId: string;
+    nickname: string;
+    score: number;
+    runId: string;
+    meta?: { step?: number; killCount?: number };
+  }): Promise<void>;
 };
 
 /**
@@ -459,6 +466,11 @@ export type AdventureRun = {
   expEarned: number;
   goldEarned: number;
   gemsEarned: number;
+
+  // Cumulative enemies defeated this run (leaderboard-season: fed to
+  // LeaderboardUpdater.updateIfBetter as `score` at settlement, same
+  // accumulate-via-checkpoint pattern as expEarned).
+  enemiesDefeated: number;
 
   // Combat/event history (optional, for anti-cheat)
   lastCombatSummary?: CombatSummary;

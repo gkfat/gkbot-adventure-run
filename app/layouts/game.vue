@@ -15,7 +15,7 @@
                 v-if="!isAdventurePage"
                 @open-drawer="drawerOpen = true"
             />
-            <GameLayoutsResourceBar v-if="selectedCharacterId && !isAdventurePage" />
+            <GameLayoutsResourceBar v-if="selectedCharacterId && !isAdventurePage && !isLeaderboardPage" />
 
             <main class="game-stage flex-grow-1">
                 <slot />
@@ -46,6 +46,9 @@ const { selectedCharacterId } = useCharacter();
 // 冒險進行中畫面版面吃緊，隱藏底部導覽列
 const route = useRoute();
 const isAdventurePage = computed(() => route.path === '/adventure');
+
+// 排行榜比分數、不涉及角色資源，不顯示金幣/鑽石資源列
+const isLeaderboardPage = computed(() => route.path === '/leaderboard');
 
 // BGM 依冒險狀態切換；layout 跨頁面導覽不會重新掛載，用 watch 才能同時涵蓋
 // 「首次進入」與「後續切換」。登出離開遊戲內頁面（layout 卸載）時停止播放。

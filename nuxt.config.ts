@@ -75,7 +75,10 @@ export default defineNuxtConfig({
         // Server-only configuration
         firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
         firestoreEmulatorHost: process.env.FIRESTORE_EMULATOR_HOST,
-        
+        // Shared secret Vercel Cron sends as `Authorization: Bearer $CRON_SECRET`
+        // (see leaderboard-season/design.md) — verified by the cron endpoint itself.
+        cronSecret: process.env.CRON_SECRET,
+
         // Public configuration (exposed to client)
         public: {
             firebaseApiKey: process.env.NUXT_PUBLIC_FIREBASE_API_KEY || '',

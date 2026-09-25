@@ -52,6 +52,9 @@ function withStageDefaults(run: AdventureRun): AdventureRun {
         // decideNextNode call regardless.
         stageCombatEncountered: run.stageCombatEncountered ?? false,
         expEarned: run.expEarned ?? 0,
+        // leaderboard-season: missing on pre-migration run docs — same
+        // tolerate-with-default pattern as expEarned above.
+        enemiesDefeated: run.enemiesDefeated ?? 0,
         // enemy-factions-and-severity Migration Plan: missing on pre-migration
         // run docs — tolerate as PARTIAL_ACTIVE/GKBOT (equivalent to the
         // unadjusted pre-change behavior), no data backfill.
@@ -160,6 +163,7 @@ export class AdventureRunRepository extends BaseRepository<AdventureRun> {
                 expEarned: 0,
                 goldEarned: 0,
                 gemsEarned: 0,
+                enemiesDefeated: 0,
 
                 lastActivityAt: timestamp,
                 updatedAt: timestamp,

@@ -149,6 +149,9 @@ export const adventureRunSchema = z.object({
     goldEarned: z.number().int().min(0),
     gemsEarned: z.number().int().min(0),
 
+    // Cumulative enemies defeated this run (leaderboard-season)
+    enemiesDefeated: z.number().int().min(0),
+
     // Combat/event history
     lastCombatSummary: combatSummarySchema.optional(),
 

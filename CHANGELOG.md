@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 實作角色技能系統
 - 實作走路動畫
 - 實作音效與 bgm
+- 實作排行榜功能與賽季結算
 
 ### Changed
 

@@ -20,6 +20,9 @@ export default defineEventHandler(async (event) => {
         '/api/auth/login',
         '/api/openapi.json',
         '/api-docs',
+        // Cron-only — verifies its own CRON_SECRET bearer token instead of
+        // Firebase auth (see leaderboard-season/design.md).
+        '/api/cron/leaderboard-season-settle',
     ];
     
     if (publicPaths.includes(event.path)) {

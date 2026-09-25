@@ -8,13 +8,18 @@ import { leaderboardEntrySchema } from '../firestore/leaderboard.schema';
 /**
  * GET /api/leaderboard
  */
-export const getLeaderboardRequestSchema = z.object({ limit: z.number().int().min(1).max(100).optional().default(50) }).strict();
+export const getLeaderboardRequestSchema = z.object({
+    // Query params always arrive as strings — coerce before validating range.
+    limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+    characterId: z.string().optional(),
+}).strict();
 
 export const getLeaderboardResponseSchema = z.object({
     success: z.boolean(),
     data: z.object({
         entries: z.array(leaderboardEntrySchema),
         total: z.number(),
+        seasonEndsAt: z.number(),
         myRank: z.number().optional(),
         myEntry: leaderboardEntrySchema.optional(),
     }),

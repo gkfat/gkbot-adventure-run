@@ -21,7 +21,7 @@ const {
     addItemMock, removeItemMock,
     rngNextMock, combatResolveMock,
     selectEventMock, eventResolveMock, generateCandidatesMock,
-    incrementProgressMock,
+    incrementProgressMock, leaderboardUpdateIfBetterMock,
 } = vi.hoisted(() => ({
     getActiveByCharacterIdMock: vi.fn(),
     createRunMock: vi.fn(),
@@ -41,6 +41,7 @@ const {
     eventResolveMock: vi.fn(),
     generateCandidatesMock: vi.fn(),
     incrementProgressMock: vi.fn(),
+    leaderboardUpdateIfBetterMock: vi.fn(),
 }));
 
 vi.mock('./combat.service', async (importOriginal) => {
@@ -73,6 +74,12 @@ vi.mock('./blessing.service', () => ({
 vi.mock('./progress-tracker.service', () => ({
     QuestAchievementProgressTracker: vi.fn().mockImplementation(function QuestAchievementProgressTrackerMock() {
         return { incrementProgress: incrementProgressMock };
+    }),
+}));
+
+vi.mock('./leaderboard-run-updater', () => ({
+    LeaderboardRunUpdater: vi.fn().mockImplementation(function LeaderboardRunUpdaterMock() {
+        return { updateIfBetter: leaderboardUpdateIfBetterMock };
     }),
 }));
 
@@ -147,6 +154,7 @@ function baseRun(overrides: Partial<AdventureRun> = {}): AdventureRun {
         expEarned: 0,
         goldEarned: 0,
         gemsEarned: 0,
+        enemiesDefeated: 0,
         lastActivityAt: Date.now(),
         updatedAt: Date.now(),
         ...overrides,
@@ -755,6 +763,7 @@ describe('AdventureRunService.resolveCombat', () => {
             goldEarned: 30,
             gemsEarned: 5,
             blessingPoints: 3,
+            enemiesDefeated: 1,
             rngIndex: 42,
         }));
         expect(result.summary.victory).toBe(true);
@@ -857,6 +866,50 @@ describe('AdventureRunService.resolveCombat', () => {
             forfeitedGems: 2,
             forfeitedItems: [droppedItem],
         }));
+    });
+
+    it('updates the leaderboard with the cumulative enemiesDefeated count at settlement, even on a DEAD ending', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.COMBAT,
+            currentNodeData: {
+                enemyLevel: 5, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveEnemies,
+            },
+            enemiesDefeated: 4,
+        }));
+        combatResolveMock.mockResolvedValue({
+            victory: false,
+            roundCount: 1,
+            playerHpRemaining: 0,
+            expGained: 0,
+            goldDropped: 0,
+            gemsDropped: 0,
+            itemsDropped: [],
+            blessingPointsGained: 0,
+            enemies: [
+                {
+                    enemyId: 'e1', name: 'Test Enemy', level: 5, 
+                },
+            ],
+            combatLog: [],
+            finalRngIndex: 1,
+        });
+        settleRunRewardsMock.mockResolvedValue({
+            character: {
+                level: 1, nickname: '玩家A', 
+            }, leveledUp: false, unspentAttributePointsGained: 0,
+        });
+
+        const service = new AdventureRunService();
+        await service.resolveCombat('account-1', 'char-1');
+
+        expect(leaderboardUpdateIfBetterMock).toHaveBeenCalledWith({
+            accountId: 'account-1',
+            characterId: 'char-1',
+            nickname: '玩家A',
+            score: 4,
+            runId: 'run-1',
+            meta: { killCount: 4 },
+        });
     });
 });
 

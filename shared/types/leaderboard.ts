@@ -8,6 +8,7 @@ import type { Timestamp } from './common';
  * Leaderboard entry
  */
 export type LeaderboardEntry = {
+  seasonId: string;          // UTC ISO week, e.g. "2026-W39" (see server/utils/season.ts)
   accountId: string;
   characterId: string;
   nickname: string;          // Player display name
@@ -26,6 +27,7 @@ export type LeaderboardEntry = {
 export type LeaderboardResult = {
   entries: LeaderboardEntry[];
   total: number;
+  seasonEndsAt: Timestamp;   // When the current season's settlement runs
   myRank?: number;           // Player's rank (if querying for self)
   myEntry?: LeaderboardEntry; // Player's entry
 };
