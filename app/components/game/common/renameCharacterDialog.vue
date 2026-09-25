@@ -16,7 +16,7 @@
             counter
             hide-details="auto"
             class="mb-3"
-            @keydown.enter="handleRename"
+            @keydown.enter.prevent
         />
 
         <div class="d-flex align-center ga-1 mb-3">
