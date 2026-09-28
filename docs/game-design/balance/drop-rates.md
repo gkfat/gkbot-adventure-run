@@ -4,19 +4,19 @@
 
 ## 1. 稀有度權重（`STANDARD_RARITY_WEIGHTS`）
 
-來源：`server/constants/templates.ts`
+來源：`server/constants/templates/items.ts`
 
 | 稀有度 | 權重 | 換算機率（未受 `maxRarity` 限制時） |
 |---|---|---|
-| N | 50 | 50% |
-| R | 30 | 30% |
-| SR | 15 | 15% |
-| SSR | 4 | 4% |
-| L | 1 | 1% |
+| N | 65 | 65% |
+| R | 28.7 | 28.7% |
+| SR | 5 | 5% |
+| SSR | 1 | 1% |
+| L | 0.3 | 0.3% |
 
 目前所有 `ItemTemplate` 共用同一份 `STANDARD_RARITY_WEIGHTS`，尚未有模板覆寫自己的權重表。
 
-實際換算機率會因 `context.maxRarity` 被截斷（見下節）：`rollRarity()`（`server/services/item.service.ts`）只在「稀有度 ≤ maxRarity」的子集合裡按權重比例重新分配，不是簡單機率歸零，而是把權重加總後重新正規化。例如 `maxRarity = R` 時，實際機率為 N 50/(50+30)=62.5%、R 30/(50+30)=37.5%，SR/SSR/L 機率為 0。
+實際換算機率會因 `context.maxRarity` 被截斷（見下節）：`rollRarity()`（`server/services/item.service.ts`）只在「稀有度 ≤ maxRarity」的子集合裡按權重比例重新分配，不是簡單機率歸零，而是把權重加總後重新正規化。例如 `maxRarity = R` 時，實際機率為 N 65/(65+28.7)≈69.4%、R 28.7/(65+28.7)≈30.6%，SR/SSR/L 機率為 0。
 
 ## 2. `maxRarity` 封頂機制
 

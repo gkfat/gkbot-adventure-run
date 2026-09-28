@@ -11,13 +11,13 @@ import {
 
 /**
  * Shared rarity weight curve for all equipment/potion templates below
- * (N/R/SR/SSR/L = 50.89/30.54/15.27/3/0.3).
+ * (N/R/SR/SSR/L = 65/28.7/5/1/0.3).
  */
 const STANDARD_RARITY_WEIGHTS = {
-    [Rarity.N]: 50.89,
-    [Rarity.R]: 30.54,
-    [Rarity.SR]: 15.27,
-    [Rarity.SSR]: 3,
+    [Rarity.N]: 65,
+    [Rarity.R]: 28.7,
+    [Rarity.SR]: 5,
+    [Rarity.SSR]: 1,
     [Rarity.L]: 0.3,
 };
 
