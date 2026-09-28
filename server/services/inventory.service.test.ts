@@ -110,7 +110,7 @@ beforeEach(() => {
 });
 
 describe('InventoryService.sellItem', () => {
-    it('credits half the item\'s rarity gold price, removes the inventory reference, and deletes the item document', async () => {
+    it('credits SELL_PRICE_RATIO of the item\'s rarity gold price, removes the inventory reference, and deletes the item document', async () => {
         setDoc('characters', 'char-1', baseCharacter());
         setDoc('items', 'item-1', baseItem());
         setDoc('inventories', 'char-1', baseInventory());
@@ -118,13 +118,13 @@ describe('InventoryService.sellItem', () => {
         const service = new InventoryService();
         const result = await service.sellItem('char-1', 'item-1');
 
-        // salvaged_wrench N gold range is 100-200 -> midpoint 150 * 0.5 = 75
-        expect(result.goldEarned).toBe(75);
+        // salvaged_wrench N gold range is 100-200 -> midpoint 150 * 0.1 = 15
+        expect(result.goldEarned).toBe(15);
         expect(txUpdateMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                collectionName: 'characters', id: 'char-1', 
+                collectionName: 'characters', id: 'char-1',
             }),
-            expect.objectContaining({ gold: 1075 }),
+            expect.objectContaining({ gold: 1015 }),
         );
         expect(txSetMock).toHaveBeenCalledWith(
             expect.objectContaining({

@@ -342,10 +342,10 @@ export function sumEquippedWeight(items: ItemInstance[]): number {
 
 /**
  * Selling always pays out this fraction of the item's shop gold price
- * (midpoint of its rarity's `priceRangeByRarity.gold` range) — half, so
- * repeatedly buying-then-selling the same item is a net loss.
+ * (midpoint of its rarity's `priceRangeByRarity.gold` range) — well under
+ * half, so repeatedly buying-then-selling the same item is a net loss.
  */
-const SELL_PRICE_RATIO = 0.5;
+const SELL_PRICE_RATIO = 0.1;
 
 /**
  * Gold payout for selling an item back — half of its rarity's gold price

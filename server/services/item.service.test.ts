@@ -396,9 +396,9 @@ describe('sumEquipmentStats', () => {
 });
 
 describe('getSellPriceGold', () => {
-    it('returns half of the rarity\'s gold price midpoint for a normal (N) equipment item', () => {
-        // salvaged_wrench N gold range is 100-200 (EQUIPMENT_PRICE_RANGE) -> midpoint 150 * 0.5 = 75
-        expect(getSellPriceGold('salvaged_wrench', Rarity.N)).toBe(75);
+    it('returns SELL_PRICE_RATIO of the rarity\'s gold price midpoint for a normal (N) equipment item', () => {
+        // salvaged_wrench N gold range is 100-200 (EQUIPMENT_PRICE_RANGE) -> midpoint 150 * 0.1 = 15
+        expect(getSellPriceGold('salvaged_wrench', Rarity.N)).toBe(15);
     });
 
     it('returns a gold payout for SSR/L items even though their shop buy price is gems-only', () => {
