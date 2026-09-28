@@ -230,6 +230,10 @@ type CombatUnit = {
     // to CombatResult.enemies[] for frontend portrait lookup.
     archetypeSlug: string;
     isBoss: boolean;
+    // Enemy-only (undefined for the player unit): drives the in-combat
+    // "菁英" tier badge (ELITE/STRONG_ELITE), carried through to
+    // CombatResult.enemies[] for the frontend.
+    tier?: EnemyTier | 'BOSS_MINION';
     canReinforce: boolean;
     // Weapon proficiency passives (weapon-proficiency-system D5) — usable on
     // any unit (e.g. BLUNT's "target takes +15% damage" debuff on an enemy).
@@ -567,7 +571,7 @@ export class CombatService extends BaseService implements CombatResolver {
                             const minionArchetype = mobArchetypes[minionArchetypeIndex] as EnemyArchetype;
                             const minionMultipliers = getStatMultipliers(context.enemyLevel, 'BOSS_MINION', severityTier);
                             const minion = this.buildEnemyUnit(
-                                minionArchetype, minionArchetypeIndex, minionMultipliers, context.enemyLevel, false, player.actionIntervalSec, eventTimestamp,
+                                minionArchetype, minionArchetypeIndex, minionMultipliers, context.enemyLevel, false, player.actionIntervalSec, eventTimestamp, 'BOSS_MINION',
                             );
                             minion.nextAttackAt = eventTimestamp;
                             alive.push(minion);
@@ -651,7 +655,7 @@ export class CombatService extends BaseService implements CombatResolver {
             playerHpRemaining: Math.max(0, player.hp),
             ...rewards,
             enemies: disambiguateEnemyNames(encountered).map(enemy => ({
-                enemyId: enemy.id, name: enemy.name, level: enemy.level as number, hpMax: enemy.hpMax, isBoss: enemy.isBoss, archetypeSlug: enemy.archetypeSlug,
+                enemyId: enemy.id, name: enemy.name, level: enemy.level as number, hpMax: enemy.hpMax, isBoss: enemy.isBoss, archetypeSlug: enemy.archetypeSlug, tier: enemy.tier,
             })),
             defeatedCount: defeated.length,
             combatLog,
@@ -706,8 +710,11 @@ export class CombatService extends BaseService implements CombatResolver {
             }
             const archetype = archetypes[archetypeIndex] as EnemyArchetype;
             const multipliers = isBossTier ? (isBossUnit ? bossMultipliers! : minionMultipliers!) : uniformMultipliers!;
+            const tier: EnemyTier | 'BOSS_MINION' = isBossTier
+                ? (isBossUnit ? 'BOSS' : 'BOSS_MINION')
+                : NODE_TYPE_TO_ENEMY_TIER[context.tier];
 
-            enemies.push(this.buildEnemyUnit(archetype, archetypeIndex, multipliers, enemyLevel, isBossUnit, playerActionIntervalSec));
+            enemies.push(this.buildEnemyUnit(archetype, archetypeIndex, multipliers, enemyLevel, isBossUnit, playerActionIntervalSec, 0, tier));
         }
         return enemies;
     }
@@ -725,6 +732,7 @@ export class CombatService extends BaseService implements CombatResolver {
         isBoss: boolean,
         playerActionIntervalSec: number,
         chargeStartAt = 0,
+        tier?: EnemyTier | 'BOSS_MINION',
     ): CombatUnit {
         // Enemies must always act slower than the player currently fighting
         // them, independent of the player's own AGI/equipment build —
@@ -754,6 +762,7 @@ export class CombatService extends BaseService implements CombatResolver {
             archetypeIndex,
             archetypeSlug: archetype.slug,
             isBoss,
+            tier,
             canReinforce: isBoss ? (archetype.canReinforce ?? false) : false,
             statusEffects: [],
             consecutiveHitCount: 0,

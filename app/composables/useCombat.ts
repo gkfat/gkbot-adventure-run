@@ -767,10 +767,11 @@ export function useCombat(
     });
 
     // 敵人狀態：以目前已播放的 log 批次逐步套用 targetHpRemaining/DEATH，還原
-    // 每隻敵人「播放進度當下」的 HP 與存活狀態；只有 Boss 戰（有任一 isBoss）
-    // 才顯示頭目/小兵的階級標籤，一般戰鬥沒有這個區分，不硬套標籤。只保留
-    // 目前正在顯示的那個 wave（見 waveDisplay），不是這個 wave 的敵人一律
-    // 過濾掉，換 wave 時交由 waveDisplay 的 exiting/entering 階段接手畫面。
+    // 每隻敵人「播放進度當下」的 HP 與存活狀態；ELITE/STRONG_ELITE 一律顯示
+    // 「菁英」標籤，頭目/小兵的階級標籤則只在 Boss 戰（有任一 isBoss）才顯示，
+    // 一般戰鬥沒有這個區分，不硬套標籤。只保留目前正在顯示的那個 wave（見
+    // waveDisplay），不是這個 wave 的敵人一律過濾掉，換 wave 時交由
+    // waveDisplay 的 exiting/entering 階段接手畫面。
     const hasBossComposition = computed(() => getResult()?.summary.enemies.some(enemy => enemy.isBoss) ?? false);
     const enemyStatus = computed(() => {
         const status = new Map((getResult()?.summary.enemies ?? [])
@@ -783,6 +784,7 @@ export function useCombat(
                     hpCurrent: enemy.hpMax,
                     isBoss: enemy.isBoss,
                     archetypeSlug: enemy.archetypeSlug,
+                    tier: enemy.tier,
                     alive: true,
                 },
             ]));
@@ -797,7 +799,11 @@ export function useCombat(
         const units = Array.from(status.values()).map(unit => ({
             ...unit,
             hpPercent: unit.hpMax > 0 ? Math.max(0, Math.min(100, (unit.hpCurrent / unit.hpMax) * 100)) : 0,
-            tierLabel: hasBossComposition.value ? (unit.isBoss ? '頭目' : '小兵') : '',
+            tierLabel: unit.isBoss
+                ? '頭目'
+                : (unit.tier === 'ELITE' || unit.tier === 'STRONG_ELITE')
+                    ? '菁英'
+                    : hasBossComposition.value ? '小兵' : '',
         }));
 
         // Boss 站中間：把 Boss 從原本位置抽出來，塞回陣列正中央的 index，其餘

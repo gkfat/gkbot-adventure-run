@@ -186,6 +186,10 @@ export type CombatResult = {
     // lastCombatSummary docs written before this field existed — newly
     // produced combat results always populate it (design.md D4).
     archetypeSlug?: string;
+    // Enemy tier (server/constants/difficulty.ts EnemyTier), drives the
+    // in-combat "菁英" badge for ELITE/STRONG_ELITE. Optional to tolerate
+    // historical lastCombatSummary docs written before this field existed.
+    tier?: 'NORMAL' | 'ELITE' | 'STRONG_ELITE' | 'BOSS' | 'BOSS_MINION';
   }>;
 
   // Enemies actually defeated this combat, independent of victory/defeat
@@ -623,8 +627,8 @@ export const DIFFICULTY_CONFIG = {
     ENEMY_LEVEL_POWER_BONUS_MAX: 3,
 
     // Base multipliers (per enemy level)
-    HP_MULT_PER_LEVEL: 0.08,
-    ATK_MULT_PER_LEVEL: 0.07,
+    HP_MULT_PER_LEVEL: 0.20,
+    ATK_MULT_PER_LEVEL: 0.18,
     DEF_MULT_PER_LEVEL: 0.05,
 
     // Normal tier HP multiplier (on top of base) — general 難度加成

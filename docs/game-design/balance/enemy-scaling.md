@@ -36,11 +36,13 @@ baseDef = 1 + levelSteps * DEF_MULT_PER_LEVEL
 
 | 係數 | 數值 |
 |---|---|
-| `HP_MULT_PER_LEVEL` | 0.08 |
-| `ATK_MULT_PER_LEVEL` | 0.07 |
+| `HP_MULT_PER_LEVEL` | 0.20 |
+| `ATK_MULT_PER_LEVEL` | 0.18 |
 | `DEF_MULT_PER_LEVEL` | 0.05 |
 
-即每高 1 級（`enemyLevel`），基礎倍率 HP +8%、ATK +7%、DEF +5%（相對 level 1 累加，非複利）。
+即每高 1 級（`enemyLevel`），基礎倍率 HP +20%、ATK +18%、DEF +5%（相對 level 1 累加，非複利）。
+
+> 調整紀錄：`HP_MULT_PER_LEVEL`（0.08→0.12→0.16→0.20）與 `ATK_MULT_PER_LEVEL`（0.07→0.10→0.14→0.18）分三輪於「角色推進 1~2 章節後敵人 HP/ATK 偏低」的手感回饋後調整，`DEF_MULT_PER_LEVEL` 維持不變。
 
 ## 四個 tier 的倍率
 
@@ -73,32 +75,32 @@ baseDef = 1 + levelSteps * DEF_MULT_PER_LEVEL
 | STRONG_ELITE | 2.60 | 2.10 | 1.60 |
 | BOSS | 4.00 | 2.80 | 2.00 |
 
-### step = 10（enemyLevel = 6，base：hp 1.40 / atk 1.35 / def 1.25）
+### step = 10（enemyLevel = 6，base：hp 2.00 / atk 1.90 / def 1.25）
 
 | Tier | HP | ATK | DEF |
 |---|---|---|---|
-| NORMAL | 1.40 | 1.35 | 1.25 |
-| ELITE | 2.52 | 2.16 | 1.625 |
-| STRONG_ELITE | 3.64 | 2.835 | 2.00 |
-| BOSS | 5.60 | 3.78 | 2.50 |
+| NORMAL | 2.00 | 1.90 | 1.25 |
+| ELITE | 3.60 | 3.04 | 1.625 |
+| STRONG_ELITE | 5.20 | 3.99 | 2.00 |
+| BOSS | 8.00 | 5.32 | 2.50 |
 
-### step = 20（enemyLevel = 11，base：hp 1.80 / atk 1.70 / def 1.50）
-
-| Tier | HP | ATK | DEF |
-|---|---|---|---|
-| NORMAL | 1.80 | 1.70 | 1.50 |
-| ELITE | 3.24 | 2.72 | 1.95 |
-| STRONG_ELITE | 4.68 | 3.57 | 2.40 |
-| BOSS | 7.20 | 4.76 | 3.00 |
-
-### step = 30（enemyLevel = 16，base：hp 2.20 / atk 2.05 / def 1.75）
+### step = 20（enemyLevel = 11，base：hp 3.00 / atk 2.80 / def 1.50）
 
 | Tier | HP | ATK | DEF |
 |---|---|---|---|
-| NORMAL | 2.20 | 2.05 | 1.75 |
-| ELITE | 3.96 | 3.28 | 2.275 |
-| STRONG_ELITE | 5.72 | 4.305 | 2.80 |
-| BOSS | 8.80 | 5.74 | 3.50 |
+| NORMAL | 3.00 | 2.80 | 1.50 |
+| ELITE | 5.40 | 4.48 | 1.95 |
+| STRONG_ELITE | 7.80 | 5.88 | 2.40 |
+| BOSS | 12.00 | 7.84 | 3.00 |
+
+### step = 30（enemyLevel = 16，base：hp 4.00 / atk 3.70 / def 1.75）
+
+| Tier | HP | ATK | DEF |
+|---|---|---|---|
+| NORMAL | 4.00 | 3.70 | 1.75 |
+| ELITE | 7.20 | 5.92 | 2.275 |
+| STRONG_ELITE | 10.40 | 7.77 | 2.80 |
+| BOSS | 16.00 | 10.36 | 3.50 |
 
 > 這些倍率會再乘上敵人 archetype 的基底數值（見下節），才是實際套用在戰鬥的 HP/ATK/DEF。
 

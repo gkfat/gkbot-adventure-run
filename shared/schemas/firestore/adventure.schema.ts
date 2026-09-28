@@ -60,6 +60,16 @@ export const combatSummarySchema = z.object({
         // before this field existed (design.md D4); newly written combat
         // results always populate it.
         archetypeSlug: z.string().optional(),
+        // Enemy tier (server/constants/difficulty.ts EnemyTier), drives the
+        // in-combat "菁英" badge. Optional for the same historical-doc reason
+        // as archetypeSlug above.
+        tier: z.enum([
+            'NORMAL',
+            'ELITE',
+            'STRONG_ELITE',
+            'BOSS',
+            'BOSS_MINION',
+        ]).optional(),
     })),
     // Enemies actually defeated this combat, independent of victory/defeat
     // (leaderboard-season). Optional to tolerate historical lastCombatSummary

@@ -61,7 +61,7 @@
                                 <span
                                     v-if="enemy.tierLabel"
                                     class="combat-result-panel__tier"
-                                    :class="`combat-result-panel__tier--${enemy.isBoss ? 'boss' : 'minion'}`"
+                                    :class="`combat-result-panel__tier--${enemy.isBoss ? 'boss' : enemy.tierLabel === '菁英' ? 'elite' : 'minion'}`"
                                 >
                                     {{ enemy.tierLabel }}
                                 </span>
@@ -414,6 +414,11 @@ const enemyAvatarSrc = (isBoss: boolean, archetypeSlug?: string) => (
         &--boss {
             background: rgba(var(--v-theme-warning), 0.2);
             color: rgb(var(--v-theme-warning));
+        }
+
+        &--elite {
+            background: rgba(var(--v-theme-secondary), 0.2);
+            color: rgb(var(--v-theme-secondary));
         }
 
         &--minion {
