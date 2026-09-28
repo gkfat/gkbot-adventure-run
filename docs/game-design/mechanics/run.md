@@ -35,7 +35,7 @@ INIT → EXPLORING ⇄ (COMBAT / EVENT / REST) → RESOLUTION → (BLESSING_SELE
 
 - 系統 SHALL 僅在角色沒有其他進行中（`state != ENDED`）的 run 時，允許 `POST /api/adventure/start` 建立新 run。
 - 已有進行中 run 時再次呼叫會回傳 409。
-- 建立時：`seed` 產生、`state = INIT`、`step = 0`、`rngIndex = 0`，並以決定性 RNG roll 出本次 Run（對應一個 Level）的 Stage 總數（`stageNodeCount`，10~20）。
+- 建立時：`seed` 產生、`state = INIT`、`step = 0`、`rngIndex = 0`，並以決定性 RNG roll 出本次 Run（對應一個 Level）的 Stage 總數（`stageNodeCount`，15~30）。
 - `chapterIndex` 設為角色目前的 `nextChapterIndex`，決定本次遠征的裂域設施主題（僅供顯示/敵人風味，run 期間不遞增）。
 - `currentLevelIndex`/`chapterTotalLevels` 不在 run 建立時決定，而是記在**角色文件**上，只在角色首次進入一個新章節時 roll 一次（見第 2 節）；同一章節內開始新 run 沿用既有值。
 
@@ -98,7 +98,7 @@ Run 結束原因（`AdventureEndReason`）：`COMPLETED`（Boss 戰勝利）、`
 3. **綜合進度因子** `factor ∈ [0,1]`：由「戰力 / 期望戰力」比值（clamp 至 `[POWER_RATIO_MIN, POWER_RATIO_MAX]` 後正規化）與「`chapterIndex / MAX_CHAPTER_FOR_SCALING`」加權平均（`POWER_FACTOR_WEIGHT`/`CHAPTER_FACTOR_WEIGHT`）而得。
 4. **區間線性插值**：
    - 關卡數（`getLevelCountRange`）：`factor=0` → 3~7 關；`factor=1` → 8~12 關。
-   - Stage 數（`getStageNodeCountRange`）：`factor=0` → 5~10 Stage；`factor=1` → 8~15 Stage。
+   - Stage 數（`getStageNodeCountRange`）：`factor=0` → 15~22 Stage；`factor=1` → 19~30 Stage。
 
 > ASSUMPTION（無設計文件佐證）：`PROGRESSION_CONFIG` 內所有常數（`BASE_POWER`、成長率、權重、各區間端點）皆為新發明數值，可自由調整；`calculateCombatPower`/`calculateAttributePower` 的權重公式（`shared/utils/calculateStats.ts`）同樣是新發明、僅供排序/縮放使用，非最終平衡數字。
 

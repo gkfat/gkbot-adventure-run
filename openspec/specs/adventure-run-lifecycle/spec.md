@@ -41,11 +41,11 @@
 - **THEN** 依序循環回清單第一個設施主題繼續使用（例如清單有 8 種主題時，第 9 個索引沿用第 1 個設施主題），並依循環後對應到的設施類型 roll 出該章節的 `chapterTotalLevels`
 
 ### Requirement: Stage 結構與 Boss 節點
-系統 SHALL 將一次 run 的場景流建構為單一個關卡（Level）的 10~20 個 Stage；run 建立時 SHALL 以決定性 RNG 決定該關卡的 Stage 總數（10~20 之間，含頭尾），且該關卡的最後一個 Stage SHALL 固定為 BOSS combat，打贏即代表這個關卡攻略成功。run 建立時 SHALL 使用角色目前的 `nextChapterIndex` 作為本次遠征的裂域設施主題（依序循環裂域設施主題清單，見 `docs/worldview.md` 第 2 節，清單可持續擴充），僅供顯示與敵人風味使用，run 期間不遞增；設施主題（章節）的推進改由「章節與關卡的推進」於角色文件層級處理，且只有攻略完章節最後一關才會真正推進。
+系統 SHALL 將一次 run 的場景流建構為單一個關卡（Level）的 15~30 個 Stage；run 建立時 SHALL 以決定性 RNG 決定該關卡的 Stage 總數（15~30 之間，含頭尾），且該關卡的最後一個 Stage SHALL 固定為 BOSS combat，打贏即代表這個關卡攻略成功。run 建立時 SHALL 使用角色目前的 `nextChapterIndex` 作為本次遠征的裂域設施主題（依序循環裂域設施主題清單，見 `docs/worldview.md` 第 2 節，清單可持續擴充），僅供顯示與敵人風味使用，run 期間不遞增；設施主題（章節）的推進改由「章節與關卡的推進」於角色文件層級處理，且只有攻略完章節最後一關才會真正推進。
 
 #### Scenario: Run 建立時決定 Stage 總數
 - **WHEN** 玩家呼叫 `POST /api/adventure/start` 建立新 run
-- **THEN** 系統以決定性 RNG roll 出本次關卡的 Stage 總數（10~20 之間），並將 run 的 `chapterIndex` 設為角色目前的 `nextChapterIndex`
+- **THEN** 系統以決定性 RNG roll 出本次關卡的 Stage 總數（15~30 之間），並將 run 的 `chapterIndex` 設為角色目前的 `nextChapterIndex`
 
 #### Scenario: 關卡最後一個 Stage 固定為 Boss
 - **WHEN** 目前關卡內 Stage 序號等於「本關卡 Stage 總數 - 1」

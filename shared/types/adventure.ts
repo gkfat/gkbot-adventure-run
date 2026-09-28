@@ -831,10 +831,10 @@ export const PROGRESSION_CONFIG = {
         LOW: 7, HIGH: 12,
     },
     STAGE_NODE_MIN: {
-        LOW: 5, HIGH: 8,
+        LOW: 15, HIGH: 19,
     },
     STAGE_NODE_MAX: {
-        LOW: 10, HIGH: 15,
+        LOW: 22, HIGH: 30,
     },
 } as const;
 

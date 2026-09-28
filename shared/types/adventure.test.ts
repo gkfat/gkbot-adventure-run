@@ -114,7 +114,7 @@ describe('getLevelCountRange / getStageNodeCountRange', () => {
             min: 3, max: 7, 
         });
         expect(getStageNodeCountRange(power, 0)).toEqual({
-            min: 5, max: 10, 
+            min: 15, max: 22,
         });
     });
 
@@ -125,7 +125,7 @@ describe('getLevelCountRange / getStageNodeCountRange', () => {
             min: 8, max: 12, 
         });
         expect(getStageNodeCountRange(power, PROGRESSION_CONFIG.MAX_CHAPTER_FOR_SCALING)).toEqual({
-            min: 8, max: 15, 
+            min: 19, max: 30,
         });
     });
 
