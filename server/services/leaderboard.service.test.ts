@@ -6,12 +6,13 @@ import { LeaderboardService } from './leaderboard.service';
 import type { LeaderboardEntry } from '../../shared/types/leaderboard';
 
 const {
-    getTopNMock, countHigherThanMock, getMock, addScoreMock,
+    getTopNMock, countHigherThanMock, getMock, addScoreMock, characterGetByIdMock,
 } = vi.hoisted(() => ({
     getTopNMock: vi.fn(),
     countHigherThanMock: vi.fn(),
     getMock: vi.fn(),
     addScoreMock: vi.fn(),
+    characterGetByIdMock: vi.fn(),
 }));
 
 vi.mock('../repositories/leaderboard.repository', () => ({
@@ -20,6 +21,12 @@ vi.mock('../repositories/leaderboard.repository', () => ({
         countHigherThan = countHigherThanMock;
         get = getMock;
         addScore = addScoreMock;
+    },
+}));
+
+vi.mock('../repositories/character.repository', () => ({
+    CharacterRepository: class {
+        getById = characterGetByIdMock;
     },
 }));
 
@@ -129,5 +136,55 @@ describe('LeaderboardService.getLeaderboard (leaderboard)', () => {
         expect(result.myEntry).toEqual({
             ...myEntry, rewardGold: 300, rewardGems: 12,
         });
+    });
+
+    it('resolves spriteUrl for the top 3 (podium) entries only, from each entry\'s own characterId', async () => {
+        getTopNMock.mockResolvedValue([
+            entry({
+                characterId: 'char-1', score: 400, 
+            }),
+            entry({
+                characterId: 'char-2', score: 300, 
+            }),
+            entry({
+                characterId: 'char-3', score: 200, 
+            }),
+            entry({
+                characterId: 'char-4', score: 100, 
+            }),
+        ]);
+        countHigherThanMock.mockResolvedValue(4);
+        characterGetByIdMock.mockImplementation((characterId: string) => (
+            characterId === 'char-2' ? { archetypeId: 'fighter' } : null
+        ));
+
+        const service = new LeaderboardService();
+        const result = await service.getLeaderboard(50);
+
+        expect(characterGetByIdMock).toHaveBeenCalledTimes(3);
+        expect(characterGetByIdMock).not.toHaveBeenCalledWith('char-4');
+        expect(result.entries[0].spriteUrl).toBeUndefined();
+        expect(result.entries[1].spriteUrl).toBe('/images/archetypes/fighter.png');
+        expect(result.entries[2].spriteUrl).toBeUndefined();
+        expect(result.entries[3].spriteUrl).toBeUndefined();
+    });
+
+    it('resolves spriteUrl on myEntry when the requester ranks within the podium', async () => {
+        const myEntry = entry({
+            characterId: 'char-2', score: 300,
+        });
+        getTopNMock.mockResolvedValue([
+            entry({
+                characterId: 'char-1', score: 400, 
+            }), myEntry,
+        ]);
+        getMock.mockResolvedValue(myEntry);
+        countHigherThanMock.mockResolvedValueOnce(5).mockResolvedValueOnce(1);
+        characterGetByIdMock.mockResolvedValue({ archetypeId: 'fighter' });
+
+        const service = new LeaderboardService();
+        const result = await service.getLeaderboard(50, 'char-2');
+
+        expect(result.myEntry?.spriteUrl).toBe('/images/archetypes/fighter.png');
     });
 });

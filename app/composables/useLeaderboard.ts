@@ -10,6 +10,7 @@ export type LeaderboardEntryView = {
     killCount?: number;
     rewardGold: number;
     rewardGems: number;
+    spriteUrl?: string;
 };
 
 interface GetLeaderboardResponse {

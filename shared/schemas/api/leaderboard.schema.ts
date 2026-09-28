@@ -15,10 +15,13 @@ export const getLeaderboardRequestSchema = z.object({
 }).strict();
 
 // 附上該名次的賽季結算獎勵（僅顯示用，不落地儲存）——見
-// server/constants/leaderboardSeason.ts。
+// server/constants/leaderboardSeason.ts。spriteUrl 僅在前 3 名（頒獎台）時
+// 附上，同樣是伺服器端即時查角色 archetype 算出、不落地儲存的顯示欄位——見
+// LeaderboardService.withPodiumSprites。
 const leaderboardEntryWithRewardSchema = leaderboardEntrySchema.extend({
     rewardGold: z.number().int().min(0),
     rewardGems: z.number().int().min(0),
+    spriteUrl: z.string().optional(),
 });
 
 export const getLeaderboardResponseSchema = z.object({

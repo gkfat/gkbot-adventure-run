@@ -59,9 +59,52 @@
             v-else
             class="leaderboard-page__scroll flex-grow-1"
         >
+            <!--
+                前三名：頒獎台。固定顯示 1～3 名的講台圖，該名次還沒有人上榜時只顯示
+                空講台。講台圖／暱稱＋獎勵拆成兩個獨立的 v-row：講台圖這排要讓三座
+                底部切齊、側邊相連，若和下方文字疊在同一個 flex column 裡，名次沒人
+                上榜時少了暱稱／獎勵這段內容，align="end" 對齊的會是「整欄」的底部
+                （也就是文字的底部），講台圖本身反而對不齊。
+            -->
+            <v-row
+                no-gutters
+                align="end"
+                class="leaderboard-page__podium"
+            >
+                <v-col
+                    v-for="slot in podiumSlots"
+                    :key="slot.rank"
+                    cols="4"
+                    :style="{ order: slot.order }"
+                >
+                    <GameLeaderboardPodiumColumn
+                        :entry="slot.entry"
+                        :rank="slot.rank"
+                    />
+                </v-col>
+            </v-row>
+
+            <v-row
+                no-gutters
+                class="mb-3"
+            >
+                <v-col
+                    v-for="slot in podiumSlots"
+                    :key="slot.rank"
+                    cols="4"
+                    class="d-flex flex-column align-center"
+                    :style="{ order: slot.order }"
+                >
+                    <span
+                        v-if="slot.entry"
+                        class="podium-info__nickname text-caption mt-1"
+                    >{{ slot.entry.nickname }}</span>
+                </v-col>
+            </v-row>
+
             <div
                 v-if="entries.length === 0"
-                class="d-flex flex-column align-center justify-center fill-height text-medium-emphasis text-body-2"
+                class="text-center text-medium-emphasis text-body-2 mb-2"
             >
                 本賽季目前還沒有人上榜
             </div>
@@ -73,17 +116,7 @@
                 :class="{ 'leaderboard-row--mine': isMine(entry) }"
             >
                 <span class="leaderboard-row__rank flex-shrink-0">
-                    <span
-                        v-if="trophyIcon(index + 1)"
-                        class="leaderboard-row__trophy"
-                        :class="trophyClass(index + 1)"
-                    >
-                        <GameCommonPixelIcon
-                            :name="trophyIcon(index + 1)!"
-                            :size="20"
-                        />
-                    </span>
-                    <span v-else class="font-pixel">{{ index + 1 }}</span>
+                    <span class="font-pixel">{{ index + 1 }}</span>
                 </span>
                 <span class="leaderboard-row__nickname flex-grow-1 text-body-2">{{ entry.nickname }}</span>
                 <span
@@ -175,6 +208,22 @@ const {
 const isMine = (entry: LeaderboardEntryView) => !!myEntry.value && entry.characterId === myEntry.value.characterId;
 const myEntryVisible = computed(() => !!myEntry.value && entries.value.some(isMine));
 
+// 講台固定顯示第 1～3 名，不論當下是否有人上榜；下方清單則完整列出所有名次
+// （含前三名，從第 1 名開始降冪排序），講台只是額外的視覺強調。視覺順序固定
+// 「2-1-3」
+// （2 名在左、1 名置中最高、3 名在右），用 CSS order 排列 v-col 這個實際
+// 的 flex item（套在巢狀元件內層無效——flex order 只影響直接子層）。
+const PODIUM_VISUAL_ORDER: Record<1 | 2 | 3, number> = {
+    2: 0,
+    1: 1,
+    3: 2,
+};
+const podiumSlots = computed(() => ([1, 2, 3] as const).map(rank => ({
+    rank,
+    entry: entries.value[rank - 1] ?? null,
+    order: PODIUM_VISUAL_ORDER[rank],
+})));
+
 const TROPHY_ICON_BY_RANK: Record<number, PixelIconName> = {
     1: 'trophyGold',
     2: 'trophySilver',
@@ -206,6 +255,20 @@ onUnmounted(stopCountdown);
     &__scroll {
         overflow-y: auto;
         min-height: 0;
+    }
+
+    &__podium {
+        padding-top: 4px;
+    }
+}
+
+.podium-info {
+    &__nickname {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: rgb(var(--v-theme-primary));
     }
 }
 
