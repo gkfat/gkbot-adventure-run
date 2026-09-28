@@ -120,6 +120,10 @@ function playSfx(sound: string): void {
  * 成功播放過」的 HTMLAudioElement 實例之後在非手勢情境下繼續播放，這一步讓
  * 戰鬥流程（由 requestAnimationFrame/setTimeout 觸發，不在手勢呼叫堆疊內）
  * 播放的傷害音效不會被靜默擋下。只需成功解鎖一次，之後不再重複執行。
+ *
+ * 用 muted（而非 volume = 0）來靜音：iOS Safari 會忽略 HTMLMediaElement.volume
+ * 的 setter（音量固定跟裝置硬體音量走），只有 muted 屬性才能真正讓播放無聲，
+ * 否則使用者會在解鎖當下聽到全部音效一起播放。
  */
 function unlockAudioPlayback(): void {
     if (audioUnlocked || typeof document === 'undefined') return;
@@ -127,14 +131,13 @@ function unlockAudioPlayback(): void {
 
     for (const sound of SFX_FILES) {
         const audio = getPooledSfx(sound);
-        const originalVolume = audio.volume;
-        audio.volume = 0;
+        audio.muted = true;
         audio.play().then(() => {
             audio.pause();
             audio.currentTime = 0;
-            audio.volume = originalVolume;
+            audio.muted = false;
         }).catch(() => {
-            audio.volume = originalVolume;
+            audio.muted = false;
         });
     }
 }

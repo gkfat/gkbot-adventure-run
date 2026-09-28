@@ -1,4 +1,3 @@
-import { SystemBtn } from '../../.nuxt/components';
 <template>
     <v-container class="fill-height">
         <v-card
@@ -14,14 +13,14 @@ import { SystemBtn } from '../../.nuxt/components';
                 <img
                     src="/images/favicon-bot-pixel.png"
                     alt="GkBot"
-                    class="login-gkbot"
+                    class="gkbot-logo"
                     width="140"
                     height="163"
                 >
             </div>
 
             <!-- Title -->
-            <v-card-title class="font-pixel login-title text-center text-wrap">
+            <v-card-title class="font-pixel gkbot-title text-center text-wrap">
                 GkBot<br>
                 Adventure<br>
                 Run
@@ -104,21 +103,3 @@ const handleGoogleLogin = async () => {
     }
 };
 </script>
-
-<style scoped lang="scss">
-.login-gkbot {
-    image-rendering: pixelated;
-    filter: drop-shadow(0 0 14px rgba(201, 162, 75, 0.25)) drop-shadow(0 6px 0 rgba(0, 0, 0, 0.4));
-}
-
-// 末世感美術字：鏽蝕鎖黃 + 暗紅/青偏移的故障陰影，疊在既有 8-bit 字體上
-.login-title {
-    color: #c9a24b;
-    letter-spacing: 1px;
-    line-height: 1.6;
-    text-shadow:
-        2px 2px 0 rgba(0, 0, 0, 0.6),
-        -2px 0 0 rgba(140, 30, 30, 0.45),
-        2px 0 0 rgba(60, 120, 130, 0.35);
-}
-</style>
