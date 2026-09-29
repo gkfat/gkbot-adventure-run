@@ -168,18 +168,16 @@ const canProgress = (skill: SkillEntry): boolean => {
 
     &__star {
         position: absolute;
-        top: -7px;
-        left: -6px;
+        top: 3px;
+        right: 3px;
         z-index: 1;
         display: flex;
         align-items: center;
-        height: 14px;
+        height: 12px;
         padding: 0 3px;
         font-size: 8px;
         line-height: 1;
-        color: #14171c;
-        background: rgb(var(--v-theme-secondary));
-        border-radius: 2px;
+        color: rgb(var(--v-theme-secondary));
         white-space: nowrap;
     }
 
