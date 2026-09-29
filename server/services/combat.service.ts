@@ -524,6 +524,10 @@ export class CombatService extends BaseService implements CombatResolver {
                         combatLog.push({
                             timestamp: eventTimestamp, wave, actorId: dot.sourceId, targetId: actor.id, action: 'SKILL',
                             skillId: dot.skillId, skillName: dot.skillName, damage: hpDamage, targetHpRemaining: actor.hp,
+                            // dot.sourceId isn't taking a turn here — its own
+                            // nextAttackAt schedule is untouched by DOT ticks
+                            // (see frontend useCombat.ts isDotTick handling).
+                            isDotTick: true,
                         });
                         dot.remainingTicks -= 1;
                     }

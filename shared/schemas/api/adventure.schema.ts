@@ -139,6 +139,10 @@ export const startCombatResponseSchema = z.object({
                 'SHIELD',
             ]).optional(),
             statusDurationSec: z.number().optional(),
+            // SKILL action only, DOT ticks — this entry is a recurring DOT
+            // tick, not `actorId` taking their own turn (見 combat.service.ts
+            // isDotTick 註解).
+            isDotTick: z.boolean().optional(),
         })),
         summary: combatSummarySchema,
         // Present only when this call ended the run (defeat) — see

@@ -949,7 +949,14 @@ export function useCombat(
             // 而不是預期中的 0%（見 known-issue.md）。這裡用 holdMs 讓 gaugeAt 在新
             // 週期開始的頭 CARD_FX_MS 內固定顯示 0%，之後再開始累加，且仍精準在
             // end（下次出手時間）補滿 100%。
-            const actedUnitIds = new Set(group.entries.map(entry => entry.actorId));
+            // isDotTick entries（如幻影分身的持續傷害）不算 actorId 真的出手——
+            // 該單位自己的 nextAttackAt 排程完全沒被這次 tick 影響，若照樣把牠的
+            // 充能週期在這裡收尾重開，會讓牠的行動條每次 tick 就無端重置一次，
+            // 跟伺服器實際排程對不上（見使用者回報：幻象法師使用幻影分身時行動
+            // 條會亂竄）。
+            const actedUnitIds = new Set(
+                group.entries.filter(entry => !entry.isDotTick).map(entry => entry.actorId),
+            );
             for (const unitId of actedUnitIds) {
                 open.get(unitId)!.end = actAt;
                 const next: UnitCycle = {
@@ -1109,7 +1116,7 @@ export function useCombat(
             }
 
             for (const entry of group.entries) {
-                if (entry.actorId !== 'player' || !entry.skillId) continue;
+                if (entry.actorId !== 'player' || !entry.skillId || entry.isDotTick) continue;
                 ensureOpen(entry.skillId, waveStartAt);
                 const cycle = open.get(entry.skillId)!;
                 cycle.end = windupStartAt;

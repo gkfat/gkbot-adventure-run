@@ -102,6 +102,12 @@ export type CombatLogEntry = {
   // `statusDurationSec` seconds, so it can render a status indicator.
   statusEffectKind?: SkillEffectKind;
   statusDurationSec?: number;
+  // SKILL action only, DOT ticks (combat.service.ts) — this entry is a
+  // recurring DOT tick, not `actorId` taking their own turn. The frontend's
+  // action-gauge cycling must not treat `actorId` as having acted here,
+  // otherwise the DOT source's gauge resets on every tick even though its
+  // `nextAttackAt` schedule is untouched (行動條亂竄 bug).
+  isDotTick?: boolean;
 };
 
 /**
