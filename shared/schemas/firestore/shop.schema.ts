@@ -9,11 +9,17 @@ import { itemInstanceSchema } from './item.schema';
  * Shop item schema — each item is priced in exactly one currency. `type`
  * defaults to `'ITEM'` when absent (pre-`character-skills` documents); a
  * `'SKILL_FRAGMENT'` slot carries `skillId`/`fragmentAmount` instead of `item`
- * (character-skills「商店技能碎片商品」).
+ * (character-skills「商店技能碎片商品」). A `'SKILL_EXP_CHIP'` slot carries a
+ * single `item` (a `skill_exp_chip` instance), same shape as `'ITEM'`
+ * (skill-universal-star-upgrade「商店技能經驗值晶片商品」).
  */
 export const shopItemSchema = z.object({
     slotId: z.string(),
-    type: z.enum(['ITEM', 'SKILL_FRAGMENT']).optional(),
+    type: z.enum([
+        'ITEM',
+        'SKILL_FRAGMENT',
+        'SKILL_EXP_CHIP',
+    ]).optional(),
     item: itemInstanceSchema.optional(),
     skillId: z.string().optional(),
     fragmentAmount: z.number().int().min(1).optional(),

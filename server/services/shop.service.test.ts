@@ -388,10 +388,10 @@ describe('ShopService.purchaseItem', () => {
     });
 });
 
-describe('ShopService.getOrGenerateShop — skill fragment slots (character-skills)', () => {
-    it('includes GOLD and GEMS skill-fragment slots for a character with a known archetype', async () => {
+describe('ShopService.getOrGenerateShop — skill fragment slots (skill-universal-star-upgrade)', () => {
+    it('includes GOLD and GEMS skill-fragment slots, picked from the full 10-skill catalog regardless of archetype', async () => {
         const service = new ShopService();
-        const shop = await service.getOrGenerateShop('char-1', 'fighter');
+        const shop = await service.getOrGenerateShop('char-1');
 
         const fragmentSlots = shop.items.filter(item => item.type === 'SKILL_FRAGMENT');
         expect(fragmentSlots).toHaveLength(2);
@@ -402,12 +402,21 @@ describe('ShopService.getOrGenerateShop — skill fragment slots (character-skil
             expect(slot.item).toBeUndefined();
         }
     });
+});
 
-    it('generates no skill-fragment slots for an unknown archetype (legacy characters)', async () => {
+describe('ShopService.getOrGenerateShop — skill exp chip slots (skill-universal-star-upgrade)', () => {
+    it('includes 3 GOLD and 1 GEMS skill-exp-chip slots, each pre-rolled with a skill_exp_chip item', async () => {
         const service = new ShopService();
-        const shop = await service.getOrGenerateShop('char-legacy', 'legacy');
+        const shop = await service.getOrGenerateShop('char-1');
 
-        expect(shop.items.some(item => item.type === 'SKILL_FRAGMENT')).toBe(false);
+        const chipSlots = shop.items.filter(item => item.type === 'SKILL_EXP_CHIP');
+        expect(chipSlots).toHaveLength(4);
+        expect(chipSlots.filter(slot => slot.currency === 'GOLD')).toHaveLength(3);
+        expect(chipSlots.filter(slot => slot.currency === 'GEMS')).toHaveLength(1);
+        for (const slot of chipSlots) {
+            expect(slot.item?.templateId).toBe('skill_exp_chip');
+            expect(slot.skillId).toBeUndefined();
+        }
     });
 });
 

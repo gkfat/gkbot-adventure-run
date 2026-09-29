@@ -25,7 +25,7 @@ import { QuestAchievementProgressTracker } from './progress-tracker.service';
 import { getAdminFirestore } from '../utils/firebaseAdmin';
 import { generateItemInstance } from './item.service';
 import {
-    getAllItemTemplates, getCharacterSkillsByArchetypeId, getCharacterSkillById,
+    getAllItemTemplates, ALL_CHARACTER_SKILLS, getCharacterSkillById,
 } from '../constants/templates';
 import type {
     DailyShop, ShopItem, CurrencyType,
@@ -61,16 +61,41 @@ export type PurchaseResult = {
 };
 
 /**
- * Skill-fragment shop slots (character-skills「商店技能碎片商品」): one GOLD-priced
- * and one GEMS-priced slot per daily shop, each granting a fixed fragment
- * amount of a randomly-picked skill from the character's own archetype.
+ * Skill-fragment shop slots (skill-universal-star-upgrade「商店技能碎片商品」): one
+ * GOLD-priced and one GEMS-priced slot per daily shop, each granting exactly 1
+ * fragment of a randomly-picked skill from ALL 10 skills (no longer limited to
+ * the character's own archetype). Priced steeply (2000 gold / 10 gems per
+ * fragment) since star-up costs run into the hundreds of fragments — the
+ * shop is a top-up, not the primary source.
  * ASSUMPTION: values are initial balance numbers, freely tunable.
  */
 const SKILL_FRAGMENT_SHOP_SLOTS: { currency: CurrencyType; price: number; fragmentAmount: number }[] = [
     {
-        currency: 'GOLD', price: 60, fragmentAmount: 4,
+        currency: 'GOLD', price: 2000, fragmentAmount: 1,
     }, {
-        currency: 'GEMS', price: 3, fragmentAmount: 4,
+        currency: 'GEMS', price: 10, fragmentAmount: 1,
+    },
+];
+
+/**
+ * Skill Exp Chip shop slots (skill-universal-star-upgrade「商店技能經驗值晶片商品」):
+ * 3 GOLD-priced + 1 GEMS-priced slot per daily shop, each selling exactly 1
+ * chip — reuses the existing "sold-once-per-day" slot mechanism as the daily
+ * purchase cap, no separate purchase-count tracking needed.
+ * ASSUMPTION: values are initial balance numbers, freely tunable.
+ */
+const SKILL_EXP_CHIP_SHOP_SLOTS: { currency: CurrencyType; price: number }[] = [
+    {
+        currency: 'GOLD', price: 50, 
+    },
+    {
+        currency: 'GOLD', price: 50, 
+    },
+    {
+        currency: 'GOLD', price: 50, 
+    },
+    {
+        currency: 'GEMS', price: 4, 
     },
 ];
 
@@ -103,7 +128,7 @@ export class ShopService extends BaseService {
      * deleting every other, stale shop document for this character) if it
      * doesn't exist yet.
      */
-    async getOrGenerateShop(characterId: string, archetypeId: string): Promise<DailyShop> {
+    async getOrGenerateShop(characterId: string): Promise<DailyShop> {
         const today = getTodayUtcDate();
         const existing = await this.shopRepo.getShop(characterId, today);
         if (existing) {
@@ -113,7 +138,7 @@ export class ShopService extends BaseService {
         const shop: DailyShop = {
             characterId,
             date: today,
-            items: generateShopItems(characterId, archetypeId),
+            items: generateShopItems(characterId),
             generatedAt: Date.now(),
         };
         const created = await this.shopRepo.createShop(shop);
@@ -264,8 +289,9 @@ export class ShopService extends BaseService {
                 throw new BusinessLogicError('Inventory is full');
             }
 
-            // Reaching here means type is 'ITEM' (or the undefined-legacy
-            // equivalent) — `item` is always populated for those slots.
+            // Reaching here means type is 'ITEM'/'SKILL_EXP_CHIP' (or the
+            // undefined-legacy equivalent) — `item` is always populated for
+            // those slots.
             const item = slot.item as ItemInstance;
             const itemRef = this.db.collection('items').doc(item.itemId);
             tx.set(itemRef, item);
@@ -281,7 +307,11 @@ export class ShopService extends BaseService {
             };
 
             let unequipped: ItemInstance | undefined;
-            if (destination === PurchaseDestination.EQUIP) {
+            // SKILL_EXP_CHIP slots ignore `destination` — a MATERIAL item has
+            // no equip slot, so it always lands in the permanent inventory
+            // regardless of what the caller requested (skill-universal-star-upgrade
+            // 「商店技能經驗值晶片商品」).
+            if (destination === PurchaseDestination.EQUIP && slot.type !== 'SKILL_EXP_CHIP') {
                 if (item.type !== ItemType.EQUIPMENT || !item.equipSlot) {
                     throw new BusinessLogicError('Item is not equipment');
                 }
@@ -456,7 +486,7 @@ function rollPrice(min: number, max: number): number {
  * is set on the embedded ItemInstance immediately since shop slots are already
  * scoped to one character; purchase delivers this exact item, never re-rolling it.
  */
-function generateShopItems(characterId: string, archetypeId: string): ShopItem[] {
+function generateShopItems(characterId: string): ShopItem[] {
     const allTemplates = getAllItemTemplates();
     const equipmentTemplates = allTemplates.filter(t => t.type === ItemType.EQUIPMENT);
     const potionTemplates = allTemplates.filter(t => t.type === ItemType.POTION);
@@ -516,10 +546,9 @@ function generateShopItems(characterId: string, archetypeId: string): ShopItem[]
         () => rollSlot(potionTemplates, index++, 'GEMS', gemsContext),
     );
 
-    const skillCatalog = getCharacterSkillsByArchetypeId(archetypeId);
-    const skillFragmentSlots: ShopItem[] = skillCatalog.length > 0
+    const skillFragmentSlots: ShopItem[] = ALL_CHARACTER_SKILLS.length > 0
         ? SKILL_FRAGMENT_SHOP_SLOTS.map((config) => {
-            const skill = skillCatalog[Math.floor(Math.random() * skillCatalog.length)]!;
+            const skill = ALL_CHARACTER_SKILLS[Math.floor(Math.random() * ALL_CHARACTER_SKILLS.length)]!;
             const slot: ShopItem = {
                 slotId: `slot-${index++}`,
                 type: 'SKILL_FRAGMENT',
@@ -533,12 +562,29 @@ function generateShopItems(characterId: string, archetypeId: string): ShopItem[]
         })
         : [];
 
+    const chipContext: ItemGenerationContext = { source: ItemSource.SHOP };
+    const skillExpChipSlots: ShopItem[] = SKILL_EXP_CHIP_SHOP_SLOTS.map((config) => {
+        const item: ItemInstance = {
+            ...generateItemInstance('skill_exp_chip', chipContext), characterId,
+        };
+        const slot: ShopItem = {
+            slotId: `slot-${index++}`,
+            type: 'SKILL_EXP_CHIP',
+            item,
+            currency: config.currency,
+            price: config.price,
+            sold: false,
+        };
+        return slot;
+    });
+
     return [
         ...goldEquipmentSlots,
         ...goldPotionSlots,
         ...gemsEquipmentSlots,
         ...gemsPotionSlots,
         ...skillFragmentSlots,
+        ...skillExpChipSlots,
     ];
 }
 

@@ -27,11 +27,29 @@ export const SKILL_EXP_TABLE: Record<number, number> = {
 /** exp granted per actual in-combat skill trigger (combat-engine settlement). */
 export const EXP_PER_SKILL_TRIGGER = 8;
 
-/** 1 spent fragment converts to this much skill exp (strengthen action). */
-export const FRAGMENT_TO_EXP_RATE = 10;
-
 /** Fixed fragment amount granted per successful combat-victory fragment drop. */
-export const SKILL_FRAGMENT_DROP_AMOUNT = 3;
+export const SKILL_FRAGMENT_DROP_AMOUNT = 1;
+
+/** Highest star rank a skill can reach. */
+export const SKILL_STAR_MAX = 5;
+
+/**
+ * Fragments required to star-up TO the given star rank (only keys 2..SKILL_STAR_MAX
+ * are meaningful — a skill starts at star 1 on unlock, so there is no cost to
+ * "reach" star 1).
+ */
+export const SKILL_STAR_UP_FRAGMENT_COST: Record<number, number> = {
+    2: 50,
+    3: 200,
+    4: 450,
+    5: 800,
+};
+
+/** Fixed skill exp granted per consumed Skill Exp Chip (use-exp-chip action). */
+export const SKILL_EXP_PER_CHIP = 50;
+
+/** Fixed chip amount granted per successful combat-victory chip drop. */
+export const SKILL_EXP_CHIP_DROP_AMOUNT = 1;
 
 /** Every N character levels opens one more equip slot, up to MAX_EQUIPPED_SKILLS. */
 export const SKILL_SLOT_LEVEL_INTERVAL = 7;

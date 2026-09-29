@@ -14,7 +14,7 @@ interface ItemStats {
 interface InventoryItem {
     itemId: string;
     templateId: string;
-    type: 'EQUIPMENT' | 'POTION';
+    type: 'EQUIPMENT' | 'POTION' | 'MATERIAL';
     equipSlot?: EquipmentSlot;
     weight?: number;
     weaponType?: WeaponType;

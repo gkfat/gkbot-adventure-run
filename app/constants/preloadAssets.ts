@@ -180,6 +180,7 @@ export const PRELOAD_IMAGE_PATHS: string[] = [
     '/images/pixel-icons/serumInjector.png',
     '/images/pixel-icons/shield.png',
     '/images/pixel-icons/signetRing.png',
+    '/images/pixel-icons/skillExpChip.png',
     '/images/pixel-icons/sneakers.png',
     '/images/pixel-icons/storeBat.png',
     '/images/pixel-icons/storeVest.png',

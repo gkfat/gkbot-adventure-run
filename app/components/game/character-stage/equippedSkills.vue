@@ -8,10 +8,13 @@
             :key="index"
             type="button"
             class="equipped-skill-slot pixel-press d-flex align-center justify-center"
-            :aria-label="slot ? `${slot.name}（Lv.${slot.level}），點擊查看角色技能` : '尚未裝配技能，點擊前往角色技能頁'"
+            :aria-label="slot ? `${slot.name}（★${slot.star ?? 1} Lv.${slot.level}），點擊查看角色技能` : '尚未裝配技能，點擊前往角色技能頁'"
             @click="goToSkillTab"
         >
             <template v-if="slot">
+                <span class="equipped-skill-slot__star font-pixel">
+                    {{ '★'.repeat(slot.star ?? 1) }}
+                </span>
                 <GameCommonPixelIcon
                     :name="(slot.icon as PixelIconName)"
                     :size="32"
@@ -62,6 +65,23 @@ const goToSkillTab = () => navigateTo('/inventory?tab=SKILL');
     color: rgb(var(--v-theme-primary));
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 2px 0 0 rgba(0, 0, 0, 0.5);
     cursor: pointer;
+
+    &__star {
+        position: absolute;
+        top: -7px;
+        left: -6px;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        height: 14px;
+        padding: 0 3px;
+        font-size: 8px;
+        line-height: 1;
+        color: #14171c;
+        background: rgb(var(--v-theme-secondary));
+        border-radius: 2px;
+        white-space: nowrap;
+    }
 
     &__value {
         position: absolute;

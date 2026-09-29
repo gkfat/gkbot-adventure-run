@@ -42,6 +42,9 @@ const skillEntrySchema = z.object({
     unlocked: z.boolean(),
     level: z.number().int().min(1).max(10).optional(),
     exp: z.number().int().min(0).optional(),
+    star: z.number().int().min(1).max(5).optional(),
+    // 已套用星等加成後、目前實際生效的效果數值——見 spec.md「星等對技能效果的
+    // 加成」。
     effect: skillEffectSchema.optional(),
     // 只有已解鎖的技能才附上——Lv.1~SKILL_MAX_LEVEL 全部等級的效果數值，供強化
     // UI 依「目前選擇要消耗的碎片數量」即時算出會落在哪一級、預覽該級的實際效果
@@ -70,6 +73,12 @@ export const getCharacterSkillsResponseSchema = z.object({
     }),
 });
 
+const skillProgressResponseSchema = z.object({
+    exp: z.number().int().min(0),
+    level: z.number().int().min(1).max(10),
+    star: z.number().int().min(1).max(5),
+});
+
 /**
  * POST /api/character/:characterId/skills/unlock
  */
@@ -79,21 +88,26 @@ export const unlockSkillResponseSchema = z.object({
     success: z.boolean(),
     data: z.object({
         skillFragments: z.record(z.string(), z.number().int().min(0)),
-        unlockedSkills: z.record(z.string(), z.object({
-            exp: z.number().int().min(0), level: z.number().int().min(1).max(10),
-        })),
+        unlockedSkills: z.record(z.string(), skillProgressResponseSchema),
     }),
 });
 
 /**
- * POST /api/character/:characterId/skills/strengthen
+ * POST /api/character/:characterId/skills/star-up
  */
-export const strengthenSkillRequestSchema = z.object({
+export const starUpSkillRequestSchema = z.object({ skillId: z.string().min(1) }).strict();
+
+export const starUpSkillResponseSchema = unlockSkillResponseSchema;
+
+/**
+ * POST /api/character/:characterId/skills/use-exp-chip
+ */
+export const useSkillExpChipRequestSchema = z.object({
     skillId: z.string().min(1),
-    fragmentsToSpend: z.number().int().min(1),
+    itemIds: z.array(z.string().min(1)).min(1),
 }).strict();
 
-export const strengthenSkillResponseSchema = unlockSkillResponseSchema;
+export const useSkillExpChipResponseSchema = unlockSkillResponseSchema;
 
 /**
  * POST /api/character/:characterId/skills/equip
@@ -122,7 +136,9 @@ export type SkillEntry = z.infer<typeof skillEntrySchema>;
 export type GetCharacterSkillsResponse = z.infer<typeof getCharacterSkillsResponseSchema>;
 export type UnlockSkillRequest = z.infer<typeof unlockSkillRequestSchema>;
 export type UnlockSkillResponse = z.infer<typeof unlockSkillResponseSchema>;
-export type StrengthenSkillRequest = z.infer<typeof strengthenSkillRequestSchema>;
-export type StrengthenSkillResponse = z.infer<typeof strengthenSkillResponseSchema>;
+export type StarUpSkillRequest = z.infer<typeof starUpSkillRequestSchema>;
+export type StarUpSkillResponse = z.infer<typeof starUpSkillResponseSchema>;
+export type UseSkillExpChipRequest = z.infer<typeof useSkillExpChipRequestSchema>;
+export type UseSkillExpChipResponse = z.infer<typeof useSkillExpChipResponseSchema>;
 export type EquipSkillRequest = z.infer<typeof equipSkillRequestSchema>;
 export type EquipSkillResponse = z.infer<typeof equipSkillResponseSchema>;

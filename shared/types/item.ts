@@ -12,6 +12,7 @@ import type {
 export enum ItemType {
   EQUIPMENT = 'EQUIPMENT',
   POTION = 'POTION',
+  MATERIAL = 'MATERIAL',
 }
 
 /**

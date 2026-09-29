@@ -1,9 +1,13 @@
 /**
- * Per-archetype character skills (character-skills): each of the 5
- * selectable archetypes gets 2 skills that echo its narrative/combat
- * identity. Each skill's `effectByLevel` is a Lv.1~10 query table — leveling
- * only strengthens the effect's numeric magnitude, `chargeSec` never changes
- * (see design.md decision 2/4).
+ * Character skills (character-skills): each of the 5 selectable archetypes
+ * originally contributed 2 skills that echo its narrative/combat identity,
+ * but skills are no longer exclusive to that archetype — any character can
+ * unlock/equip any of the 10 skills (see `ALL_CHARACTER_SKILLS` below).
+ * `archetypeId` on each `CharacterSkill` is kept as narrative/icon-grouping
+ * metadata only. Each skill's `effectByLevel` is a Lv.1~10 query table —
+ * leveling only strengthens the effect's numeric magnitude, `chargeSec` never
+ * changes at the Lv.1~10 layer (star-rank bonuses on top of this are applied
+ * separately, see `applyStarBonus`/`applyStarBonusToChargeSec`).
  *
  * ASSUMPTION (design.md Open Questions): `chargeSec`/`unlockFragmentCost`/
  * per-level magnitudes are initial balance values, freely tunable via
@@ -174,14 +178,51 @@ export const CHARACTER_SKILLS: Record<string, readonly CharacterSkill[]> = {
     ],
 } as const;
 
+/**
+ * Every selectable archetype's skills, flattened into a single catalog
+ * (character-skills「解鎖技能」/「查詢角色技能資料」): skills are no longer
+ * exclusive to the archetype that originally defined them — any character can
+ * unlock/equip any of these 10 skills. `archetypeId` on `CharacterSkill` is
+ * kept purely as narrative/icon-grouping metadata.
+ */
+export const ALL_CHARACTER_SKILLS: readonly CharacterSkill[] = Object.values(CHARACTER_SKILLS).flat();
+
 export function getCharacterSkillsByArchetypeId(archetypeId: string): readonly CharacterSkill[] {
     return CHARACTER_SKILLS[archetypeId] ?? [];
 }
 
 export function getCharacterSkillById(skillId: string): CharacterSkill | undefined {
-    for (const skills of Object.values(CHARACTER_SKILLS)) {
-        const found = skills.find(skill => skill.skillId === skillId);
-        if (found) return found;
-    }
-    return undefined;
+    return ALL_CHARACTER_SKILLS.find(skill => skill.skillId === skillId);
+}
+
+/**
+ * Star-rank bonus applied on top of `effectByLevel[level-1]` (character-skills
+ * 「星等對技能效果的加成」): magnitude fields scale up `1 + 0.1 * (star - 1)`.
+ * `FREEZE`'s `durationSec` IS a magnitude field (the freeze length itself);
+ * every other kind's `durationSec` is a buff-duration field and does NOT
+ * scale with star.
+ */
+export function applyStarBonus(effect: SkillEffect, star: number): SkillEffect {
+    const scale = 1 + 0.1 * (star - 1);
+    if (scale === 1) return effect;
+
+    return {
+        ...effect,
+        ...(effect.multiplier !== undefined ? { multiplier: round2(effect.multiplier * scale) } : {}),
+        ...(effect.percent !== undefined ? { percent: round2(effect.percent * scale) } : {}),
+        ...(effect.flatPercent !== undefined ? { flatPercent: round2(effect.flatPercent * scale) } : {}),
+        ...(effect.kind === 'FREEZE' && effect.durationSec !== undefined
+            ? { durationSec: round2(effect.durationSec * scale) }
+            : {}),
+    };
+}
+
+/**
+ * Star-rank charge-time reduction (character-skills「星等對技能效果的加成」):
+ * `chargeSec` shortens by `5% * (star - 1)`, floored at 60% of the original
+ * value.
+ */
+export function applyStarBonusToChargeSec(chargeSec: number, star: number): number {
+    const factor = Math.max(0.6, 1 - 0.05 * (star - 1));
+    return round2(chargeSec * factor);
 }

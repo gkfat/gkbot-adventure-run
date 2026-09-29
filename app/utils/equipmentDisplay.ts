@@ -129,6 +129,7 @@ const TEMPLATE_ICON: Record<string, PixelIconName> = {
     servo_greaves: 'greaves',
     research_chip_ring: 'chipRing',
     engine_oil_basic: 'engineOil',
+    skill_exp_chip: 'skillExpChip',
     tech_goggles: 'techGoggles',
     cargo_bot_plate: 'cargoBotPlate',
     hydraulic_arm_guard: 'hydraulicArmGuard',

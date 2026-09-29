@@ -1,12 +1,12 @@
 <template>
     <v-row
-        v-if="skills.length > 0"
+        v-if="visibleSkills.length > 0"
         dense
     >
         <v-col
-            v-for="skill in skills"
+            v-for="skill in visibleSkills"
             :key="skill.skillId"
-            cols="2"
+            cols="3"
         >
             <button
                 type="button"
@@ -14,9 +14,17 @@
                 :class="{ 'pixel-slot--locked': !skill.unlocked, 'pixel-slot--equipped': skill.isEquipped }"
                 @click="emit('select', skill)"
             >
+                <div
+                    v-if="skill.unlocked"
+                    class="pixel-slot__star font-pixel"
+                >
+                    {{ '★'.repeat(skill.star ?? 1) }}
+                </div>
+
                 <GameCommonPixelIcon
                     :name="(skill.icon as PixelIconName)"
-                    :size="32"
+                    :size="40"
+                    :class="{ 'pixel-slot__icon--lit': skill.unlocked }"
                 />
                 <span
                     v-if="skill.unlocked"
@@ -33,13 +41,13 @@
 
                 <div
                     v-if="skill.isEquipped"
-                    class="pixel-slot__equipped-overlay"
+                    class="pixel-slot__equipped-badge bg-green"
                     aria-label="佩戴中"
                 >
                     <v-icon
                         icon="mdi-check-bold"
-                        size="20"
-                        color="green"
+                        size="14"
+                        color="black"
                     />
                 </div>
 
@@ -56,16 +64,27 @@
 <script setup lang="ts">
 import type { SkillEntry } from '../../../composables/useCharacterSkills';
 import type { PixelIconName } from '../../../utils/pixelIcons';
-import { SKILL_MAX_LEVEL } from '../../../../shared/constants/skills';
+import {
+    SKILL_MAX_LEVEL, SKILL_STAR_MAX, SKILL_STAR_UP_FRAGMENT_COST,
+} from '../../../../shared/constants/skills';
 
-defineProps<{ skills: SkillEntry[] }>();
+const props = defineProps<{ skills: SkillEntry[] }>();
 const emit = defineEmits<{ select: [skill: SkillEntry] }>();
 
-// 尚未解鎖：碎片已達門檻，可解鎖；已解鎖：尚未滿級且持有碎片，可消耗強化升級。
+// 尚未取得任何碎片、也未解鎖的技能不顯示——避免玩家還沒摸到邊的技能塞滿格狀清單。
+const visibleSkills = computed(() => (
+    props.skills.filter(skill => skill.unlocked || (skill.fragmentCount ?? 0) > 0)
+));
+
+// 尚未解鎖：碎片已達門檻，可解鎖；已解鎖且 Lv.10：碎片已達下一星等門檻，可升星。
 const canProgress = (skill: SkillEntry): boolean => {
     const fragmentCount = skill.fragmentCount ?? 0;
     if (!skill.unlocked) return fragmentCount >= skill.unlockFragmentCost;
-    return (skill.level ?? 1) < SKILL_MAX_LEVEL && fragmentCount > 0;
+
+    const star = skill.star ?? 1;
+    if ((skill.level ?? 1) < SKILL_MAX_LEVEL || star >= SKILL_STAR_MAX) return false;
+    const cost = SKILL_STAR_UP_FRAGMENT_COST[star + 1] ?? Infinity;
+    return fragmentCount >= cost;
 };
 </script>
 
@@ -143,14 +162,40 @@ const canProgress = (skill: SkillEntry): boolean => {
         }
     }
 
-    &__equipped-overlay {
+    &__icon--lit {
+        filter: brightness(1.35) drop-shadow(0 0 4px rgba(var(--v-theme-primary), 0.65));
+    }
+
+    &__star {
         position: absolute;
-        inset: 0;
+        top: -7px;
+        left: -6px;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        height: 14px;
+        padding: 0 3px;
+        font-size: 8px;
+        line-height: 1;
+        color: #14171c;
+        background: rgb(var(--v-theme-secondary));
+        border-radius: 2px;
+        white-space: nowrap;
+    }
+
+    &__equipped-badge {
+        position: absolute;
+        bottom: -5px;
+        right: -5px;
+        width: 20px;
+        height: 20px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(20, 23, 28, 0.6);
-        border-radius: 1px;
+        line-height: 0;
+        background: #14171c;
+        border: 1.5px solid rgb(var(--v-theme-green));
+        border-radius: 50%;
         pointer-events: none;
     }
 

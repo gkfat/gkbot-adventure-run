@@ -81,32 +81,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- 可獲得技能（character-skills）：讓玩家在選角當下就能看到這個職業
-                     未來能練出哪些技能，不需要開新戰鬥或到角色頁才第一次看到。 -->
-                <div class="text-caption text-medium-emphasis mb-1">
-                    可獲得技能
-                </div>
-                <div class="d-flex flex-column ga-2">
-                    <div
-                        v-for="skill in archetypeSkills"
-                        :key="skill.skillId"
-                        class="d-flex align-center ga-2"
-                    >
-                        <div class="archetype-gallery__skill-icon d-flex align-center justify-center flex-shrink-0">
-                            <GameCommonPixelIcon
-                                :name="(skill.icon as PixelIconName)"
-                                :size="20"
-                            />
-                        </div>
-                        <div style="min-width: 0;">
-                            <div class="text-caption">{{ skill.name }}</div>
-                            <div class="archetype-gallery__skill-desc text-caption text-medium-emphasis">
-                                {{ skill.description }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div class="archetype-detail__nav-row d-flex ga-2">
@@ -196,9 +170,6 @@ import { RARITY_COLOR, resolvePixelIcon } from '../../../utils/equipmentDisplay'
 import {
     getStarterLoadoutPreview, type StarterLoadoutItemPreview,
 } from '../../../../shared/constants/starterLoadout';
-import { getCharacterSkillsByArchetypeId } from '../../../../shared/constants/characterSkills';
-import type { PixelIconName } from '../../../utils/pixelIcons';
-
 defineEmits<{ cancel: [] }>();
 
 const starterDetailOpen = ref(false);
@@ -217,9 +188,6 @@ const selectedIndex = ref(0);
 const selected = computed(() => archetypes.value[selectedIndex.value] ?? archetypes.value[0] ?? null);
 const starterLoadoutPreview = computed(() => (
     selected.value ? getStarterLoadoutPreview(selected.value.archetypeId) : []
-));
-const archetypeSkills = computed(() => (
-    selected.value ? getCharacterSkillsByArchetypeId(selected.value.archetypeId) : []
 ));
 
 const ARCHETYPE_BLURB: Record<string, string> = {
@@ -312,24 +280,6 @@ const handleConfirm = () => {
     &__bar-fill {
         height: 100%;
         background: rgb(var(--v-theme-green));
-    }
-
-    &__skill-icon {
-        width: 32px;
-        height: 32px;
-        background: #14171c;
-        border: 2px solid rgba(196, 203, 219, 0.25);
-        border-radius: 3px;
-        color: rgb(var(--v-theme-primary));
-    }
-
-    &__skill-desc {
-        font-size: 10px;
-        line-height: 1.3;
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
     }
 }
 

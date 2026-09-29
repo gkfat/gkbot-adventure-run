@@ -2,6 +2,7 @@ import type {
     EquipmentSlot, Rarity, WeaponType,
 } from '../../shared/types/common';
 import type { ShopSlotType } from '../../shared/types/shop';
+import { getApiErrorMessage } from '../utils/apiError';
 
 interface ShopItemStats {
     ATK?: number;
@@ -15,7 +16,7 @@ interface ShopItemStats {
 export interface ShopItemInstance {
     itemId: string;
     templateId: string;
-    type: 'EQUIPMENT' | 'POTION';
+    type: 'EQUIPMENT' | 'POTION' | 'MATERIAL';
     equipSlot?: EquipmentSlot;
     weight?: number;
     weaponType?: WeaponType;
@@ -158,7 +159,7 @@ export const useShop = () => {
             return response.data;
         } catch (err: any) {
             console.error('[useShop] Failed to purchase item:', err);
-            purchaseError.value = err.message || '購買失敗';
+            purchaseError.value = getApiErrorMessage(err, '購買失敗');
             return null;
         } finally {
             purchaseLoading.value = false;

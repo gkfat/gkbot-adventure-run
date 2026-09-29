@@ -10,6 +10,7 @@ export interface SkillEntry {
     unlocked: boolean;
     level?: number;
     exp?: number;
+    star?: number;
     effect?: SkillEffect;
     // 只有已解鎖的技能才有值——Lv.1~SKILL_MAX_LEVEL 全部等級的效果數值，供強化
     // UI 依選擇的碎片數量算出會落在哪一級、預覽該級效果（known-issue.md #2）。
@@ -27,9 +28,9 @@ interface GetSkillsResponse {
     data: { skills: SkillEntry[]; unlockedSlotCount: number; equippedSkillIds: EquippedSkillIds };
 }
 
-interface UnlockOrStrengthenResponse {
+interface UnlockOrStarUpResponse {
     success: boolean;
-    data: { skillFragments: Record<string, number>; unlockedSkills: Record<string, { exp: number; level: number }> };
+    data: { skillFragments: Record<string, number>; unlockedSkills: Record<string, { exp: number; level: number; star: number }> };
 }
 
 interface EquipResponse {
@@ -86,7 +87,7 @@ export const useCharacterSkills = () => {
         actionError.value = null;
 
         try {
-            await api.post<UnlockOrStrengthenResponse>(`/api/character/${selectedCharacterId.value}/skills/unlock`, { skillId });
+            await api.post<UnlockOrStarUpResponse>(`/api/character/${selectedCharacterId.value}/skills/unlock`, { skillId });
             await fetchSkills();
             return true;
         } catch (err: any) {
@@ -98,21 +99,40 @@ export const useCharacterSkills = () => {
         }
     };
 
-    const strengthenSkill = async (skillId: string, fragmentsToSpend: number): Promise<boolean> => {
+    const starUpSkill = async (skillId: string): Promise<boolean> => {
         if (!selectedCharacterId.value) return false;
 
         actionLoading.value = true;
         actionError.value = null;
 
         try {
-            await api.post<UnlockOrStrengthenResponse>(`/api/character/${selectedCharacterId.value}/skills/strengthen`, {
-                skillId, fragmentsToSpend,
+            await api.post<UnlockOrStarUpResponse>(`/api/character/${selectedCharacterId.value}/skills/star-up`, { skillId });
+            await fetchSkills();
+            return true;
+        } catch (err: any) {
+            console.error('[useCharacterSkills] Failed to star-up skill:', err);
+            actionError.value = err.message || '升星失敗';
+            return false;
+        } finally {
+            actionLoading.value = false;
+        }
+    };
+
+    const useSkillExpChip = async (skillId: string, itemIds: string[]): Promise<boolean> => {
+        if (!selectedCharacterId.value) return false;
+
+        actionLoading.value = true;
+        actionError.value = null;
+
+        try {
+            await api.post<UnlockOrStarUpResponse>(`/api/character/${selectedCharacterId.value}/skills/use-exp-chip`, {
+                skillId, itemIds,
             });
             await fetchSkills();
             return true;
         } catch (err: any) {
-            console.error('[useCharacterSkills] Failed to strengthen skill:', err);
-            actionError.value = err.message || '強化失敗';
+            console.error('[useCharacterSkills] Failed to use skill exp chip:', err);
+            actionError.value = err.message || '使用晶片失敗';
             return false;
         } finally {
             actionLoading.value = false;
@@ -138,6 +158,16 @@ export const useCharacterSkills = () => {
         } finally {
             actionLoading.value = false;
         }
+    };
+
+    /**
+     * 標記本地快取為過期（保留現有 skills 供畫面繼續顯示，不清空），下次
+     * `onMounted` 檢查 `loaded` 時就會重新 fetch。用於技能碎片數量可能已在
+     * 背景被更動之後（例如冒險結算掉落技能碎片），確保下次進入技能頁會拿到
+     * 最新資料，而不是沿用進冒險前的舊快照。
+     */
+    const invalidate = () => {
+        loaded.value = false;
     };
 
     const reset = () => {
@@ -166,8 +196,10 @@ export const useCharacterSkills = () => {
 
         fetchSkills,
         unlockSkill,
-        strengthenSkill,
+        starUpSkill,
+        useSkillExpChip,
         equipSkill,
+        invalidate,
         reset,
     };
 };

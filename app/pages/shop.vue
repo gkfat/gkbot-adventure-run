@@ -269,6 +269,25 @@
 
         <!-- 技能碎片購買結果 dialog -->
         <GameCommonSkillFragmentPurchaseDialog ref="skillFragmentPurchaseDialogRef" />
+
+        <!-- 技能碎片購買失敗提示（例如餘額不足） -->
+        <GameCommonDialogFrame
+            v-model="purchaseErrorDialogOpen"
+            max-width="280"
+        >
+            <div class="text-body-2 text-center mb-3" style="color: rgb(var(--v-theme-warning));">
+                {{ purchaseErrorMessage }}
+            </div>
+            <SystemBtn
+                block
+                variant="outlined"
+                color="primary"
+                class="text-none"
+                @click="purchaseErrorDialogOpen = false"
+            >
+                關閉
+            </SystemBtn>
+        </GameCommonDialogFrame>
     </div>
 </template>
 
@@ -276,6 +295,7 @@
 import { GACHA_CONFIG } from '~~/shared/constants/gacha';
 import { ItemType } from '../../shared/types/item';
 import type { ShopSlot, ShopItemInstance } from '../composables/useShop';
+import { translateApiErrorMessage } from '../utils/apiError';
 
 definePageMeta({
     middleware: ['auth'],
@@ -290,7 +310,7 @@ useHead({
 const GOLD_COST = GACHA_CONFIG.GOLD_COST;
 const GEMS_COST = GACHA_CONFIG.GEMS_COST;
 const {
-    items, loading, loaded, error, fetchShop, purchase,
+    items, loading, loaded, error, fetchShop, purchase, purchaseError,
     dailySupply, claimDailySupplyLoading, fetchDailySupply, claimDailySupply,
 } = useShop();
 const { fetchCharacter } = useCharacter();
@@ -331,6 +351,11 @@ const tiers = computed(() => [
         label: '道具',
         items: sortByCurrencyThenPrice(items.value.filter(slot => slot.item?.type === ItemType.POTION)),
     },
+    {
+        key: 'MATERIAL',
+        label: '技能經驗值晶片',
+        items: sortByCurrencyThenPrice(items.value.filter(slot => slot.item?.type === ItemType.MATERIAL)),
+    },
 ]);
 
 // 技能碎片商品（character-skills）：不是 ItemInstance，另外用一組簡易卡片呈現，
@@ -346,6 +371,12 @@ const fragmentPurchaseLoadingSlotId = ref<string | null>(null);
 type SkillFragmentPurchaseDialog = { open: (result: { skillId: string; amount: number; name: string; icon: string }) => void };
 const skillFragmentPurchaseDialogRef = ref<SkillFragmentPurchaseDialog | null>(null);
 
+// 購買失敗（例如餘額不足）時彈出提示 dialog——技能碎片卡片沒有像
+// GameCommonShopPurchaseDialog 那樣預先用 canAfford 擋掉按鈕，所以錯誤只能在
+// API 回應後才知道，得用 dialog 主動告知玩家，而不是讓按鈕悄悄轉一圈就沒反應。
+const purchaseErrorDialogOpen = ref(false);
+const purchaseErrorMessage = ref('');
+
 const handlePurchaseFragmentSlot = async (slot: ShopSlot) => {
     if (slot.sold || fragmentPurchaseLoadingSlotId.value) return;
     fragmentPurchaseLoadingSlotId.value = slot.slotId;
@@ -356,7 +387,10 @@ const handlePurchaseFragmentSlot = async (slot: ShopSlot) => {
         await fetchCharacter();
         if (skillsLoaded.value) fetchSkills();
         skillFragmentPurchaseDialogRef.value?.open(result.skillFragment);
+        return;
     }
+    purchaseErrorMessage.value = translateApiErrorMessage(purchaseError.value || '購買失敗');
+    purchaseErrorDialogOpen.value = true;
 };
 
 // eslint-disable-next-line no-unused-vars -- named param is required TS function-type syntax, not a real binding

@@ -4,7 +4,7 @@ import {
 import { requireAuth } from '../../../../utils/auth';
 import { CharacterSkillService } from '../../../../services/character-skill.service';
 import {
-    strengthenSkillRequestSchema, strengthenSkillResponseSchema,
+    useSkillExpChipRequestSchema, useSkillExpChipResponseSchema,
 } from '../../../../../shared/schemas/api/character-skill.schema';
 import { toH3Error } from '../../../../utils/errorHandler';
 import {
@@ -25,19 +25,19 @@ export default defineEventHandler(async (event) => {
         }
 
         const body = await readBody(event);
-        const parseResult = strengthenSkillRequestSchema.safeParse(body);
+        const parseResult = useSkillExpChipRequestSchema.safeParse(body);
         if (!parseResult.success) {
-            throw new ValidationError('Invalid skill strengthen request', parseResult.error.flatten());
+            throw new ValidationError('Invalid skill exp chip request', parseResult.error.flatten());
         }
 
         const characterSkillService = new CharacterSkillService();
-        const character = await characterSkillService.strengthenSkill(
-            authUser.uid, characterId, parseResult.data.skillId, parseResult.data.fragmentsToSpend,
+        const character = await characterSkillService.useSkillExpChip(
+            authUser.uid, characterId, parseResult.data.skillId, parseResult.data.itemIds,
         );
 
         logRequest({
             severity: 'INFO',
-            message: 'Skill strengthened',
+            message: 'Skill exp chip used',
             method: event.method,
             path: event.path,
             status: 200,
@@ -54,11 +54,11 @@ export default defineEventHandler(async (event) => {
             },
         };
 
-        return strengthenSkillResponseSchema.parse(response);
+        return useSkillExpChipResponseSchema.parse(response);
     } catch (error: unknown) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to strengthen skill',
+            message: 'Failed to use skill exp chip',
             method: event.method,
             path: event.path,
             status: error instanceof AppError ? error.statusCode : 500,

@@ -5,6 +5,13 @@
         content-class="skill-dialog"
     >
         <template v-if="skill">
+            <div
+                v-if="skill.unlocked && skill.isEquipped"
+                class="skill-dialog__equipped-badge font-pixel"
+            >
+                佩戴中
+            </div>
+
             <div class="d-flex align-center ga-3 mb-3">
                 <div class="skill-dialog__icon d-flex align-center justify-center">
                     <GameCommonPixelIcon
@@ -13,14 +20,22 @@
                     />
                 </div>
                 <div>
-                    <div class="font-pixel text-body-1">{{ skill.name }}</div>
+                    <div class="d-flex align-center ga-2">
+                        <span class="font-pixel text-body-1">{{ skill.name }}</span>
+                        <span
+                            v-if="skill.unlocked"
+                            class="text-caption font-pixel"
+                            style="color: rgb(var(--v-theme-secondary));"
+                        >
+                            {{ '★'.repeat(skill.star ?? 1) }}
+                        </span>
+                    </div>
                     <div
                         v-if="skill.unlocked"
-                        class="text-caption"
+                        class="font-pixel skill-dialog__level"
                         style="color: rgb(var(--v-theme-primary));"
                     >
-                        Lv.{{ skill.level }}
-                        <span v-if="skill.isEquipped" style="color: rgb(var(--v-theme-green));">・佩戴中</span>
+                        Lv.{{ skill.level }}<span class="skill-dialog__level-max">/{{ SKILL_MAX_LEVEL }}</span>
                     </div>
                     <div v-else class="text-caption text-medium-emphasis">尚未解鎖</div>
                 </div>
@@ -39,59 +54,74 @@
                 充能時間：{{ skill.chargeSec }} 秒
             </div>
 
+            <!-- 效果：選到足夠升級的晶片數時，下方以醒目數字顯示升級後結果供比較 -->
             <div
                 v-if="skill.unlocked && skill.effect"
+                class="skill-dialog__box skill-dialog__box--effect mb-3"
+            >
+                <div class="text-caption text-medium-emphasis mb-1">效果</div>
+                <div class="d-flex align-center justify-space-between ga-2">
+                    <span class="text-body-2">{{ describeSkillEffect(skill.effect) }}</span>
+                    <span
+                        v-if="willLevelUp && previewEffect"
+                        class="skill-dialog__preview-value font-pixel flex-shrink-0"
+                    >
+                        → {{ previewDiffParts ? previewDiffParts.to : describeSkillEffect(previewEffect) }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- 成長進度：等級經驗值與升星碎片並列成兩條進度，同一種讀法 -->
+            <div
+                v-if="skill.unlocked"
                 class="skill-dialog__box mb-3"
             >
-                <div class="text-caption text-medium-emphasis mb-1">目前效果</div>
-                <div class="text-body-2">{{ describeSkillEffect(skill.effect) }}</div>
-            </div>
-
-            <!-- 下一級效果預覽（known-issue.md #2）：內容隨目前選擇的碎片數量同步
-                 變化——疊加大量碎片時會連續往後計算多級（不是只看下一級就停住，
-                 見使用者回報），選到的碎片數若足以觸發升級，顯示「Lv.X → Lv.Y」
-                 與對應數值差異，否則維持顯示目前等級/效果。沒有碎片可強化時完全
-                 不顯示這個 panel（使用者要求：反正也沒辦法選碎片觸發升級）。 -->
-            <div
-                v-if="skill.unlocked && skill.effect && previewEffect && (skill.fragmentCount ?? 0) > 0"
-                class="skill-dialog__box skill-dialog__box--preview mb-3"
-            >
-                <div class="text-caption mb-1" style="color: rgb(var(--v-theme-primary));">
-                    {{ willLevelUp ? `Lv.${skill.level} → Lv.${previewLevel}` : `Lv.${skill.level}` }}
-                </div>
-                <div
-                    v-if="willLevelUp && previewDiffParts"
-                    class="text-body-2"
-                >
-                    {{ previewDiffParts.label }}：{{ previewDiffParts.from }} →
-                    <span class="skill-dialog__preview-value">{{ previewDiffParts.to }}</span>
-                </div>
-                <div v-else class="text-body-2">
-                    {{ willLevelUp ? describeSkillEffectDiff(skill.effect, previewEffect) : describeSkillEffect(skill.effect) }}
-                </div>
-            </div>
-
-            <div
-                v-if="skill.unlocked && skill.level != null && skill.level < SKILL_MAX_LEVEL"
-                class="mb-3"
-            >
-                <div class="d-flex align-center justify-space-between mb-1">
-                    <span class="text-caption text-medium-emphasis">經驗值</span>
-                    <span class="text-caption font-pixel">{{ expIntoLevel }} / {{ expForNextLevel }}</span>
-                </div>
-                <div class="skill-dialog__bar">
+                <div class="mb-3">
+                    <template v-if="skill.level != null && skill.level < SKILL_MAX_LEVEL">
+                        <div class="d-flex align-center justify-space-between mb-1">
+                            <span class="text-caption text-medium-emphasis">升至 Lv.{{ previewLevel + 1 }} 經驗值</span>
+                            <span class="text-caption font-pixel">{{ expIntoLevel }} / {{ expForNextLevel }}</span>
+                        </div>
+                        <div class="skill-dialog__bar">
+                            <div
+                                class="skill-dialog__bar-fill"
+                                :style="{ width: `${expPercent}%` }"
+                            />
+                        </div>
+                    </template>
                     <div
-                        class="skill-dialog__bar-fill"
-                        :style="{ width: `${expPercent}%` }"
-                    />
+                        v-else
+                        class="text-caption"
+                        style="color: rgb(var(--v-theme-green));"
+                    >
+                        已達最高等級
+                    </div>
                 </div>
-            </div>
-            <div
-                v-else-if="skill.unlocked"
-                class="text-caption mb-3"
-                style="color: rgb(var(--v-theme-green));"
-            >
-                已達最高等級
+
+                <!-- 升星碎片（已解鎖即顯示）；升星按鈕仍需 Lv.10 才會出現 -->
+                <template v-if="(skill.star ?? 1) < SKILL_STAR_MAX">
+                    <div class="d-flex align-center justify-space-between mb-1">
+                        <span class="text-caption text-medium-emphasis">
+                            升至 ★{{ (skill.star ?? 1) + 1 }} 碎片
+                        </span>
+                        <span class="text-caption font-pixel">
+                            {{ skill.fragmentCount ?? 0 }} / {{ nextStarFragmentCost }}
+                        </span>
+                    </div>
+                    <div class="skill-dialog__bar">
+                        <div
+                            class="skill-dialog__bar-fill skill-dialog__bar-fill--fragment"
+                            :style="{ width: `${fragmentPercent}%` }"
+                        />
+                    </div>
+                </template>
+                <div
+                    v-else
+                    class="text-caption"
+                    style="color: rgb(var(--v-theme-green));"
+                >
+                    已達最高星等
+                </div>
             </div>
 
             <div
@@ -123,20 +153,18 @@
             </SystemBtn>
 
             <div
-                v-else-if="skill.level != null && skill.level < SKILL_MAX_LEVEL"
-                class="mb-2"
+                v-else-if="skill.level != null && skill.level < SKILL_MAX_LEVEL && chipCount > 0"
+                class="skill-dialog__box mb-3"
             >
-                <div
-                    v-if="(skill.fragmentCount ?? 0) > 0"
-                    class="d-flex align-center justify-center ga-3 mb-2"
-                >
+                <div class="text-caption text-medium-emphasis mb-2">技能經驗值晶片（持有 {{ chipCount }}）</div>
+                <div class="d-flex align-center justify-center ga-2 mb-2">
                     <SystemBtn
                         variant="outlined"
                         color="primary"
                         size="small"
                         class="text-none"
-                        :disabled="fragmentsToSpend <= 0"
-                        @click="fragmentsToSpend = 0"
+                        :disabled="chipsToSpend <= 0"
+                        @click="chipsToSpend = 0"
                     >
                         MIN
                     </SystemBtn>
@@ -145,21 +173,21 @@
                         variant="outlined"
                         color="primary"
                         class="skill-dialog__stepper-btn"
-                        :disabled="fragmentsToSpend <= 0"
-                        @click="fragmentsToSpend = Math.max(0, fragmentsToSpend - 1)"
+                        :disabled="chipsToSpend <= 0"
+                        @click="chipsToSpend = Math.max(0, chipsToSpend - 1)"
                     >
                         <v-icon icon="mdi-minus" size="16" />
                     </SystemBtn>
-                    <span class="font-pixel text-body-2" style="min-width: 56px; text-align: center;">
-                        {{ fragmentsToSpend }} / {{ skill.fragmentCount }}
+                    <span class="skill-dialog__count font-pixel text-body-2">
+                        {{ chipsToSpend }} / {{ chipCount }}
                     </span>
                     <SystemBtn
                         size="small"
                         variant="outlined"
                         color="primary"
                         class="skill-dialog__stepper-btn"
-                        :disabled="fragmentsToSpend >= (skill.fragmentCount ?? 0)"
-                        @click="fragmentsToSpend = Math.min(skill.fragmentCount ?? 0, fragmentsToSpend + 1)"
+                        :disabled="chipsToSpend >= chipCount"
+                        @click="chipsToSpend = Math.min(chipCount, chipsToSpend + 1)"
                     >
                         <v-icon icon="mdi-plus" size="16" />
                     </SystemBtn>
@@ -168,69 +196,87 @@
                         color="primary"
                         size="small"
                         class="text-none"
-                        @click="fragmentsToSpend = skill.fragmentCount ?? 0"
+                        @click="chipsToSpend = chipCount"
                     >
                         MAX
                     </SystemBtn>
                 </div>
                 <SystemBtn
-                    v-if="(skill.fragmentCount ?? 0) > 0"
                     block
-                    variant="outlined"
+                    variant="flat"
                     color="primary"
                     class="text-none"
-                    :disabled="fragmentsToSpend === 0"
+                    :disabled="chipsToSpend === 0"
                     :loading="actionLoading"
-                    @click="handleStrengthen"
+                    @click="handleUseChip"
                 >
-                    消耗碎片強化
+                    使用晶片升級
                 </SystemBtn>
             </div>
 
             <SystemBtn
-                v-if="skill.unlocked && !skill.isEquipped"
+                v-if="skill.unlocked && skill.level === SKILL_MAX_LEVEL && (skill.star ?? 1) < SKILL_STAR_MAX"
                 block
                 variant="flat"
-                color="green"
-                class="text-none mb-2"
-                :disabled="!hasOpenSlot"
+                color="primary"
+                class="text-none mb-3"
+                :disabled="(skill.fragmentCount ?? 0) < nextStarFragmentCost"
                 :loading="actionLoading"
-                @click="handleEquip"
+                @click="handleStarUp"
             >
-                {{ hasOpenSlot ? '佩戴' : '佩戴欄位已滿' }}
-            </SystemBtn>
-            <SystemBtn
-                v-else-if="skill.unlocked && skill.isEquipped"
-                block
-                variant="outlined"
-                color="warning"
-                class="text-none mb-2"
-                :loading="actionLoading"
-                @click="handleUnequip"
-            >
-                卸下
+                消耗碎片升星
             </SystemBtn>
 
-            <SystemBtn
-                block
-                variant="outlined"
-                color="primary"
-                class="text-none"
-                @click="open = false"
-            >
-                關閉
-            </SystemBtn>
+            <v-row dense>
+                <v-col v-if="skill.unlocked" cols="6">
+                    <SystemBtn
+                        v-if="!skill.isEquipped"
+                        block
+                        variant="flat"
+                        color="green"
+                        class="text-none"
+                        :disabled="!hasOpenSlot"
+                        :loading="actionLoading"
+                        @click="handleEquip"
+                    >
+                        {{ hasOpenSlot ? '佩戴' : '欄位已滿' }}
+                    </SystemBtn>
+                    <SystemBtn
+                        v-else
+                        block
+                        variant="outlined"
+                        color="warning"
+                        class="text-none"
+                        :loading="actionLoading"
+                        @click="handleUnequip"
+                    >
+                        卸下
+                    </SystemBtn>
+                </v-col>
+                <v-col :cols="skill.unlocked ? 6 : 12">
+                    <SystemBtn
+                        block
+                        variant="outlined"
+                        color="primary"
+                        class="text-none"
+                        @click="open = false"
+                    >
+                        關閉
+                    </SystemBtn>
+                </v-col>
+            </v-row>
         </template>
     </GameCommonDialogFrame>
 </template>
 
 <script setup lang="ts">
 import type { SkillEntry } from '../../../composables/useCharacterSkills';
-import { describeSkillEffect, describeSkillEffectDiff, describeSkillEffectDiffParts } from '../../../utils/skillDisplay';
+import { describeSkillEffect, describeSkillEffectDiffParts } from '../../../utils/skillDisplay';
 import type { PixelIconName } from '../../../utils/pixelIcons';
 import {
-    SKILL_MAX_LEVEL, SKILL_EXP_TABLE, FRAGMENT_TO_EXP_RATE, getSkillLevelForExp,
+    SKILL_MAX_LEVEL, SKILL_STAR_MAX, SKILL_STAR_UP_FRAGMENT_COST, SKILL_EXP_TABLE, SKILL_EXP_PER_CHIP, getSkillLevelForExp,
 } from '../../../../shared/constants/skills';
+import { applyStarBonus } from '../../../../shared/constants/characterSkills';
 
 const props = defineProps<{
     equippedSkillIds: (string | null)[];
@@ -238,36 +284,43 @@ const props = defineProps<{
 }>();
 
 const {
-    skills, unlockSkill, strengthenSkill, equipSkill, actionLoading, actionError,
+    skills, unlockSkill, starUpSkill, useSkillExpChip, equipSkill, actionLoading, actionError,
 } = useCharacterSkills();
+const { items: inventoryItems } = useInventory();
 const { playSfx } = useAudio();
 
 const open = ref(false);
 const skill = ref<SkillEntry | null>(null);
-// known-issue.md #2：強化改成可選擇消耗幾個碎片，預設 0（使用者要求：預設不
-// 選任何碎片，改由玩家自己選擇要消耗多少），而不是強制一次全部投入。
-const fragmentsToSpend = ref(0);
+// 升級改成可選擇消耗幾顆技能經驗值晶片，預設 0（比照舊版碎片強化的互動慣例：
+// 預設不選任何晶片，改由玩家自己選擇要消耗多少），而不是強制一次全部投入。
+const chipsToSpend = ref(0);
 
 const pixelIconName = computed(() => (skill.value?.icon ?? 'mysteryCapsule') as PixelIconName);
 
-// 選擇碎片後預估落在哪一級（用同一套 exp 換算邏輯 getSkillLevelForExp，跟
-// 後端 strengthenSkill 的判斷共用同一份 shared 常數）——下面經驗值條/預覽 panel
-// 都以這個「預估等級」為準，選到的碎片數超過一個等級的門檻時會連續往後推算
-// 多級，而不是卡在目前等級的區間就不動（使用者回報）。
+// 目前角色背包內持有的技能經驗值晶片數量/itemId 清單——晶片不綁定特定
+// skillId，任何一顆都能用於任何技能的升級。
+const chipItemIds = computed(() => inventoryItems.value.filter(item => item.templateId === 'skill_exp_chip').map(item => item.itemId));
+const chipCount = computed(() => chipItemIds.value.length);
+
+const nextStarFragmentCost = computed(() => SKILL_STAR_UP_FRAGMENT_COST[(skill.value?.star ?? 1) + 1] ?? Infinity);
+
+// 選擇晶片後預估落在哪一級（用同一套 exp 換算邏輯 getSkillLevelForExp，跟
+// 後端 useSkillExpChip 的判斷共用同一份 shared 常數）——下面經驗值條/預覽 panel
+// 都以這個「預估等級」為準，選到的晶片數超過一個等級的門檻時會連續往後推算
+// 多級，而不是卡在目前等級的區間就不動。
 const previewLevel = computed(() => {
     if (!skill.value?.level || skill.value.exp == null) return skill.value?.level ?? 1;
-    const previewExp = skill.value.exp + fragmentsToSpend.value * FRAGMENT_TO_EXP_RATE;
+    const previewExp = skill.value.exp + chipsToSpend.value * SKILL_EXP_PER_CHIP;
     return Math.min(SKILL_MAX_LEVEL, getSkillLevelForExp(previewExp));
 });
 
-// 經驗值條隨加減碎片即時預覽：分母/分子都改用 previewLevel 的區間計算，足以
+// 經驗值條隨加減晶片即時預覽：分母/分子都改用 previewLevel 的區間計算，足以
 // 升級時會自動換算成「下一等級的經驗值累積」，而不是停留在原本等級的區間封頂
-// 不動（使用者回報）。fragmentsToSpend 為 0 時 previewLevel 等於目前等級，行為
-// 跟未選碎片時一致。
+// 不動。chipsToSpend 為 0 時 previewLevel 等於目前等級，行為跟未選晶片時一致。
 const expIntoLevel = computed(() => {
     if (!skill.value?.level || skill.value.exp == null) return 0;
     const currentThreshold = SKILL_EXP_TABLE[previewLevel.value] ?? 0;
-    const previewExp = skill.value.exp + fragmentsToSpend.value * FRAGMENT_TO_EXP_RATE;
+    const previewExp = skill.value.exp + chipsToSpend.value * SKILL_EXP_PER_CHIP;
     return Math.max(0, Math.min(previewExp - currentThreshold, expForNextLevel.value));
 });
 const expForNextLevel = computed(() => {
@@ -277,10 +330,17 @@ const expForNextLevel = computed(() => {
     const nextThreshold = level < SKILL_MAX_LEVEL ? (SKILL_EXP_TABLE[level + 1] ?? currentThreshold) : currentThreshold;
     return Math.max(1, nextThreshold - currentThreshold);
 });
+const fragmentPercent = computed(() => (nextStarFragmentCost.value === Infinity ? 100 : Math.min(100, Math.round(((skill.value?.fragmentCount ?? 0) / nextStarFragmentCost.value) * 100))));
 const expPercent = computed(() => Math.min(100, Math.round((expIntoLevel.value / expForNextLevel.value) * 100)));
 const willLevelUp = computed(() => Boolean(skill.value?.level) && previewLevel.value > skill.value!.level!);
-// previewLevel 對應等級的實際效果數值，取自 effectByLevel（Lv.1 對應 index 0）。
-const previewEffect = computed(() => skill.value?.effectByLevel?.[previewLevel.value - 1]);
+// previewLevel 對應等級的實際效果數值，取自 effectByLevel（Lv.1 對應 index 0），
+// 套用與目前星等相同的加成比例，才能跟 skill.effect（伺服器已套用星等加成後
+// 的目前生效數值）做公平比較。
+const previewEffect = computed(() => {
+    const base = skill.value?.effectByLevel?.[previewLevel.value - 1];
+    if (!base) return undefined;
+    return applyStarBonus(base, skill.value?.star ?? 1);
+});
 // 拆成 label/from/to 三段，讓 template 把「變動後數值」用比較顯眼的樣式呈現
 // （使用者要求）。
 const previewDiffParts = computed(() => (
@@ -302,19 +362,29 @@ const handleUnlock = async () => {
     open.value = false;
 };
 
-const handleStrengthen = async () => {
-    if (!skill.value || !skill.value.fragmentCount || fragmentsToSpend.value <= 0) return;
+const handleUseChip = async () => {
+    if (!skill.value || chipsToSpend.value <= 0) return;
     const skillId = skill.value.skillId;
-    const amount = Math.min(fragmentsToSpend.value, skill.value.fragmentCount);
-    const success = await strengthenSkill(skillId, amount);
+    const itemIds = chipItemIds.value.slice(0, chipsToSpend.value);
+    const success = await useSkillExpChip(skillId, itemIds);
     if (!success) return;
     playSfx('exploreStart.mp3');
-    // strengthenSkill 內部已經 fetchSkills() 過一輪最新資料，把 dialog 顯示的
-    // skill.value 換成重新整理後的版本，讓玩家能連續強化、即時看到新等級/效果，
+    // useSkillExpChip 內部已經 fetchSkills() 過一輪最新資料，把 dialog 顯示的
+    // skill.value 換成重新整理後的版本，讓玩家能連續升級、即時看到新等級/效果，
     // 不需要關閉重開。
     const updated = skills.value.find(entry => entry.skillId === skillId);
     if (updated) skill.value = updated;
-    fragmentsToSpend.value = 0;
+    chipsToSpend.value = 0;
+};
+
+const handleStarUp = async () => {
+    if (!skill.value) return;
+    const skillId = skill.value.skillId;
+    const success = await starUpSkill(skillId);
+    if (!success) return;
+    playSfx('exploreStart.mp3');
+    const updated = skills.value.find(entry => entry.skillId === skillId);
+    if (updated) skill.value = updated;
 };
 
 const handleEquip = async () => {
@@ -334,7 +404,7 @@ const handleUnequip = async () => {
 defineExpose({
     open: (target: SkillEntry) => {
         skill.value = target;
-        fragmentsToSpend.value = 0;
+        chipsToSpend.value = 0;
         open.value = true;
     },
 });
@@ -342,6 +412,22 @@ defineExpose({
 
 <style scoped lang="scss">
 .skill-dialog {
+    position: relative;
+
+    &__equipped-badge {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        z-index: 2;
+        padding: 2px 8px;
+        font-size: 10px;
+        line-height: 1.6;
+        white-space: nowrap;
+        color: #14171c;
+        background: rgb(var(--v-theme-green));
+        border-radius: 2px;
+    }
+
     &__icon {
         width: 48px;
         height: 48px;
@@ -351,16 +437,33 @@ defineExpose({
         border-radius: 3px;
     }
 
+    &__level {
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    &__level-max {
+        font-size: 12px;
+        opacity: 0.6;
+    }
+
     &__box {
         padding: 8px 10px;
         background: rgba(196, 203, 219, 0.04);
         border: 1px solid rgba(196, 203, 219, 0.15);
         border-radius: 3px;
+    }
 
-        &--preview {
-            background: rgba(var(--v-theme-primary), 0.06);
-            border-color: rgba(var(--v-theme-primary), 0.3);
-        }
+    &__box--effect {
+        border-color: rgba(var(--v-theme-primary), 0.3);
+        background: rgba(var(--v-theme-primary), 0.06);
+    }
+
+    &__count {
+        min-width: 64px;
+        text-align: center;
+        white-space: nowrap;
     }
 
     &__bar {
@@ -376,6 +479,10 @@ defineExpose({
         transition: width 0.2s ease-out;
     }
 
+    &__bar-fill--fragment {
+        background: rgb(var(--v-theme-secondary));
+    }
+
     &__stepper-btn {
         min-width: 36px !important;
         padding: 0 !important;
@@ -384,6 +491,7 @@ defineExpose({
     // 升級效果預覽的「變動後數值」：比一般文字更粗、換色，讓玩家一眼看出強化
     // 後會變成多少（使用者要求：讓文字更明顯一點）。
     &__preview-value {
+        font-size: 16px;
         font-weight: 700;
         color: rgb(var(--v-theme-green));
     }

@@ -1281,3 +1281,84 @@ describe('CombatService.resolve — character/enemy skills (character-skills)', 
         expect(dotEvents.every(entry => entry.targetId === 'player')).toBe(true);
     });
 });
+
+describe('CombatService — skill drops (skill-universal-star-upgrade)', () => {
+    // computeRewards is private; these tests call it directly with a minimal
+    // fake RngCursor to avoid reverse-engineering the full resolve() combat-sim
+    // roll sequence (which shares the same queued-roll mock as the reward
+    // rolls asserted here).
+    function queueCursor(rolls: number[]) {
+        const queue = [...rolls];
+        return {
+            next: () => queue.shift() ?? 0.99, get index() { return 0; }, 
+        };
+    }
+
+    function defeatedUnit() {
+        return {
+            id: 'enemy-1',
+            name: 'Test Enemy',
+            atk: 1,
+            def: 1,
+            hpMax: 1,
+            hp: 0,
+            actionIntervalSec: 1,
+            critChance: 0,
+            critMultiplier: 1,
+            dodgeChance: 0,
+            nextAttackAt: 0,
+            archetypeIndex: 0,
+            archetypeSlug: 'test-enemy',
+            isBoss: false,
+        };
+    }
+
+    type ComputeRewards = (
+        run: AdventureRun, cursor: ReturnType<typeof queueCursor>, context: CombatContext,
+        defeated: ReturnType<typeof defeatedUnit>[], luck: number, activeModifiers: RunModifier[],
+    ) => { skillFragmentDrop?: { skillId: string; amount: number }; itemsDropped: { templateId: string }[] };
+
+    it('fragment drop pool spans all 10 skills, not just the character\'s own archetype', () => {
+        const service = new CombatService();
+        const computeRewards = (service as unknown as { computeRewards: ComputeRewards }).computeRewards.bind(service);
+        // dropRoll(item)=miss, gemsRoll=miss, fragmentDropRoll=hit, pickRoll=0.25
+        // -> ALL_CHARACTER_SKILLS[floor(0.25*10)=2] = 'adventurer_gale_slash'
+        // (index 2, the 3rd flattened skill — fighter has 2, then adventurer's
+        // first skill), chipDropRoll=miss.
+        const cursor = queueCursor([
+            0.99,
+            0.99,
+            0,
+            0.25,
+            0.99,
+        ]);
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [],
+        };
+
+        const rewards = computeRewards(baseRun(), cursor, context, [defeatedUnit()], 0, []);
+
+        expect(rewards.skillFragmentDrop?.skillId).toBe('adventurer_gale_slash');
+    });
+
+    it('rolls an independent skill exp chip drop that lands in itemsDropped', () => {
+        const service = new CombatService();
+        const computeRewards = (service as unknown as { computeRewards: ComputeRewards }).computeRewards.bind(service);
+        // dropRoll(item)=miss, gemsRoll=miss, fragmentDropRoll=miss (no pickRoll
+        // consumed), chipDropRoll=hit.
+        const cursor = queueCursor([
+            0.99,
+            0.99,
+            0.99,
+            0,
+        ]);
+        const context: CombatContext = {
+            enemyLevel: 1, tier: NodeType.COMBAT, waveCount: 1, enemyCountPerWave: 1, firstWaveArchetypeIndices: [],
+        };
+
+        const rewards = computeRewards(baseRun(), cursor, context, [defeatedUnit()], 0, []);
+
+        expect(rewards.skillFragmentDrop).toBeUndefined();
+        expect(rewards.itemsDropped.some(item => item.templateId === 'skill_exp_chip')).toBe(true);
+    });
+});

@@ -42,6 +42,10 @@ export const equipmentSchema = z.partialRecord(
 export const skillProgressSchema = z.object({
     exp: z.number().int().min(0),
     level: z.number().int().min(1).max(10),
+    // Optional for backward compatibility with records written before the
+    // star system shipped — self-healed to 1 at the service read layer
+    // (character-skills「查詢角色技能資料」), not defaulted here.
+    star: z.number().int().min(1).max(5).optional(),
 }).strict();
 
 /**

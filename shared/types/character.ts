@@ -54,6 +54,7 @@ export type TalentTree = {
 export type SkillProgress = {
   exp: number;
   level: number; // 1-10
+  star: number; // 1-5; records created before this field existed are self-healed to 1
 };
 
 /**

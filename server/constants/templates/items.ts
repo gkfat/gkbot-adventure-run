@@ -1429,6 +1429,54 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
         },
         priceRangeByRarity: POTION_PRICE_RANGE,
     },
+
+    // Skill Exp Chip (skill-universal-star-upgrade): single-rarity MATERIAL
+    // consumable used to level a character skill within its current star rank
+    // (character-skills「技能經驗值晶片直接升級」). Always rolls Rarity.N —
+    // `rarityWeights`/`priceRangeByRarity` only exist to satisfy ItemTemplate's
+    // required shape; this item is sold via fixed-price shop slots
+    // (SKILL_EXP_CHIP_SHOP_SLOTS in shop.service.ts), not the generic
+    // priced-by-rarity flow.
+    'skill_exp_chip': {
+        templateId: 'skill_exp_chip',
+        name: '技能經驗值晶片',
+        description: '從報廢終端拆下的資料晶片，插上的瞬間，肌肉記憶卻先於思考動了起來。',
+        type: ItemType.MATERIAL,
+        rarityWeights: {
+            [Rarity.N]: 1,
+            [Rarity.R]: 0,
+            [Rarity.SR]: 0,
+            [Rarity.SSR]: 0,
+            [Rarity.L]: 0,
+        },
+        priceRangeByRarity: {
+            [Rarity.N]: {
+                gold: {
+                    min: 50, max: 50,
+                },
+            },
+            [Rarity.R]: {
+                gold: {
+                    min: 50, max: 50,
+                },
+            },
+            [Rarity.SR]: {
+                gold: {
+                    min: 50, max: 50,
+                },
+            },
+            [Rarity.SSR]: {
+                gold: {
+                    min: 50, max: 50,
+                },
+            },
+            [Rarity.L]: {
+                gold: {
+                    min: 50, max: 50,
+                },
+            },
+        },
+    },
 };
 
 /**

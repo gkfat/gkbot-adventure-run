@@ -89,7 +89,8 @@ import { getBestiaryResponseSchema } from '../../shared/schemas/api/bestiary.sch
 import {
     getCharacterSkillsResponseSchema,
     unlockSkillRequestSchema, unlockSkillResponseSchema,
-    strengthenSkillRequestSchema, strengthenSkillResponseSchema,
+    starUpSkillRequestSchema, starUpSkillResponseSchema,
+    useSkillExpChipRequestSchema, useSkillExpChipResponseSchema,
     equipSkillRequestSchema, equipSkillResponseSchema,
 } from '../../shared/schemas/api/character-skill.schema';
 
@@ -774,7 +775,7 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
                 content: { 'application/json': { schema: unlockSkillResponseSchema } },
             },
             400: {
-                description: 'Unknown skill for this archetype, already unlocked, or not enough fragments',
+                description: 'Unknown skill, already unlocked, or not enough fragments',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
             401: {
@@ -790,21 +791,21 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
 
     registry.registerPath({
         method: 'post',
-        path: '/api/character/{characterId}/skills/strengthen',
-        description: 'Consume fragmentsToSpend fragments of an already-unlocked skill, converting them to exp and applying the level-up check',
+        path: '/api/character/{characterId}/skills/star-up',
+        description: 'Star-up an already-Lv.10 unlocked skill by spending the star rank\'s required skill fragments, resetting it to Lv.1 at the new star',
         tags: ['Character'],
         security: [{ bearerAuth: [] }],
         request: {
             params: z.object({ characterId: z.string() }),
-            body: { content: { 'application/json': { schema: strengthenSkillRequestSchema } } },
+            body: { content: { 'application/json': { schema: starUpSkillRequestSchema } } },
         },
         responses: {
             200: {
-                description: 'Skill strengthened',
-                content: { 'application/json': { schema: strengthenSkillResponseSchema } },
+                description: 'Skill starred up',
+                content: { 'application/json': { schema: starUpSkillResponseSchema } },
             },
             400: {
-                description: 'Unknown skill for this archetype, not yet unlocked, or not enough fragments',
+                description: 'Skill not unlocked, not at max level, already at max star, or not enough fragments',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
             401: {
@@ -813,6 +814,36 @@ export function createOpenAPIRegistry(): OpenAPIRegistry {
             },
             404: {
                 description: 'Character not found or not owned by the caller',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+        },
+    });
+
+    registry.registerPath({
+        method: 'post',
+        path: '/api/character/{characterId}/skills/use-exp-chip',
+        description: 'Consume one or more Skill Exp Chip items from the character\'s inventory to add exp to an unlocked skill',
+        tags: ['Character'],
+        security: [{ bearerAuth: [] }],
+        request: {
+            params: z.object({ characterId: z.string() }),
+            body: { content: { 'application/json': { schema: useSkillExpChipRequestSchema } } },
+        },
+        responses: {
+            200: {
+                description: 'Skill exp chip used',
+                content: { 'application/json': { schema: useSkillExpChipResponseSchema } },
+            },
+            400: {
+                description: 'Skill not unlocked, or one or more items are not a Skill Exp Chip owned by this character',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            401: {
+                description: 'Unauthorized',
+                content: { 'application/json': { schema: errorResponseSchema } },
+            },
+            404: {
+                description: 'Character or item not found',
                 content: { 'application/json': { schema: errorResponseSchema } },
             },
         },

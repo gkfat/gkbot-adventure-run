@@ -29,7 +29,7 @@
                 class="text-body-2 mb-3"
                 style="color: rgb(var(--v-theme-warning));"
             >
-                {{ purchaseError }}
+                {{ translateApiErrorMessage(purchaseError) }}
             </div>
 
             <SystemBtn
@@ -59,6 +59,7 @@
 
 <script setup lang="ts">
 import { describeItem } from '../../../utils/equipmentDisplay';
+import { translateApiErrorMessage } from '../../../utils/apiError';
 import type { ShopSlot } from '../../../composables/useShop';
 
 const emit = defineEmits<{ purchased: [] }>();

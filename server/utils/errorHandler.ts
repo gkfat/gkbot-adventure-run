@@ -60,6 +60,12 @@ export function toH3Error(error: any): H3Error {
             statusCode: error.statusCode,
             message: error.message,
             data: {
+                // h3's default sendError only forwards `data`/`statusMessage`
+                // to the client JSON body, dropping the thrown error's own
+                // `message` entirely — duplicate it into `data.message` so
+                // the frontend can read the real reason instead of ofetch's
+                // generic "[METHOD] url: status statusText" fallback.
+                message: error.message,
                 code: error.code,
                 details: (error as any).details,
             },

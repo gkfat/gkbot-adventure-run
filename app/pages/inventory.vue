@@ -253,7 +253,9 @@ import {
     equippedStatValue, equippedStatColor, type ItemLike,
 } from '../utils/equipmentDisplay';
 import { WEIGHT_OVERLOAD_PENALTY } from '../../shared/constants/equipmentWeight';
-import { SKILL_MAX_LEVEL } from '../../shared/constants/skills';
+import {
+    SKILL_MAX_LEVEL, SKILL_STAR_MAX, SKILL_STAR_UP_FRAGMENT_COST,
+} from '../../shared/constants/skills';
 
 definePageMeta({
     middleware: ['auth'],
@@ -275,12 +277,16 @@ const {
     skills, unlockedSlotCount, equippedSkillIds, loaded: skillsLoaded, fetchSkills,
 } = useCharacterSkills();
 
-// 技能 tab 紅點：任一技能可解鎖（碎片達門檻）或可強化升級（未滿級且持有碎片），
+// 技能 tab 紅點：任一技能可解鎖（碎片達門檻）或可升星（Lv.10 且碎片達下一星等門檻），
 // 邏輯比照 skillGrid.vue 的 canProgress，讓玩家不用點進 tab 也知道有東西可點。
 const canSkillProgress = (skill: SkillEntry): boolean => {
     const fragmentCount = skill.fragmentCount ?? 0;
     if (!skill.unlocked) return fragmentCount >= skill.unlockFragmentCost;
-    return (skill.level ?? 1) < SKILL_MAX_LEVEL && fragmentCount > 0;
+
+    const star = skill.star ?? 1;
+    if ((skill.level ?? 1) < SKILL_MAX_LEVEL || star >= SKILL_STAR_MAX) return false;
+    const cost = SKILL_STAR_UP_FRAGMENT_COST[star + 1] ?? Infinity;
+    return fragmentCount >= cost;
 };
 const hasProgressableSkill = computed(() => skills.value.some(canSkillProgress));
 
@@ -379,8 +385,12 @@ const route = useRoute();
 const initialTab = TAB_OPTIONS.some(option => option.key === route.query.tab) ? (route.query.tab as TabKey) : 'EQUIPMENT';
 const tab = ref<TabKey>(initialTab);
 
+// 「道具」tab 涵蓋 POTION 與 MATERIAL（技能經驗值晶片屬於 MATERIAL）——見
+// inventory spec「篩選道具涵蓋藥水與素材」。
 const sortedItems = computed(() => {
-    const filtered = items.value.filter(item => item.type === tab.value);
+    const filtered = items.value.filter(item => (
+        tab.value === 'POTION' ? (item.type === 'POTION' || item.type === 'MATERIAL') : item.type === tab.value
+    ));
 
     return [...filtered].sort((a, b) => {
         const slotDiff = (

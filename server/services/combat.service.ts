@@ -34,9 +34,11 @@ import {
 } from '../constants/combat';
 import { generateItemInstance } from './item.service';
 import {
-    getItemTemplate, ITEM_TEMPLATES, getCharacterSkillById, getCharacterSkillsByArchetypeId,
+    getItemTemplate, ITEM_TEMPLATES, getCharacterSkillById, ALL_CHARACTER_SKILLS,
 } from '../constants/templates';
-import { SKILL_FRAGMENT_DROP_AMOUNT } from '../../shared/constants/skills';
+import {
+    SKILL_FRAGMENT_DROP_AMOUNT, SKILL_EXP_CHIP_DROP_AMOUNT, 
+} from '../../shared/constants/skills';
 import type {
     SkillEffect,
     AdventureRun, CombatContext, CombatResolver, CombatResolution, CombatLogEntry, RunModifier,
@@ -634,7 +636,7 @@ export class CombatService extends BaseService implements CombatResolver {
 
         const victory = player.hp > 0;
         const rewards = victory
-            ? this.computeRewards(run, rewardCursor, context, defeated, character.attributes.LUCK, character.archetypeId, activeModifiers)
+            ? this.computeRewards(run, rewardCursor, context, defeated, character.attributes.LUCK, activeModifiers)
             : {
                 expGained: 0, goldDropped: 0, gemsDropped: 0, itemsDropped: [], blessingPointsGained: 0,
             };
@@ -1281,7 +1283,7 @@ export class CombatService extends BaseService implements CombatResolver {
     }
 
     private computeRewards(
-        run: AdventureRun, cursor: RngCursor, context: CombatContext, defeated: CombatUnit[], luck: number, archetypeId: string, activeModifiers: RunModifier[],
+        run: AdventureRun, cursor: RngCursor, context: CombatContext, defeated: CombatUnit[], luck: number, activeModifiers: RunModifier[],
     ) {
         let expGained = 0;
         let goldBase = 0;
@@ -1326,20 +1328,34 @@ export class CombatService extends BaseService implements CombatResolver {
 
         const blessingPointsGained = defeated.length > 0 ? blessingPointsForVictory(NODE_TYPE_TO_ENEMY_TIER[context.tier]) : 0;
 
-        // Character skills (character-skills「戰鬥掉落」): one LUCK-gated roll per
-        // combat victory (not per kill, unlike item drops above) — on a hit,
-        // pick uniformly among the character's own archetype's skills and
-        // grant a fixed fragment amount.
+        // Character skills (skill-universal-star-upgrade「戰鬥掉落」): one
+        // LUCK-gated roll per combat victory (not per kill, unlike item drops
+        // above) — on a hit, pick uniformly among ALL 10 skills (no longer
+        // limited to the character's own archetype) and grant a fixed
+        // fragment amount.
         let skillFragmentDrop: { skillId: string; amount: number } | undefined;
-        const catalog = getCharacterSkillsByArchetypeId(archetypeId);
-        if (catalog.length > 0) {
+        if (ALL_CHARACTER_SKILLS.length > 0) {
             const fragmentDropRoll = cursor.next();
             if (fragmentDropRoll < luckDropChance) {
                 const pickRoll = cursor.next();
-                const chosen = catalog[Math.floor(pickRoll * catalog.length)]!;
+                const chosen = ALL_CHARACTER_SKILLS[Math.floor(pickRoll * ALL_CHARACTER_SKILLS.length)]!;
                 skillFragmentDrop = {
                     skillId: chosen.skillId, amount: SKILL_FRAGMENT_DROP_AMOUNT,
                 };
+            }
+        }
+
+        // Skill Exp Chip (skill-universal-star-upgrade「戰鬥掉落」): a second,
+        // independent LUCK-gated roll — not tied to any specific skillId, so
+        // it's delivered as a regular dropped item (same pipeline as
+        // equipment drops above) rather than through skillFragmentDrop.
+        const chipDropRoll = cursor.next();
+        if (chipDropRoll < luckDropChance) {
+            for (let i = 0; i < SKILL_EXP_CHIP_DROP_AMOUNT; i++) {
+                itemsDropped.push({
+                    ...generateItemInstance('skill_exp_chip', DROP_ITEM_CONTEXT),
+                    characterId: run.characterId,
+                });
             }
         }
 

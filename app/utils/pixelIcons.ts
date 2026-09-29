@@ -22,4 +22,5 @@ export type PixelIconName =
     | 'mysteryCapsule'
     | 'confirm' | 'cancel'
     | 'treasureChest'
-    | 'trophyGold' | 'trophySilver' | 'trophyBronze';
+    | 'trophyGold' | 'trophySilver' | 'trophyBronze'
+    | 'skillExpChip';

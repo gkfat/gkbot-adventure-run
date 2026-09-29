@@ -30,7 +30,7 @@ export const purchaseItemRequestSchema = z.object({
 export const purchaseItemResponseSchema = z.object({
     success: z.boolean(),
     data: z.object({
-        // Present for `type: 'ITEM'` slots; absent for `SKILL_FRAGMENT` slots.
+        // Present for `type: 'ITEM'`/`'SKILL_EXP_CHIP'` slots; absent for `SKILL_FRAGMENT` slots.
         item: z.object({
             itemId: z.string(),
             templateId: z.string(),

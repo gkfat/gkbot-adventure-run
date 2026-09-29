@@ -1,13 +1,14 @@
 import {
-    defineEventHandler, getRouterParam,
+    defineEventHandler, getRouterParam, readBody,
 } from 'h3';
 import { requireAuth } from '../../../../utils/auth';
-import { ShopService } from '../../../../services/shop.service';
-import { CharacterRepository } from '../../../../repositories/character.repository';
-import { getShopResponseSchema } from '../../../../../shared/schemas/api/shop.schema';
+import { CharacterSkillService } from '../../../../services/character-skill.service';
+import {
+    starUpSkillRequestSchema, starUpSkillResponseSchema,
+} from '../../../../../shared/schemas/api/character-skill.schema';
 import { toH3Error } from '../../../../utils/errorHandler';
 import {
-    AppError, NotFoundError, ValidationError,
+    AppError, ValidationError,
 } from '../../../../../shared/types/errors';
 import { logRequest } from '../../../../utils/logger';
 
@@ -23,18 +24,18 @@ export default defineEventHandler(async (event) => {
             throw new ValidationError('characterId is required');
         }
 
-        const characterRepo = new CharacterRepository();
-        const character = await characterRepo.getByIdForAccount(characterId, authUser.uid);
-        if (!character) {
-            throw new NotFoundError('character');
+        const body = await readBody(event);
+        const parseResult = starUpSkillRequestSchema.safeParse(body);
+        if (!parseResult.success) {
+            throw new ValidationError('Invalid skill star-up request', parseResult.error.flatten());
         }
 
-        const shopService = new ShopService();
-        const shop = await shopService.getOrGenerateShop(characterId);
+        const characterSkillService = new CharacterSkillService();
+        const character = await characterSkillService.starUpSkill(authUser.uid, characterId, parseResult.data.skillId);
 
         logRequest({
             severity: 'INFO',
-            message: 'Shop retrieved',
+            message: 'Skill starred up',
             method: event.method,
             path: event.path,
             status: 200,
@@ -46,16 +47,16 @@ export default defineEventHandler(async (event) => {
         const response = {
             success: true,
             data: {
-                date: shop.date,
-                items: shop.items,
+                skillFragments: character.skillFragments,
+                unlockedSkills: character.unlockedSkills,
             },
         };
 
-        return getShopResponseSchema.parse(response);
+        return starUpSkillResponseSchema.parse(response);
     } catch (error: unknown) {
         logRequest({
             severity: 'ERROR',
-            message: 'Failed to get shop',
+            message: 'Failed to star-up skill',
             method: event.method,
             path: event.path,
             status: error instanceof AppError ? error.statusCode : 500,
