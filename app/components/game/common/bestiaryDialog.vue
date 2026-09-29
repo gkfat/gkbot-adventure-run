@@ -206,6 +206,7 @@ watch(() => props.modelValue, (open) => {
 
     &__grid-scroll {
         overflow-y: auto;
+        overflow-x: hidden;
         min-height: 0;
     }
 
@@ -239,5 +240,6 @@ watch(() => props.modelValue, (open) => {
 .bestiary-dialog {
     height: 100%;
     min-height: 0;
+    overflow-x: hidden;
 }
 </style>
