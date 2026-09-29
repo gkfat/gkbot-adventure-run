@@ -137,6 +137,11 @@ export const adventureRunSchema = z.object({
     stageNodeIndex: z.number().int().min(0),
     stageNodeCount: z.number().int().min(0),
 
+    // Per-revealed-node type snapshot, keyed by stageNodeIndex (stringified) —
+    // lets the client node-map restore already-visited node colors after a
+    // reload/reconnect. See AdventureRun.nodeTypeHistory.
+    nodeTypeHistory: z.record(z.string(), z.union([z.nativeEnum(NodeType), z.literal('BLESSING_SELECT')])).optional(),
+
     // Facility severity / enemy faction (enemy-factions-and-severity)
     severityTier: facilitySeveritySchema,
     factionType: enemyFactionSchema,

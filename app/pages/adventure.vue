@@ -301,62 +301,13 @@
                     </div>
 
                     <v-divider class="my-2" />
-                    <v-row dense>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">EXP</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
-                                {{ currentRun.expEarned }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">金幣</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
-                                +{{ currentRun.goldEarned }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">寶石</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
-                                +{{ currentRun.gemsEarned }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">道具</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
-                                x{{ currentRun.runInventory.length }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">祝福</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
-                                x{{ currentRun.blessings.length }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">詛咒</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
-                                x{{ currentRun.curses.length }}
-                            </div>
-                        </v-col>
-                    </v-row>
+                    <GameAdventureNodePath
+                        :node-count="currentRun.stageNodeCount"
+                        :current-index="currentRun.stageNodeIndex"
+                        :current-node-type="currentRun.currentNodeType"
+                        :current-state="currentRun.state"
+                        :node-type-history="currentRun.nodeTypeHistory"
+                    />
                 </div>
             </div>
 
@@ -455,76 +406,17 @@
                         </div>
                     </div>
 
-                    <!-- 累積獲得：從冒險一開始就顯示（初始為 0），不用等第一筆獎勵入帳。
-                         戰鬥結束到玩家關閉結算 dialog 前這段期間顯示 displayedRunTotals
-                         凍結的戰前快照，而不是 currentRun 的即時值（見上方 frozenRunTotals
-                         的說明，避免這一列在玩家還沒看完戰鬥結算前就先跳成戰後數字）。 -->
+                    <!-- 節點路徑：目前所在的節點（glow）與已探索過的節點（依類型上色），
+                         取代原本的累積獲得數字列——累積戰利品已可在結算 dialog 查看，
+                         此處只需呈現探索進度本身。 -->
                     <v-divider class="my-2" />
-                    <v-row dense>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">EXP</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
-                                {{ displayedRunTotals.expEarned }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">金幣</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: #e0c063;">
-                                +{{ displayedRunTotals.goldEarned }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">寶石</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-primary));">
-                                +{{ displayedRunTotals.gemsEarned }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">道具</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
-                                x{{ displayedRunTotals.itemCount }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">祝福</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
-                                x{{ displayedRunTotals.blessingCount }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">詛咒</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-warning));">
-                                x{{ displayedRunTotals.curseCount }}
-                            </div>
-                        </v-col>
-                        <v-col
-                            cols="4"
-                            class="adventure-page__loot-stat d-flex align-center justify-space-between"
-                        >
-                            <div class="text-caption text-medium-emphasis">技能碎片</div>
-                            <div class="font-pixel adventure-page__loot-value" style="color: rgb(var(--v-theme-green));">
-                                x{{ displayedRunTotals.fragmentCount }}
-                            </div>
-                        </v-col>
-                    </v-row>
+                    <GameAdventureNodePath
+                        :node-count="currentRun.stageNodeCount"
+                        :current-index="currentRun.stageNodeIndex"
+                        :current-node-type="currentRun.currentNodeType"
+                        :current-state="currentRun.state"
+                        :node-type-history="currentRun.nodeTypeHistory"
+                    />
                 </div>
 
                 <!-- COMBAT：觸發戰鬥；戰鬥結果在 COMBAT/RESOLUTION 都顯示，直到玩家繼續前進。
@@ -1011,7 +903,7 @@ const {
     character, loading: characterLoading, fetchCharacter,
 } = useCharacter();
 const {
-    skills: characterSkills, equippedSkillIds, loaded: skillsLoaded, fetchSkills,
+    skills: characterSkills, equippedSkillIds, loaded: skillsLoaded, fetchSkills, invalidate: invalidateSkills,
 } = useCharacterSkills();
 const {
     currentRun, loading: runLoading, error: runError, checked, fetchCurrent, advance, useHealingItem,
@@ -1051,40 +943,12 @@ const characterSpriteSrc = computed(() => {
 const combatStartHp = ref(0);
 
 // 頂端「累積獲得」summary 列（EXP/金幣/寶石/道具/祝福/詛咒）在戰鬥結束前
-// 不應變更：startCombat 一收到勝利回應就已經 fetchCurrent()，把 currentRun
-// 更新成戰鬥「結束後」的數字，但玩家這時可能還在看戰鬥演出或戰鬥結算 dialog
-// （見使用者回報）。做法比照上面 combatStartHp：在 handleStartCombat 呼叫
-// startCombat 前先快照目前的 currentRun 累積值，戰鬥期間（有 lastCombatResult
-// 且結算 dialog 還沒被玩家關掉）顯示這份快照，玩家按下「繼續前進」關閉
-// 結算 dialog 後才切回 currentRun 的即時值（見下方 combatSummaryDialogOpen 的 watch）。
-const frozenRunTotals = ref<{
-    expEarned: number
-    goldEarned: number
-    gemsEarned: number
-    itemCount: number
-    blessingCount: number
-    curseCount: number
-    fragmentCount: number
-} | null>(null);
-const combatTotalsFrozen = ref(false);
-// character-skills「戰鬥掉落」（known-issue.md #3）：頂端 summary 列只顯示碎片
+// character-skills「戰鬥掉落」（known-issue.md #3）：結算 dialog 只顯示碎片
 // 「總數」，不分技能種類——比照 itemCount 同一個「累積數量」呈現方式，種類
 // 細節留給角色頁技能 tab。
 const fragmentCountOf = (skillFragmentsEarned: Record<string, number> | undefined) => (
     Object.values(skillFragmentsEarned ?? {}).reduce((sum, count) => sum + count, 0)
 );
-const displayedRunTotals = computed(() => {
-    if (combatTotalsFrozen.value && frozenRunTotals.value) return frozenRunTotals.value;
-    return {
-        expEarned: currentRun.value?.expEarned ?? 0,
-        goldEarned: currentRun.value?.goldEarned ?? 0,
-        gemsEarned: currentRun.value?.gemsEarned ?? 0,
-        itemCount: currentRun.value?.runInventory.length ?? 0,
-        blessingCount: currentRun.value?.blessings.length ?? 0,
-        curseCount: currentRun.value?.curses.length ?? 0,
-        fragmentCount: fragmentCountOf(currentRun.value?.skillFragmentsEarned),
-    };
-});
 // character-skills：目前佩戴中的技能（含圖示/名稱），供角色 stage 左側的技能
 // 充能欄位使用；只取已解鎖且實際佩戴的欄位，忽略空欄位。
 const equippedSkillsForCombat = computed(() => (
@@ -1384,7 +1248,6 @@ watch(combatAnimPlaybackDone, (done) => {
 // （known-issue.md #issue，戰鬥失敗需關閉 dialog 後才進入冒險失敗畫面）。
 watch(showCombatSummaryDialog, async (open, wasOpen) => {
     if (wasOpen && !open) {
-        combatTotalsFrozen.value = false;
         await commitPendingSettlement();
     }
 });
@@ -1565,16 +1428,6 @@ const handleRetreat = async () => {
 const handleStartCombat = async () => {
     if (!character.value) return false;
     combatStartHp.value = currentRun.value?.playerHp ?? 0;
-    frozenRunTotals.value = {
-        expEarned: currentRun.value?.expEarned ?? 0,
-        goldEarned: currentRun.value?.goldEarned ?? 0,
-        gemsEarned: currentRun.value?.gemsEarned ?? 0,
-        itemCount: currentRun.value?.runInventory.length ?? 0,
-        blessingCount: currentRun.value?.blessings.length ?? 0,
-        curseCount: currentRun.value?.curses.length ?? 0,
-        fragmentCount: fragmentCountOf(currentRun.value?.skillFragmentsEarned),
-    };
-    combatTotalsFrozen.value = true;
     return await startCombat(character.value.characterId);
 };
 
@@ -1710,9 +1563,11 @@ const handleSelectBlessing = async (blessingId: string) => {
 
 const handleReturnHome = () => {
     // Settlement may have just moved run-inventory items into the permanent
-    // inventory — invalidate the cached backpack so the inventory page
-    // refetches instead of showing the pre-run snapshot (known-issue.md #4).
+    // inventory, and/or dropped skill fragments — invalidate the cached
+    // backpack and skills so their pages refetch instead of showing the
+    // pre-run snapshot (known-issue.md #4).
     invalidateInventory();
+    invalidateSkills();
     clearSettlement();
     navigateTo('/main');
 };

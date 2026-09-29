@@ -43,6 +43,7 @@ export type AdventureRunView = {
     factionType: EnemyFaction;
     currentNodeType?: NodeType;
     currentNodeData?: unknown;
+    nodeTypeHistory?: Record<string, NodeType | 'BLESSING_SELECT'>;
     playerHp: number;
     playerHpMax: number;
     blessingPoints: number;

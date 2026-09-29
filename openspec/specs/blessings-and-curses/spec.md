@@ -7,11 +7,15 @@
 ## Requirements
 
 ### Requirement: 祝福點數累積與選擇
-系統 SHALL 依 combat-engine 已實作的規則累積 `blessingPoints`（每場戰鬥勝利依節點 tier 給予固定點數），達 adventure-run-core 已定義的門檻時觸發 BLESSING_SELECT 狀態並提供 3 選 1 候選。候選 SHALL 只從「玩家目前未滿等級（Lv3）」的 Blessing 家族中產生，並依各家族的 `rarity`（COMMON/RARE/EPIC）加權抽選，rarity 越高被抽中的機率隨角色 LUCK 提升；每個候選 SHALL 帶著本次若被選中要授予/升級到的等級（未擁有該家族 → Lv1，已擁有 LvN 且 N < 3 → LvN+1）。選擇後的 Blessing 僅在本次 run 有效。
+系統 SHALL 依 combat-engine 已實作的規則累積 `blessingPoints`（每場戰鬥勝利依節點 tier 給予固定點數）。達 adventure-run-core 已定義的門檻後，SHALL 在玩家「進入」下一個 stage node（`stageNodeIndex` 已遞增、離開 RESOLUTION 進入 EXPLORING 之後）才揭露該節點為 BLESSING_SELECT 並提供 3 選 1 候選——與 COMBAT/EVENT/REST/CHOICE 等其他節點類型一致，玩家一律是先進入節點才得知節點內容，BLESSING_SELECT 不例外。候選 SHALL 只從「玩家目前未滿等級（Lv3）」的 Blessing 家族中產生，並依各家族的 `rarity`（COMMON/RARE/EPIC）加權抽選，rarity 越高被抽中的機率隨角色 LUCK 提升；每個候選 SHALL 帶著本次若被選中要授予/升級到的等級（未擁有該家族 → Lv1，已擁有 LvN 且 N < 3 → LvN+1）。選擇後的 Blessing 僅在本次 run 有效。stage 結構性保留的節點（保底 Rest、Boss）SHALL 優先於 BLESSING_SELECT，即使門檻已達成也不得被祝福選擇取代。
 
-#### Scenario: 累積達門檻觸發選擇
-- **WHEN** run 的 `blessingPoints` 累積達到門檻
-- **THEN** run 狀態轉為 BLESSING_SELECT，回傳 3 個候選 Blessing，各自標示 rarity 與本次提供的等級
+#### Scenario: 累積達門檻，於下個節點觸發選擇
+- **WHEN** run 的 `blessingPoints` 累積達到門檻，且玩家推進到的下一個 stage node 不是結構性保留的保底 Rest 或 Boss 節點
+- **THEN** `stageNodeIndex` 先遞增進入該節點，run 狀態才轉為 BLESSING_SELECT，回傳 3 個候選 Blessing，各自標示 rarity 與本次提供的等級
+
+#### Scenario: 下個節點是保底 Rest 或 Boss，優先於祝福選擇
+- **WHEN** run 的 `blessingPoints` 已達到門檻，但玩家推進到的下一個 stage node 是結構性保留的保底 Rest 或 Boss 節點
+- **THEN** 該節點仍依原本規則揭露為 REST 或 BOSS，不觸發 BLESSING_SELECT；`blessingPoints` 保留待下次符合條件的節點再觸發
 
 #### Scenario: 選擇未擁有的家族，新增為 Lv1
 - **WHEN** 玩家呼叫 `POST /api/adventure/blessing/select` 選擇一個尚未擁有的 Blessing 家族

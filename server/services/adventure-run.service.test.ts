@@ -334,6 +334,51 @@ describe('AdventureRunService.advance — node generation priority', () => {
         }));
     });
 
+    // nodeTypeHistory: persisted so the client's node-map can restore
+    // already-visited node colors after a reload/reconnect (see 使用者回報
+    // — "斷點繼續探索時，之前踩過的節點會變回灰色").
+    describe('nodeTypeHistory', () => {
+        it('records the revealed node type keyed by stageNodeIndex, merged onto any existing history', async () => {
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                step: 1, lastRestStep: 0, stageNodeIndex: 5,
+                nodeTypeHistory: {
+                    0: NodeType.COMBAT, 3: NodeType.EVENT,
+                },
+            }));
+            rngNextMock.mockResolvedValue(0); // lowest roll -> COMBAT
+
+            const service = new AdventureRunService();
+            await service.advance('account-1', 'char-1');
+
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+                nodeTypeHistory: {
+                    0: NodeType.COMBAT, 3: NodeType.EVENT, 5: NodeType.COMBAT,
+                },
+            }));
+        });
+
+        it('records BLESSING_SELECT for the revealed node when the Blessing threshold is reached', async () => {
+            getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+                state: AdventureStateType.EXPLORING, blessingPoints: 3, stageNodeIndex: 5, stageNodeCount: 25,
+                nodeTypeHistory: { 0: NodeType.COMBAT },
+            }));
+            getByIdOrThrowMock.mockResolvedValue({
+                characterId: 'char-1', attributes: { LUCK: 0 },
+            });
+            generateCandidatesMock.mockResolvedValue([]);
+
+            const service = new AdventureRunService();
+            await service.advance('account-1', 'char-1');
+
+            expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
+                state: AdventureStateType.BLESSING_SELECT,
+                nodeTypeHistory: {
+                    0: NodeType.COMBAT, 5: 'BLESSING_SELECT',
+                },
+            }));
+        });
+    });
+
     // require-combat-before-rest: REST must never appear (guaranteed cadence
     // or weighted pool) until the run has encountered at least one
     // combat-tier node.
@@ -1130,23 +1175,25 @@ describe('AdventureRunService.resolveEvent', () => {
     });
 });
 
-describe('AdventureRunService.advanceFromResolution — BLESSING_SELECT candidate generation', () => {
-    it('generates candidates and stores them when blessingPoints reaches the threshold', async () => {
+describe('AdventureRunService.advanceFromExploring — BLESSING_SELECT candidate generation', () => {
+    it('generates candidates and reveals BLESSING_SELECT once the player has stepped into the node (blessingPoints reached the threshold)', async () => {
+        // stageNodeIndex=3 of 25 — well clear of the guaranteed-Rest (23) and
+        // Boss (24) slots, so the Blessing check is free to take this node.
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
-            state: AdventureStateType.RESOLUTION, blessingPoints: 3,
+            state: AdventureStateType.EXPLORING, blessingPoints: 3, stageNodeIndex: 3, stageNodeCount: 25,
         }));
         getByIdOrThrowMock.mockResolvedValue({
-            characterId: 'char-1', attributes: { LUCK: 7 }, 
+            characterId: 'char-1', attributes: { LUCK: 7 },
         });
         generateCandidatesMock.mockResolvedValue([
             {
-                modifierId: 'blessing_atk_boost', level: 1, 
+                modifierId: 'blessing_atk_boost', level: 1,
             },
             {
-                modifierId: 'blessing_def_boost', level: 1, 
+                modifierId: 'blessing_def_boost', level: 1,
             },
             {
-                modifierId: 'blessing_hp_boost', level: 1, 
+                modifierId: 'blessing_hp_boost', level: 1,
             },
         ]);
 
@@ -1154,10 +1201,35 @@ describe('AdventureRunService.advanceFromResolution — BLESSING_SELECT candidat
         await service.advance('account-1', 'char-1');
 
         expect(generateCandidatesMock).toHaveBeenCalledWith('run-1', 7, []);
+        expect(rngNextMock).not.toHaveBeenCalled();
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
             state: AdventureStateType.BLESSING_SELECT,
             currentNodeData: { candidates: expect.any(Array) },
         }));
+    });
+
+    it('does not swap the guaranteed-Rest slot for BLESSING_SELECT even when blessingPoints has reached the threshold', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.EXPLORING, blessingPoints: 99, stageNodeIndex: 23, stageNodeCount: 25,
+        }));
+
+        const service = new AdventureRunService();
+        await service.advance('account-1', 'char-1');
+
+        expect(generateCandidatesMock).not.toHaveBeenCalled();
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({ state: AdventureStateType.REST }));
+    });
+
+    it('does not swap the Boss slot for BLESSING_SELECT even when blessingPoints has reached the threshold', async () => {
+        getActiveByCharacterIdMock.mockResolvedValue(baseRun({
+            state: AdventureStateType.EXPLORING, blessingPoints: 99, stageNodeIndex: 24, stageNodeCount: 25,
+        }));
+
+        const service = new AdventureRunService();
+        await service.advance('account-1', 'char-1');
+
+        expect(generateCandidatesMock).not.toHaveBeenCalled();
+        expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({ currentNodeType: NodeType.BOSS }));
     });
 });
 
@@ -1291,10 +1363,11 @@ describe('AdventureRunService.selectBlessing', () => {
         await expect(service.selectBlessing('account-1', 'char-1', 'not-a-candidate')).rejects.toThrow(ValidationError);
     });
 
-    it('adds the chosen blessing, resets blessingPoints, and advances to EXPLORING', async () => {
+    it('adds the chosen blessing, resets blessingPoints, and resolves the node (stageNodeIndex/step were already advanced when it was revealed)', async () => {
         getActiveByCharacterIdMock.mockResolvedValue(baseRun({
             state: AdventureStateType.BLESSING_SELECT,
             step: 4,
+            stageNodeIndex: 3,
             blessings: [],
             blessingPoints: 3,
             currentNodeData: {
@@ -1311,15 +1384,17 @@ describe('AdventureRunService.selectBlessing', () => {
 
         expect(chosen.modifierId).toBe('blessing_atk_boost');
         expect(saveCheckpointMock).toHaveBeenCalledWith('run-1', expect.objectContaining({
-            state: AdventureStateType.EXPLORING,
-            step: 5,
+            state: AdventureStateType.RESOLUTION,
             blessings: [
                 {
-                    modifierId: 'blessing_atk_boost', level: 1, 
+                    modifierId: 'blessing_atk_boost', level: 1,
                 },
             ],
             blessingPoints: 0,
         }));
+        const [, patch] = saveCheckpointMock.mock.calls[0] as [string, Record<string, unknown>];
+        expect(patch).not.toHaveProperty('step');
+        expect(patch).not.toHaveProperty('stageNodeIndex');
     });
 
     it('upgrades an already-owned family in place instead of adding a second entry', async () => {

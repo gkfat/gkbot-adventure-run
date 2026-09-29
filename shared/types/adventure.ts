@@ -448,6 +448,14 @@ export type AdventureRun = {
   stageNodeIndex: number;        // 0-based, resets to 0 on stage change
   stageNodeCount: number;        // node count for this stage, rolled once at stage start
 
+  // 每個已揭露節點的類型快照（key 是該節點的 stageNodeIndex，字串化），供
+  // 客戶端節點地圖在重新整理/斷線重連後仍能還原已探索節點的顏色（見使用者
+  // 回報：斷點繼續探索時，之前踩過的節點會變回灰色，因為原本只靠前端
+  // in-memory 累積，reload 就遺失了）。BLESSING_SELECT 沒有對應的 NodeType，
+  // 用字面量 'BLESSING_SELECT' 記錄。在 advanceFromExploring 揭露節點的當下
+  // 寫入，一個 run 最多 stageNodeCount（~25）筆，run 結束即整份捨棄。
+  nodeTypeHistory?: Record<string, NodeType | 'BLESSING_SELECT'>;
+
   // Facility risk severity + enemy faction (enemy-factions-and-severity) —
   // both rolled once at createRun from the not-yet-written seed, fixed for
   // the whole run. Missing on pre-migration run docs — see
@@ -543,14 +551,15 @@ export const ALLOWED_TRANSITIONS: Record<AdventureStateType, AdventureStateType[
         AdventureStateType.COMBAT,
         AdventureStateType.EVENT,
         AdventureStateType.REST,
+        AdventureStateType.BLESSING_SELECT,
     ],
     // COMBAT -> ENDED is the death path (endReason=DEAD), not a player choice —
     // there is no voluntary quit; only DISCONNECT (timeout) and DEAD end a run early.
     [AdventureStateType.COMBAT]: [AdventureStateType.RESOLUTION, AdventureStateType.ENDED],
     [AdventureStateType.EVENT]: [AdventureStateType.RESOLUTION],
     [AdventureStateType.REST]: [AdventureStateType.RESOLUTION],
-    [AdventureStateType.RESOLUTION]: [AdventureStateType.BLESSING_SELECT, AdventureStateType.EXPLORING],
-    [AdventureStateType.BLESSING_SELECT]: [AdventureStateType.EXPLORING],
+    [AdventureStateType.RESOLUTION]: [AdventureStateType.EXPLORING],
+    [AdventureStateType.BLESSING_SELECT]: [AdventureStateType.RESOLUTION],
     [AdventureStateType.ENDED]: [],
 };
 

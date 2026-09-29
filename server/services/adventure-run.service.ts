@@ -9,8 +9,9 @@
  * COMBAT is resolved via `resolveCombat()` (combat-engine's
  * `POST /api/adventure/combat/start`). EVENT is resolved via `resolveEvent()`
  * (events-and-blessings' `POST /api/adventure/event/resolve`). BLESSING_SELECT
- * candidates are generated here (`advanceFromResolution`) and picked via
- * `selectBlessing()` (events-and-blessings' `POST /api/adventure/blessing/select`).
+ * candidates are generated here (`advanceFromExploring`, once the player has
+ * actually stepped into that node) and picked via `selectBlessing()`
+ * (events-and-blessings' `POST /api/adventure/blessing/select`).
  */
 
 import { FieldValue } from 'firebase-admin/firestore';
@@ -564,11 +565,11 @@ export class AdventureRunService extends BaseService {
     }
 
     /**
-     * Select one of the current BLESSING_SELECT candidates. Since
-     * `advanceFromResolution` skips its usual `step + 1` when routing into
-     * BLESSING_SELECT (see there), this is the one that increments it —
-     * BLESSING_SELECT -> EXPLORING is a direct edge (ALLOWED_TRANSITIONS),
-     * there is no separate RESOLUTION checkpoint after picking.
+     * Select one of the current BLESSING_SELECT candidates. stageNodeIndex/
+     * step for this node were already advanced when it was revealed (see
+     * advanceFromExploring) — a Blessing pick resolves the current node just
+     * like COMBAT/EVENT do, so this only moves BLESSING_SELECT -> RESOLUTION;
+     * the next `advance()` call is what steps into the following node.
      */
     async selectBlessing(accountId: string, characterId: string, blessingId: string): Promise<BlessingCandidate> {
         await this.requireOwnedCharacter(accountId, characterId);
@@ -584,17 +585,11 @@ export class AdventureRunService extends BaseService {
             throw new ValidationError('blessingId is not among the current candidates');
         }
 
-        // Boss nodes always settle immediately in advanceFromResolution and
-        // never reach BLESSING_SELECT (see design.md), so this is always a
-        // non-Boss node — plain stageNodeIndex advance.
-        const { stageNodeIndex } = resolveStageFields(run);
         const {
             blessings, hpMax, hp,
         } = upsertGrantedBlessing(run, chosen);
         await this.runRepo.saveCheckpoint(run.runId, {
-            state: AdventureStateType.EXPLORING,
-            step: run.step + 1,
-            stageNodeIndex: stageNodeIndex + 1,
+            state: AdventureStateType.RESOLUTION,
             blessings,
             blessingPoints: 0,
             playerHpMax: hpMax,
@@ -602,9 +597,6 @@ export class AdventureRunService extends BaseService {
             currentNodeType: FieldValue.delete(),
             currentNodeData: FieldValue.delete(),
             lastActivityAt: Date.now(),
-        });
-        await this.progressTracker.incrementProgress({
-            accountId: run.accountId, characterId: run.characterId, type: 'STEP_REACHED', amount: run.step + 1,
         });
         if (chosen.rarity === 'EPIC') {
             await this.progressTracker.incrementProgress({
@@ -700,7 +692,37 @@ export class AdventureRunService extends BaseService {
         return NodeType.COMBAT; // floating point fallback
     }
 
+    /**
+     * Leaving EXPLORING reveals what the node the player just stepped into
+     * actually is. A pending Blessing pick (見 advanceFromResolution 的
+     * stageNodeIndex advance) is revealed here too — like every other node
+     * type, the player only learns "this node is a Blessing pick" after
+     * already being on it, not before (見使用者回報：所有節點都應先進入之後
+     * 才得知內容). The mandatory Rest/Boss slots (decideNextNode 的
+     * stageNodeCount-2 / stageNodeCount-1) still take priority — those two
+     * positions are structural and must never be swapped for a Blessing pick.
+     */
     private async advanceFromExploring(run: AdventureRun): Promise<AdventureRun> {
+        const {
+            stageNodeIndex, stageNodeCount,
+        } = resolveStageFields(run);
+        const isMandatorySlot = stageNodeIndex >= stageNodeCount - 2;
+        if (!isMandatorySlot && run.blessingPoints >= NODE_CONFIG.BLESSING_POINTS_THRESHOLD) {
+            const character = await this.characterRepo.getByIdOrThrow(run.characterId, 'character');
+            const candidates = await this.blessingService.generateCandidates(
+                run.runId, character.attributes.LUCK, run.blessings,
+            );
+            return this.runRepo.saveCheckpoint(run.runId, {
+                state: AdventureStateType.BLESSING_SELECT,
+                currentNodeType: FieldValue.delete(),
+                currentNodeData: { candidates },
+                nodeTypeHistory: {
+                    ...run.nodeTypeHistory, [stageNodeIndex]: 'BLESSING_SELECT', 
+                },
+                lastActivityAt: Date.now(),
+            });
+        }
+
         const nodeType = await this.decideNextNode(run);
         // Streak is tracked by category, not exact type: two combat-tier
         // nodes in a row (e.g. COMBAT then ELITE) count toward the same
@@ -715,6 +737,9 @@ export class AdventureRunService extends BaseService {
             currentNodeType: nodeType,
             lastNodeType: nodeType,
             nodeTypeStreak,
+            nodeTypeHistory: {
+                ...run.nodeTypeHistory, [stageNodeIndex]: nodeType, 
+            },
             lastActivityAt: Date.now(),
         };
         if (!run.stageCombatEncountered && isCombatNodeType(nodeType)) {
@@ -875,26 +900,14 @@ export class AdventureRunService extends BaseService {
      * (single-stage-run-settlement — one Stage = one run), skipping
      * BLESSING_SELECT entirely even if blessingPoints has reached the
      * threshold (picking a Blessing the run won't live to use is pointless).
-     * Any other node just advances stageNodeIndex, or routes into
-     * BLESSING_SELECT once enough blessingPoints have accumulated.
+     * Any other node just advances stageNodeIndex and moves to EXPLORING —
+     * whether the next node turns out to be a Blessing pick is decided later,
+     * in advanceFromExploring, once the player is actually on that node (見
+     * advanceFromExploring 的說明).
      */
     private async advanceFromResolution(run: AdventureRun): Promise<{ run: AdventureRun; settlement?: SettleSummary }> {
         if (run.currentNodeType === NodeType.BOSS) {
             return this.settleRun(run, AdventureEndReason.COMPLETED);
-        }
-
-        if (run.blessingPoints >= NODE_CONFIG.BLESSING_POINTS_THRESHOLD) {
-            const character = await this.characterRepo.getByIdOrThrow(run.characterId, 'character');
-            const candidates = await this.blessingService.generateCandidates(
-                run.runId, character.attributes.LUCK, run.blessings,
-            );
-
-            const updated = await this.runRepo.saveCheckpoint(run.runId, {
-                state: AdventureStateType.BLESSING_SELECT,
-                currentNodeData: { candidates },
-                lastActivityAt: Date.now(),
-            });
-            return { run: updated };
         }
 
         const { stageNodeIndex } = resolveStageFields(run);
