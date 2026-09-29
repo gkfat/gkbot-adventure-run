@@ -7,6 +7,38 @@ const bgmEnabled = ref(true);
 const sfxEnabled = ref(true);
 const error = ref<string | null>(null);
 
+const DEFAULT_VOLUME = 0.5;
+const BGM_VOLUME_STORAGE_KEY = 'audio.bgmVolume';
+const SFX_VOLUME_STORAGE_KEY = 'audio.sfxVolume';
+
+/**
+ * 讀取 localStorage 中的音量（0~1）。音量只存在使用者這個裝置的瀏覽器，
+ * 讀取失敗（隱私模式、被封鎖）或內容不是合法數值時回退為預設值。
+ */
+function loadVolume(key: string): number {
+    try {
+        const raw = localStorage.getItem(key);
+        if (raw === null) return DEFAULT_VOLUME;
+        const value = Number(raw);
+        if (!Number.isFinite(value)) return DEFAULT_VOLUME;
+        return Math.min(1, Math.max(0, value));
+    } catch (err) {
+        console.warn('[useAudio] Failed to read volume:', key, err);
+        return DEFAULT_VOLUME;
+    }
+}
+
+function saveVolume(key: string, value: number): void {
+    try {
+        localStorage.setItem(key, String(value));
+    } catch (err) {
+        console.warn('[useAudio] Failed to save volume:', key, err);
+    }
+}
+
+const bgmVolume = ref(typeof localStorage === 'undefined' ? DEFAULT_VOLUME : loadVolume(BGM_VOLUME_STORAGE_KEY));
+const sfxVolume = ref(typeof localStorage === 'undefined' ? DEFAULT_VOLUME : loadVolume(SFX_VOLUME_STORAGE_KEY));
+
 /**
  * 所有會被 playSfx() 用到的音效檔名，需與 public/audio/sfx/ 目錄內容同步。
  * 用來在 unlockAudioPlayback() 時預先建立並解鎖每個音效各自的 Audio 物件——
@@ -69,6 +101,7 @@ function playBgm(track: string): void {
         stopBgm();
         const audio = new Audio(`/audio/bgm/${track}`);
         audio.loop = true;
+        audio.volume = bgmVolume.value;
         currentBgm = audio;
         audio.play().catch((err) => {
             console.warn('[useAudio] Failed to play BGM:', track, err);
@@ -106,6 +139,7 @@ function playSfx(sound: string): void {
     try {
         const audio = getPooledSfx(sound);
         audio.currentTime = 0;
+        audio.volume = sfxVolume.value;
         audio.play().catch((err) => {
             console.warn('[useAudio] Failed to play SFX:', sound, err);
         });
@@ -248,6 +282,23 @@ export const useAudio = () => {
     };
 
     /**
+     * 調整 BGM 音量（0~1），立即套用到播放中的曲目並存入 localStorage
+     */
+    const setBgmVolume = (value: number): void => {
+        bgmVolume.value = Math.min(1, Math.max(0, value));
+        if (currentBgm) currentBgm.volume = bgmVolume.value;
+        saveVolume(BGM_VOLUME_STORAGE_KEY, bgmVolume.value);
+    };
+
+    /**
+     * 調整 SFX 音量（0~1），存入 localStorage；下次播放音效時套用
+     */
+    const setSfxVolume = (value: number): void => {
+        sfxVolume.value = Math.min(1, Math.max(0, value));
+        saveVolume(SFX_VOLUME_STORAGE_KEY, sfxVolume.value);
+    };
+
+    /**
      * 清除錯誤訊息（例如錯誤提示關閉時呼叫）
      */
     const clearError = (): void => {
@@ -269,8 +320,12 @@ export const useAudio = () => {
         bgmEnabled: computed(() => bgmEnabled.value),
         sfxEnabled: computed(() => sfxEnabled.value),
         error: computed(() => error.value),
+        bgmVolume: computed(() => bgmVolume.value),
+        sfxVolume: computed(() => sfxVolume.value),
 
         fetchSettings,
+        setBgmVolume,
+        setSfxVolume,
         toggleBgm,
         toggleSfx,
         playBgm,

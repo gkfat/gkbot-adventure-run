@@ -9,7 +9,7 @@
             音效設定
         </div>
 
-        <div class="d-flex align-center justify-space-between mb-3">
+        <div class="d-flex align-center justify-space-between">
             <span class="text-body-2">背景音樂</span>
             <button
                 type="button"
@@ -25,6 +25,20 @@
                 />
             </button>
         </div>
+
+        <v-slider
+            :model-value="Math.round(bgmVolume * 100)"
+            :min="0"
+            :max="100"
+            :step="1"
+            :disabled="!bgmEnabled"
+            color="primary"
+            density="compact"
+            hide-details
+            aria-label="背景音樂音量"
+            class="mb-2"
+            @update:model-value="setBgmVolume($event / 100)"
+        />
 
         <div class="d-flex align-center justify-space-between">
             <span class="text-body-2">音效</span>
@@ -42,6 +56,19 @@
                 />
             </button>
         </div>
+
+        <v-slider
+            :model-value="Math.round(sfxVolume * 100)"
+            :min="0"
+            :max="100"
+            :step="1"
+            :disabled="!sfxEnabled"
+            color="primary"
+            density="compact"
+            hide-details
+            aria-label="音效音量"
+            @update:model-value="setSfxVolume($event / 100)"
+        />
 
         <div
             v-if="error"
@@ -68,7 +95,8 @@ defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const {
-    bgmEnabled, sfxEnabled, error, toggleBgm, toggleSfx,
+    bgmEnabled, sfxEnabled, error, bgmVolume, sfxVolume,
+    toggleBgm, toggleSfx, setBgmVolume, setSfxVolume,
 } = useAudio();
 </script>
 
